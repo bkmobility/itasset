@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.8 - 관리자 웹 (정적 페이지, Supabase 연동) */
+/* IT 자산관리시스템 v1.9 - 관리자 웹 (정적 페이지, Supabase 연동) */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -35,12 +35,20 @@
   }
   function seenHtml(d) { var s = seen(d); return s.cls ? '<span class="dot" style="background:' + s.cls + '"></span>' + esc(s.txt) : '—'; }
   function badge(t, c) { return '<span class="badge b-' + c + '">' + esc(t) + '</span>'; }
-  function warrantyBadge(d) {
+  function warrantyBadge(d, calc) {
     if (!d) return '—';
-    var n = -dayDiff(d);
-    if (n < 0) return badge('만료됨', 'bad');
-    if (n <= 90) return badge('D-' + n, 'warn');
-    return esc(ymd(d));
+    var n = -dayDiff(d), t = esc(ymd(d)), c = calc ? ' <span class="note" title="제조년월 + 5년으로 계산">계산</span>' : '';
+    if (n < 0) return '<span style="color:#c42b1c;font-weight:600">' + t + ' · 만료</span>' + c;
+    if (n <= 90) return '<span style="color:#d46b08;font-weight:600">' + t + ' · 3개월 이내</span>' + c;
+    return '<span style="color:#1e8e3e">' + t + '</span>' + c;
+  }
+  function warrOf(a) {   // 대장에 보증만료일이 있으면 그 값, 없으면 제조년월 + 5년(제조월 말일)
+    if (a.warranty_end) return { d: a.warranty_end, calc: false };
+    var m = /(\d{4})\D+(\d{1,2})/.exec(String(a.mfg_ym || ''));
+    if (!m) return { d: null, calc: false };
+    var y = +m[1] + 5, mo = +m[2]; if (mo < 1 || mo > 12) return { d: null, calc: false };
+    var e = new Date(y, mo, 0);
+    return { d: e.getFullYear() + '-' + ('0' + (e.getMonth() + 1)).slice(-2) + '-' + ('0' + e.getDate()).slice(-2), calc: true };
   }
   function cpuShort(c) {
     if (!c) return '';
@@ -116,15 +124,16 @@
   }
   function demoDates() {
     var n = new Date(), y = n.getFullYear(), m = n.getMonth();
-    S.employees.forEach(function (e, i) { if (e.joined_at === undefined) { e.joined_at = i < 4 ? dstr(new Date(y, m, 1 + i)) : (i < 8 ? dstr(new Date(y, m - 1, 5 + i)) : null); e.left_at = null; } });
-    var q = S.employees[S.employees.length - 1]; if (q && !q.__d) { q.__d = 1; q.active = false; q.left_at = dstr(new Date(y, m, 2)); }
+    S.employees.forEach(function (e, i) { if (e.joined_at === undefined) { e.joined_at = i < 4 ? dstr(new Date(y, m, 1 + i)) : (i < 8 ? dstr(new Date(y, m - 1, 5 + i)) : null); e.left_at = null; e.joined_est = i < 2; e.left_est = false; } });
+    var q = S.employees[S.employees.length - 1]; if (q && !q.__d) { q.__d = 1; q.active = false; q.left_at = dstr(new Date(y, m, 2)); q.left_est = true; }
   }
   async function loadAll() {
-    if (DEMO) { var d = demoData(); S.assets = d.assets.map(function (a) { return a; }); S.employees = d.employees; S.devices = d.devices; S.history = d.history; S.support = d.support; S.imports = S.imports || []; S.dates = true; demoDates(); rebuildAssets(); return; }
+    if (DEMO) { var d = demoData(); S.assets = d.assets.map(function (a) { return a; }); S.employees = d.employees; S.devices = d.devices; S.history = d.history; S.support = d.support; S.imports = S.imports || []; S.dates = true; S.est = true; demoDates(); rebuildAssets(); return; }
     var res = await Promise.all([fetchAll('assets', 'asset_no'), fetchAll('employees', 'emp_no'), fetchAll('devices', 'mac'),
       sb.from('asset_history').select('*').order('created_at', { ascending: false }).limit(50)]);
     S.assets = res[0]; S.employees = res[1]; S.devices = res[2]; S.history = res[3].data || [];
     var dr = await sb.from('employees').select('joined_at,left_at').limit(1); S.dates = !dr.error;
+    var er = await sb.from('employees').select('joined_est,left_est').limit(1); S.est = !er.error;
     var ir = await sb.from('employee_imports').select('*').order('applied_at', { ascending: false }).limit(50);
     S.impErr = !!ir.error; S.imports = ir.error ? [] : ir.data;   // v1.6 DB 업데이트 전에도 나머지 화면은 동작
     var sr = await sb.from('support_requests').select('*').order('created_at', { ascending: false }).limit(300);
@@ -138,7 +147,7 @@
     S.empBy = empBy;
     S.assets.forEach(function (a) {
       var d = devBy[a.asset_no], e = d && d.emp_no ? empBy[d.emp_no] : null;
-      a._dev = d || null; a._emp = e || null;
+      a._dev = d || null; a._emp = e || null; var w = warrOf(a); a.warr_end = w.d; a.warr_calc = w.calc;
       a.pc_name = d ? d.computer_name : null; a.ip = d ? d.ip : null; a.cpu = d ? d.cpu : null; a.ram_gb = d ? d.ram_gb : null;
       a.storage = d ? d.storage : null; a.os = d ? d.os : null; a.gpu = d ? d.gpu : null; a.mac = d ? d.mac : null; a.last_seen = d ? d.last_seen : null;
       a.user_mismatch = !!(a.user_name && e && a.user_name !== e.name && a.user_name.charAt(0) !== '(');
@@ -181,7 +190,7 @@
     var nav = ROUTES.map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '실사(재물조사)', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.8</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="자산번호·사용자·PC 이름·사번 검색 (Enter)" value="' + esc(F.q) + '"><div class="sp"></div><div class="who">' + esc(S.user ? S.user.email : '데모 관리자') + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + html + '</div></div></div>';
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.cat = ''; F.status = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
     var lo = $('#logout'); if (lo) lo.onclick = async function () { await sb.auth.signOut(); location.reload(); };
@@ -220,13 +229,13 @@
     var wr = [];
     A.forEach(function (a) {
       if (/^폐기/.test(a.status || '')) return;
-      var n = a.warranty_end ? -dayDiff(a.warranty_end) : null, yr = isPc(a) ? ageYears(a) : null;
+      var n = a.warr_end ? -dayDiff(a.warr_end) : null, yr = isPc(a) ? ageYears(a) : null;
       var who = (a.user_name || '') + (a.dept ? ' · ' + a.dept : '');
-      if (n != null && n <= 30 && n >= -90) wr.push({ no: a.asset_no, cat: a.category, who: who, date: ymd(a.warranty_end), st: n < 0 ? '만료됨' : 'D-' + n, col: n <= 14 ? '#c42b1c' : '#e9a100', k: n });
+      if (n != null && n <= 30 && n >= -90) wr.push({ no: a.asset_no, cat: a.category, who: who, date: ymd(a.warr_end), st: n < 0 ? '만료됨' : 'D-' + n, col: n <= 14 ? '#c42b1c' : '#e9a100', k: n });
       else if (yr != null && yr >= 5) wr.push({ no: a.asset_no, cat: a.category, who: who, date: '사용 ' + Math.floor(yr) + '년차', st: '교체 권장', col: '#5c5c5c', k: 1000 - yr });
     });
     wr.sort(function (x, y) { return x.k - y.k; });
-    var warrSoon = A.filter(function (a) { if (!a.warranty_end) return false; var n = -dayDiff(a.warranty_end); return n >= 0 && n <= 30; }).length;
+    var warrSoon = A.filter(function (a) { if (!a.warr_end) return false; var n = -dayDiff(a.warr_end); return n >= 0 && n <= 30; }).length;
     // 최근 활동 (자산 변경 이력 + 인사 명단 적용)
     var act = S.history.map(function (h) { return { t: h.created_at, a: h.asset_no || '(미등록 PC)', d: h.detail }; })
       .concat(S.imports.map(function (x) { return { t: x.applied_at, a: '인사 명단' + (x.reverted_at ? ' (되돌림)' : ''), d: (x.file_name || '') + ' · 신규 ' + x.added + ' · 변경 ' + x.changed + ' · 퇴사 ' + x.deactivated }; }))
@@ -284,7 +293,7 @@
     var rows = list.slice((F.page - 1) * PS, F.page * PS).map(function (a) {
       return '<tr class="clk" data-no="' + esc(a.asset_no) + '"><td><input type="checkbox" class="sel" data-no="' + esc(a.asset_no) + '"' + (F.sel[a.asset_no] ? ' checked' : '') + '></td>' +
         '<td class="mono">' + esc(a.asset_no) + '</td><td>' + esc(a.category) + '</td><td>' + esc(a.manufacturer) + '</td><td>' + esc(a.model) + '</td><td>' + esc(a.mfg_ym) + '</td><td>' + esc(a.status) + '</td>' +
-        '<td>' + esc(a.user_name) + (a.user_mismatch ? ' ' + badge('불일치', 'warn') : '') + '</td><td>' + esc(a.dept) + '</td><td>' + esc(a.title) + '</td><td>' + warrantyBadge(a.warranty_end) + '</td>' +
+        '<td>' + esc(a.user_name) + (a.user_mismatch ? ' ' + badge('불일치', 'warn') : '') + '</td><td>' + esc(a.dept) + '</td><td>' + esc(a.title) + '</td><td>' + warrantyBadge(a.warr_end, a.warr_calc) + '</td>' +
         '<td class="auto">' + esc(a.pc_name || '—') + '</td><td class="auto mono">' + esc(a.ip || '—') + '</td><td class="auto">' + esc(specStr(a)) + '</td><td class="auto">' + seenHtml(a.last_seen) + '</td></tr>';
     }).join('') || '<tr><td colspan="15" class="note" style="padding:24px;text-align:center">조건에 맞는 자산이 없습니다.</td></tr>';
     var nsel = Object.keys(F.sel).length;
@@ -295,10 +304,14 @@
       '<button class="btn" id="xl">엑셀 다운로드</button></div>' +
       '<div class="note" style="margin:6px 0">기존 시스템 항목 · <span style="color:#0f6cbd">파란 배경 = 프로그램이 자동으로 채우는 항목</span> · <span class="dot" style="background:#1e8e3e"></span>오늘 <span class="dot" style="background:#faad14"></span>3일 이상 <span class="dot" style="background:#c42b1c"></span>7일 이상 미확인</div>' +
       (nsel ? '<div class="bulk"><b>' + nsel + '개 선택됨</b><span>|</span><button class="btn sm" id="b-status">상태 변경</button><button class="btn sm" id="b-qr">QR코드 출력</button><button class="btn sm" id="b-xl">선택 항목 엑셀</button><button class="btn sm" id="b-clear">선택 해제</button></div>' : '') +
-      '<div style="overflow:auto"><table class="tbl"><thead><tr><th><input type="checkbox" id="all"></th><th>관리번호</th><th>자산분류</th><th>제조사</th><th>모델명</th><th>제조년월</th><th>자산상태</th><th>사용자명</th><th>소속명</th><th>직책</th><th>보증</th><th class="auto">컴퓨터 이름</th><th class="auto">IP</th><th class="auto">사양 (CPU / RAM / 저장)</th><th class="auto">최종 확인</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div style="overflow:auto"><table class="tbl"><thead><tr><th><input type="checkbox" id="all"></th><th>관리번호</th><th>자산분류</th><th>제조사</th><th>모델명</th><th>제조년월</th><th>자산상태</th><th>사용자명</th><th>소속명</th><th>직책</th><th>보증 (제조년월+5년)</th><th class="auto">컴퓨터 이름</th><th class="auto">IP</th><th class="auto">사양 (CPU / RAM / 저장)</th><th class="auto">최종 확인</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="pager"><span>' + (list.length ? ((F.page - 1) * PS + 1) + '–' + Math.min(list.length, F.page * PS) : 0) + ' / ' + list.length.toLocaleString() + '건</span><span><button class="btn sm" id="prev"' + (F.page <= 1 ? ' disabled' : '') + '>‹ 이전</button> ' + F.page + ' / ' + pages + ' <button class="btn sm" id="next"' + (F.page >= pages ? ' disabled' : '') + '>다음 ›</button></span></div>');
     function sel(id, ph, opts, cur) { return '<select id="' + id + '"><option value="">' + ph + '</option>' + opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>'; }
-    var qEl = $('#q'); qEl.oninput = function () { F.q = qEl.value; F.page = 1; var pos = qEl.selectionStart; pageAssets(); var n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); };
+    var qEl = $('#q'), qComp = false;
+    function qGo() { F.q = qEl.value; F.page = 1; var pos = qEl.selectionStart; pageAssets(); var n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); }
+    qEl.addEventListener('compositionstart', function () { qComp = true; });
+    qEl.addEventListener('compositionend', function () { qComp = false; qGo(); });
+    qEl.oninput = function (e) { if (qComp || (e && e.isComposing)) return; qGo(); };
     ['cat', 'status', 'collect'].forEach(function (id) { $('#' + id).onchange = function (e) { F[id] = e.target.value; F.page = 1; pageAssets(); }; });
     $('#prev').onclick = function () { F.page--; pageAssets(); }; $('#next').onclick = function () { F.page++; pageAssets(); };
     $('#all').onchange = function (e) { list.slice((F.page - 1) * PS, F.page * PS).forEach(function (a) { if (e.target.checked) F.sel[a.asset_no] = 1; else delete F.sel[a.asset_no]; }); pageAssets(); };
@@ -359,6 +372,15 @@
   }
 
   // ---------- PC 점검 ----------
+  function cpuYear(c) {   // CPU 이름에서 출시 연도를 추정 (모르면 null)
+    c = String(c || ''); var m;
+    if ((m = /Core\(TM\)\s*Ultra/i.exec(c))) return 2024;
+    if ((m = /i[3579]-\s*(\d{4,5})/i.exec(c))) { var n = m[1], g = n.length === 5 ? +n.slice(0, 2) : +n.slice(0, 1);
+      var T = { 2: 2011, 3: 2012, 4: 2013, 5: 2015, 6: 2015, 7: 2017, 8: 2017, 9: 2018, 10: 2020, 11: 2021, 12: 2021, 13: 2022, 14: 2023 }; return T[g] || null; }
+    if ((m = /Ryzen\s*\d\s*(?:PRO\s*)?(\d)\d{3}/i.exec(c))) { var R = { 1: 2017, 2: 2018, 3: 2019, 4: 2021, 5: 2021, 6: 2022, 7: 2022, 8: 2024, 9: 2024 }; return R[m[1]] || null; }
+    return null;
+  }
+  function assetYear(a) { var m = /(\d{4})/.exec(String(a.mfg_ym || a.purchase_date || '')); return m ? +m[1] : null; }
   function pageCheck(tab) {
     tab = tab || 'mismatch';
     var hold = getHold();
@@ -376,12 +398,32 @@
     } else {
       var linked = {}; S.devices.forEach(function (d) { if (d.asset_no) linked[d.asset_no] = 1; });
       var free = S.assets.filter(function (a) { return isPc(a) && !linked[a.asset_no]; });
-      body = '<div class="note">프로그램은 실행됐지만 대장의 관리번호(QR 스티커 번호)와 연결되지 않은 PC입니다. 관리번호를 입력해 연결하세요.</div><datalist id="free">' + free.slice(0, 800).map(function (a) { return '<option value="' + esc(a.asset_no) + '">' + esc((a.user_name || '') + ' ' + (a.model || '')) + '</option>'; }).join('') + '</datalist>' +
-        '<table class="tbl" style="margin-top:10px"><thead><tr><th>컴퓨터 이름</th><th>MAC</th><th>IP</th><th>실행 사번 / 성명</th><th>최종 확인</th><th>후보</th><th>관리번호 연결</th></tr></thead><tbody>' +
-        (unreg.map(function (d) {
-          var e = S.empBy[d.emp_no], cand = free.filter(function (a) { return e && a.user_name === e.name; }).map(function (a) { return a.asset_no; }).join(', ');
-          return '<tr><td>' + esc(d.computer_name) + '</td><td class="mono">' + esc(d.mac) + '</td><td class="mono">' + esc(d.ip) + '</td><td>' + esc(d.emp_no) + ' / ' + esc(e ? e.name : '?') + '</td><td>' + seenHtml(d.last_seen) + '</td><td class="mono">' + esc(cand || '—') + '</td><td><input type="text" list="free" class="ln" data-id="' + esc(d.id) + '" placeholder="A-PC-000000" style="width:130px" value="' + esc(cand.split(',')[0] || '') + '"> <button class="btn sm pri link" data-id="' + esc(d.id) + '">연결</button></td></tr>';
-        }).join('') || '<tr><td colspan="7" class="note" style="padding:20px;text-align:center">미등록 PC가 없습니다.</td></tr>') + '</tbody></table>';
+      S.skip = S.skip || {};
+      function fld(k, v) { return '<div class="uk"><div class="note">' + k + '</div><b>' + esc(v || '—') + '</b></div>'; }
+      body = '<div class="note">프로그램은 실행됐지만 대장의 관리번호(QR 스티커 번호)와 연결되지 않은 PC입니다. 수집한 사양과 대장 정보를 비교해 연결하세요.</div><datalist id="free">' + free.slice(0, 800).map(function (a) { return '<option value="' + esc(a.asset_no) + '">' + esc((a.user_name || '') + ' ' + (a.model || '')) + '</option>'; }).join('') + '</datalist>' +
+        (unreg.filter(function (d) { return !S.skip[d.id]; }).map(function (d) {
+          var e = S.empBy[d.emp_no], cy = cpuYear(d.cpu);
+          var cands = free.filter(function (a) { return e && a.user_name === e.name; }).map(function (a) {
+            var ay = assetYear(a), ok = null, diff = null;
+            if (cy && ay) { diff = ay - cy; ok = diff >= 0 && diff <= 3 ? true : (diff < 0 || diff > 5 ? false : null); }
+            return { a: a, ay: ay, ok: ok, diff: diff };
+          });
+          var best = null; cands.forEach(function (c) { if (c.ok === true && (!best || c.diff < best.diff)) best = c; });
+          var sel = best || cands[0] || null;
+          var cards = cands.length ? cands.map(function (c) {
+            var why = c.ok === true ? '<span style="color:#1e8e3e">CPU 출시 ' + cy + '년 → 제조년월 ' + esc(c.a.mfg_ym || '') + '과 <b>시기 일치</b></span>' :
+              c.ok === false ? '<span style="color:#c42b1c">CPU 출시(' + cy + '년)와 이 PC의 제조 시기(' + c.ay + '년)가 맞지 않음 → <b>시기 불일치</b></span>' :
+              '<span class="note">' + (cy ? '시기를 판단하기 어렵습니다.' : '수집된 CPU로 출시 연도를 알 수 없어 비교하지 않았습니다.') + '</span>';
+            return '<label class="ucand' + (sel === c ? ' on' : '') + '"><div class="ut"><input type="radio" name="pk' + esc(d.id) + '" value="' + esc(c.a.asset_no) + '"' + (sel === c ? ' checked' : '') + '> <b class="mono">' + esc(c.a.asset_no) + '</b>' + (best === c ? ' ' + badge('추천', 'ok') : '') + '</div>' +
+              '<div style="font-size:12px;line-height:1.7">' + esc(c.a.manufacturer || '') + ' ' + esc(c.a.model || '') + ' · 제조년월 ' + esc(c.a.mfg_ym || '—') + ' · 구매일 ' + esc(c.a.purchase_date ? ymd(c.a.purchase_date) : '—') + '<br>소속 ' + esc(c.a.dept || '—') + ' · ' + esc(c.a.title || '') + ' · 상태 ' + esc(c.a.status || '') + '</div><div class="uw">' + why + '</div></label>';
+          }).join('') : '<div class="note">같은 사용자(' + esc(e ? e.name : '?') + ') 명의의 연결 가능한 PC가 대장에 없습니다. 아래에 관리번호를 직접 입력하세요.</div>';
+          return '<div class="card ucard" data-id="' + esc(d.id) + '"><div style="margin-bottom:8px"><b style="font-size:14px">' + esc(d.computer_name) + '</b> <span class="note">프로그램 실행: ' + seenHtml(d.last_seen) + ' · 사번 ' + esc(d.emp_no) + ' / ' + esc(e ? e.name : '?') + '</span></div>' +
+            '<div class="uspec">' + fld('CPU', d.cpu) + fld('RAM', d.ram_gb ? d.ram_gb + ' GB' : '') + fld('그래픽카드', d.gpu) + fld('저장장치', d.storage) + fld('Windows', d.os) + fld('MAC', d.mac) + fld('IP', d.ip) + '</div>' +
+            '<div style="font-size:12px;font-weight:600;margin:10px 0 6px">연결할 관리번호 선택' + (cands.length > 1 ? ' <span class="note" style="font-weight:400">· 같은 사용자 명의의 PC ' + cands.length + '대입니다. 수집한 사양과 대장 정보를 비교해 보세요</span>' : '') + '</div>' +
+            '<div class="ucands">' + cards + '</div>' +
+            '<div class="row" style="margin-top:10px"><span class="note">목록에 없으면</span><input type="text" list="free" class="ln" data-id="' + esc(d.id) + '" placeholder="관리번호 직접 입력" style="width:190px"><span class="grow"></span><button class="btn skip" data-id="' + esc(d.id) + '">건너뛰기</button><button class="btn pri link" data-id="' + esc(d.id) + '">' + (sel ? esc(sel.a.asset_no) + ' 으로 연결' : '연결') + '</button></div></div>';
+        }).join('') || '<div class="note" style="padding:20px;text-align:center">미등록 PC가 없습니다.</div>') +
+        '<div class="note">추천은 참고용입니다. CPU 출시 연도와 대장의 제조년월·구매일을 비교해 가장 가까운 후보를 미리 선택해 둡니다. 연결 후에는 이 PC에서 프로그램을 실행할 때마다 해당 자산이 자동으로 갱신됩니다.</div>';
     }
     shell('check', '<h1>PC 점검</h1><div class="tabs">' + tabA('mismatch', '사용자 불일치', mism.length) + tabA('stale', '7일 이상 미확인', stale.length) + tabA('unreg', '미등록 PC', unreg.length) + '</div>' + body);
     $$('.fix').forEach(function (b) { b.onclick = async function () {
@@ -390,8 +432,10 @@
         await dbUpdateAsset(a.asset_no, { user_name: e.name, user_id: e.emp_no, dept: e.dept, title: e.title }); toast('대장을 수정했습니다.'); pageCheck('mismatch'); } catch (er) { fail(er); }
     }; });
     $$('.hold').forEach(function (b) { b.onclick = function () { var h = getHold(); h[b.dataset.no] = 1; setHold(h); pageCheck('mismatch'); }; });
+    $$('.skip').forEach(function (b) { b.onclick = function () { S.skip = S.skip || {}; S.skip[b.dataset.id] = 1; pageCheck('unreg'); }; });
+    $$('.ucand input').forEach(function (r) { r.onchange = function () { var card = r.closest('.ucard'); card.querySelectorAll('.ucand').forEach(function (x) { x.classList.remove('on'); }); r.closest('.ucand').classList.add('on'); card.querySelector('.link').textContent = r.value + ' 으로 연결'; }; });
     $$('.link').forEach(function (b) { b.onclick = async function () {
-      var no = $('.ln[data-id="' + b.dataset.id + '"]').value.trim();
+      var rd = document.querySelector('input[name="pk' + b.dataset.id + '"]:checked'), no = ($('.ln[data-id="' + b.dataset.id + '"]').value.trim()) || (rd ? rd.value : '');
       var a = S.assets.filter(function (x) { return x.asset_no === no; })[0];
       if (!a) { toast('대장에 없는 관리번호입니다.'); return; }
       if (S.devices.some(function (d) { return d.asset_no === no; })) { toast('이미 다른 PC와 연결된 관리번호입니다.'); return; }
@@ -576,28 +620,35 @@
         try {
           var p = parseSheet(rd.result, EMP_MAP, 'emp_no'), pv = $('#pv_wide');
           if (p.cols.indexOf('emp_no') < 0 || p.cols.indexOf('name') < 0) { pv.innerHTML = '<div class="err">필수 항목(사번 또는 인사ID, 성명 또는 이름)을 찾지 못했습니다. 항목 이름 줄을 확인하세요.</div>'; return; }
+          var baseD = firstOfMonth();
           function draw(deact) {
             var plan = planEmployees(p, deact);
             var outPct = act ? plan.outs.length / act : 0;
             var sum = '<div class="kpis"><div class="kpi ok"><div class="t">신규</div><div class="n">+' + plan.news.length + '</div></div><div class="kpi warn"><div class="t">변경</div><div class="n">' + plan.chgs.length + '</div></div><div class="kpi bad"><div class="t">퇴사(명단에서 빠짐)</div><div class="n">' + plan.outs.length + '</div></div><div class="kpi"><div class="t">오류·제외</div><div class="n">' + (plan.errs.length + p.skipped) + '</div><div class="s">동일 ' + plan.same + '명</div></div></div>';
             var rows = [];
-            plan.chgs.forEach(function (x) { rows.push([x.r.emp_no, x.r.name, x.r.dept, x.r.team, x.r.title, x.r.sales_title, x.r.ext_no, tagH('변경 · ' + x.diffs.map(function (d) { return DF[d]; }).join('·'), 'warn')]); });
-            plan.news.forEach(function (x) { rows.push([x.r.emp_no, x.r.name, x.r.dept, x.r.team, x.r.title, x.r.sales_title, x.r.ext_no, tagH('신규', 'ok')]); });
-            plan.outs.forEach(function (x) { rows.push([x.c.emp_no, x.c.name, x.c.dept, x.c.team, x.c.title, x.c.sales_title, x.c.ext_no, tagH('퇴사 · 명단에서 빠짐', 'bad')]); });
-            var shown = rows.slice(0, 200).map(function (r) { return '<tr><td class="mono">' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + esc(r[2] || '') + '</td><td>' + esc(r[3] || '') + '</td><td>' + esc(r[4] || '') + '</td><td>' + esc(r[5] || '') + '</td><td>' + esc(r[6] || '') + '</td><td>' + r[7] + '</td></tr>'; }).join('') || '<tr><td colspan="8" class="note" style="padding:14px;text-align:center">바뀌는 내용이 없습니다.</td></tr>';
+            plan.chgs.forEach(function (x) { rows.push([x.r.emp_no, x.r.name, x.r.dept, x.r.team, x.r.title, '', '', tagH('변경 · ' + x.diffs.map(function (d) { return DF[d]; }).join('·'), 'warn')]); });
+            plan.news.forEach(function (x) { rows.push([x.r.emp_no, x.r.name, x.r.dept, x.r.team, x.r.title, (S.dates ? (x.r.joined_at ? esc(x.r.joined_at) : esc(baseD) + ' <span class="note">예상</span>') : ''), '', tagH('신규', 'ok')]); });
+            plan.outs.forEach(function (x) { rows.push([x.c.emp_no, x.c.name, x.c.dept, x.c.team, x.c.title, '', (S.dates ? esc(prevDay(baseD)) + ' <span class="note">예상</span>' : ''), tagH('퇴사 · 명단에서 빠짐', 'bad')]); });
+            var shown = rows.slice(0, 200).map(function (r) { return '<tr><td class="mono">' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + esc(r[2] || '') + '</td><td>' + esc(r[3] || '') + '</td><td>' + esc(r[4] || '') + '</td><td>' + (r[5] || '') + '</td><td>' + (r[6] || '') + '</td><td>' + r[7] + '</td></tr>'; }).join('') || '<tr><td colspan="8" class="note" style="padding:14px;text-align:center">바뀌는 내용이 없습니다.</td></tr>';
             var err = plan.errs.length ? '<div class="err" style="margin:6px 0">오류 ' + plan.errs.length + '건은 제외됩니다: ' + esc(plan.errs.slice(0, 5).join(', ')) + (plan.errs.length > 5 ? ' …' : '') + '</div>' : '';
             var big = deact && outPct > 0.3 ? '<div class="err" style="margin:6px 0">퇴사 처리가 재직 인원의 ' + Math.round(outPct * 100) + '%입니다. 일부 인원만 담긴 파일이 아닌지 확인하세요. 아래 체크를 눌러야 적용할 수 있습니다.<br><label><input type="checkbox" id="emp_ok"> 확인했습니다</label></div>' : '';
             var total = plan.news.length + plan.chgs.length + plan.outs.length;
             pv.innerHTML = '<div class="card"><h3>인사 대장 미리보기 <span class="note" style="font-weight:400">· ' + esc(f.name) + ' · ' + p.rows.length.toLocaleString() + '명 인식' + (p.skipped ? ' · 사번 없는 행 ' + p.skipped + '건 제외' : '') + '</span></h3>' + sum +
+              (S.dates ? '<div class="basebox"><b>명단 기준일</b><input type="date" id="emp_base" value="' + baseD + '"><span class="chips"><button class="chip' + (baseD === firstOfMonth() ? ' on' : '') + '" data-bd="cur">이번 달 1일</button><button class="chip" data-bd="next">다음 달 1일</button></span><span class="note" style="flex:1;min-width:300px">이 명단을 뽑은 날짜입니다. 새로 나온 사람의 <b>입사일 = 기준일(' + esc(baseD) + ')</b>, 빠진 사람의 <b>퇴사일 = 기준일 전날(' + esc(prevDay(baseD)) + ')</b>로 기록합니다(예상). 엑셀에 입사일 열이 있으면 그 값을 우선합니다.</span></div>' : '') +
               '<label style="font-size:12px;display:block;margin:6px 0"><input type="checkbox" id="emp_deact"' + (deact ? ' checked' : '') + '> 파일에 없는 사번은 퇴사 처리(사번 확인 불가)</label>' + err + big +
-              '<div style="overflow:auto;max-height:340px"><table class="tbl"><thead><tr><th>사번(인사ID)</th><th>이름</th><th>조직명</th><th>본부/팀</th><th>호칭</th><th>영업직책</th><th>내선</th><th>상태</th></tr></thead><tbody>' + shown + '</tbody></table></div>' + (rows.length > 200 ? '<div class="note">상위 200건만 표시 (전체 ' + rows.length + '건 모두 적용됩니다)</div>' : '') +
-              '<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="emp_cancel">취소</button><button class="btn pri" id="emp_go"' + (total ? '' : ' disabled') + '>적용 (신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ')</button></div></div>';
+              '<div style="overflow:auto;max-height:340px"><table class="tbl"><thead><tr><th>사번(인사ID)</th><th>이름</th><th>조직명</th><th>본부/팀</th><th>호칭</th><th>입사일</th><th>퇴사일</th><th>상태</th></tr></thead><tbody>' + shown + '</tbody></table></div>' + (rows.length > 200 ? '<div class="note">상위 200건만 표시 (전체 ' + rows.length + '건 모두 적용됩니다)</div>' : '') +
+              '<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="emp_cancel">취소</button><button class="btn pri" id="emp_go"' + (total ? '' : ' disabled') + '>적용 (' + (S.dates ? '기준일 ' + esc(baseD) + ' · ' : '') + '신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ')</button></div></div>';
             $('#emp_deact').onchange = function () { draw(this.checked); };
+            var bi = $('#emp_base');
+            if (bi) {
+              bi.onchange = function () { if (/^\d{4}-\d{2}-\d{2}$/.test(this.value)) { baseD = this.value; draw($('#emp_deact').checked); } };
+              $$('[data-bd]').forEach(function (b) { b.onclick = function () { var n = new Date(); baseD = b.dataset.bd === 'next' ? dstr(new Date(n.getFullYear(), n.getMonth() + 1, 1)) : firstOfMonth(); draw($('#emp_deact').checked); }; });
+            }
             $('#emp_cancel').onclick = function () { pv.innerHTML = ''; $('#f_emp').value = ''; };
             $('#emp_go').onclick = async function () {
               var ok = $('#emp_ok'); if (big && !(ok && ok.checked)) { toast('퇴사 비율이 높습니다. 확인 체크가 필요합니다.'); return; }
               var btn = this; btn.disabled = true; btn.textContent = '적용 중…';
-              try { await applyEmployees(plan, f.name, p.cols); toast('적용했습니다. (신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ')'); pageData(); $('#pv_wide').innerHTML = '<div class="badge b-ok">완료: 인사 대장 (신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ') — 인사 명단 > 적용 이력에서 되돌릴 수 있습니다.</div>'; }
+              try { await applyEmployees(plan, f.name, p.cols, S.dates ? baseD : null); toast('적용했습니다. (신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ')'); pageData(); $('#pv_wide').innerHTML = '<div class="badge b-ok">완료: 인사 대장 (신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ') — 인사 명단 > 적용 이력에서 되돌릴 수 있습니다.</div>'; }
               catch (er) { fail(er); btn.disabled = false; btn.textContent = '다시 시도'; }
             };
           }
@@ -612,7 +663,10 @@
   var EMP_FIELDS = ['name', 'dept', 'team', 'title', 'sales_title', 'duty', 'ext_no', 'address'];
   function EF() { return S.dates ? EMP_FIELDS.concat(['joined_at', 'left_at']) : EMP_FIELDS; }
   function tdy() { return ymd(new Date()); }
-  function empSnap(c) { var o = { emp_no: c.emp_no, active: c.active !== false }; EF().forEach(function (f) { o[f] = c[f] == null ? null : c[f]; }); return o; }
+  function estH(e, k) { return (S.est && e[k + '_est'] && e[k + '_at']) ? ' <span class="note" title="엑셀 명단 기준일로 추정한 날짜입니다. [수정]에서 직접 입력하면 사라집니다.">예상</span>' : ''; }
+  function prevDay(d) { var x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() - 1); return x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2) + '-' + ('0' + x.getDate()).slice(-2); }
+  function firstOfMonth() { var n = new Date(); return n.getFullYear() + '-' + ('0' + (n.getMonth() + 1)).slice(-2) + '-01'; }
+  function empSnap(c) { var o = { emp_no: c.emp_no, active: c.active !== false }; EF().forEach(function (f) { o[f] = c[f] == null ? null : c[f]; }); if (S.est) { o.joined_est = !!c.joined_est; o.left_est = !!c.left_est; } return o; }
   var EMPV = { q: '', st: 'all', from: null, to: null, chip: '이번 달' };
   function pad2(n) { return ('0' + n).slice(-2); }
   function dstr(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
@@ -656,21 +710,23 @@
   }
   var DF = { name: '이름', dept: '조직명', team: '본부/팀', title: '호칭', sales_title: '영업직책', duty: '업무', ext_no: '내선', address: '주소', joined_at: '입사일', active: '재직 복귀' };
   function tagH(t, k) { return '<span class="badge b-' + k + '">' + esc(t) + '</span>'; }
-  async function applyEmployees(plan, fileName, cols) {
-    var before = [], addedKeys = [], now = new Date().toISOString(), td = tdy();
+  async function applyEmployees(plan, fileName, cols, baseDate) {
+    var before = [], addedKeys = [], now = new Date().toISOString(), td = baseDate || tdy(), outD = baseDate ? prevDay(baseDate) : tdy();
     var up = [];
     function mk(x, base) {
       var o = { emp_no: x.r.emp_no, active: true, updated_at: now };
       EMP_FIELDS.forEach(function (f) { o[f] = cols.indexOf(f) >= 0 ? (x.r[f] == null ? null : x.r[f]) : (base && base[f] != null ? base[f] : null); });
       if (S.dates) {
-        o.joined_at = cols.indexOf('joined_at') >= 0 && x.r.joined_at ? x.r.joined_at : (base ? (base.joined_at || null) : td);
+        var hasJ = cols.indexOf('joined_at') >= 0 && x.r.joined_at;
+        o.joined_at = hasJ ? x.r.joined_at : (base ? (base.joined_at || null) : td);
         o.left_at = null;
+        if (S.est) { o.joined_est = hasJ ? false : (base ? !!base.joined_est : true); o.left_est = false; }
       }
       return o;
     }
     plan.news.forEach(function (x) { addedKeys.push(x.r.emp_no); up.push(mk(x, null)); });
     plan.chgs.forEach(function (x) { before.push(empSnap(x.c)); up.push(mk(x, x.c)); });
-    plan.outs.forEach(function (x) { before.push(empSnap(x.c)); var o = empSnap(x.c); o.active = false; o.updated_at = now; if (S.dates) o.left_at = td; up.push(o); });
+    plan.outs.forEach(function (x) { before.push(empSnap(x.c)); var o = empSnap(x.c); o.active = false; o.updated_at = now; if (S.dates) o.left_at = outD; if (S.est) o.left_est = true; up.push(o); });
     await dbUpsert('employees', up, 'emp_no');
     var rec = { applied_at: now, applied_by: S.user ? S.user.email : '데모 관리자', file_name: fileName, added: plan.news.length, changed: plan.chgs.length, deactivated: plan.outs.length, added_keys: addedKeys, before_rows: before, reverted_at: null };
     if (!DEMO) { var r = await sb.from('employee_imports').insert(rec).select().single(); if (r.error) throw r.error; rec = r.data; }
@@ -714,7 +770,7 @@
   async function empQuick(no, activate, tab) {
     var c = S.employees.filter(function (e) { return e.emp_no === no; })[0]; if (!c) return;
     if (!confirm(c.name + ' (' + no + ') 님을 ' + (activate ? '재직(복직) 상태로 되돌립니다.' : '퇴사 처리합니다.\n이후 PC 프로그램의 [사번 확인]에서 확인되지 않습니다. (적용 이력에서 되돌릴 수 있습니다)') + '\n계속할까요?')) return;
-    var o = empSnap(c); o.active = !!activate; o.updated_at = new Date().toISOString(); if (S.dates) o.left_at = activate ? null : tdy();
+    var o = empSnap(c); o.active = !!activate; o.updated_at = new Date().toISOString(); if (S.dates) { o.left_at = activate ? null : tdy(); if (S.est) o.left_est = false; }
     try { await saveManual([empSnap(c)], [], [o], '직접 등록 (' + (activate ? '복직' : '퇴사 처리') + ')', [0, activate ? 1 : 0, activate ? 0 : 1]); toast(activate ? '복직 처리했습니다.' : '퇴사 처리했습니다.'); pageEmployees(tab); } catch (er) { fail(er); }
   }
   function empForm(no, tab) {
@@ -746,7 +802,7 @@
       if (!cur && ex && !confirm(key + ' 는 이미 등록된 사번입니다 (' + ex.name + ').\n입력한 내용으로 수정할까요?')) return;
       var o = { emp_no: key, active: ex ? ex.active !== false : true, updated_at: new Date().toISOString() };
       EMP_FIELDS.forEach(function (fl) { o[fl] = fl === 'name' ? nm : (g(fl) || null); });
-      if (S.dates) { var jd = g('joined_at') || null, ld = g('left_at') || null; if (!ex && !jd) jd = tdy(); o.joined_at = jd; o.left_at = ld; }
+      if (S.dates) { var jd = g('joined_at') || null, ld = g('left_at') || null; if (!ex && !jd) jd = tdy(); o.joined_at = jd; o.left_at = ld; if (S.est) { o.joined_est = (ex && jd === ex.joined_at) ? !!ex.joined_est : false; o.left_est = (ex && ld === ex.left_at) ? !!ex.left_est : false; } }
       var btn = this; btn.disabled = true; btn.textContent = '저장 중…';
       try {
         if (ex) await saveManual([empSnap(ex)], [], [o], '직접 등록 (수정)', [0, 1, 0]);
@@ -792,9 +848,9 @@
       var rows = list.sort(function (a, b) { return String(isNew ? b.joined_at : b.left_at).localeCompare(String(isNew ? a.joined_at : a.left_at)); }).slice(0, 300).map(function (e) {
         var pc = devCount(e.emp_no);
         return isNew ?
-          '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(ymd(e.joined_at)) + '</td><td>' + tagH(srcOf(e.emp_no, 'add'), 'gray') + '</td><td>' + (pc ? tagH('연동됨', 'ok') : tagH('미연동', 'warn')) + '</td></tr>' :
-          '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(ymd(e.left_at)) + '</td><td>' + tagH(srcOf(e.emp_no, 'out'), 'gray') + '</td><td>' + (pc ? '<b style="color:#c42b1c">PC ' + pc + '대 회수 필요</b>' : '<span style="color:#1e8e3e">PC 없음</span>') + '</td><td><button class="btn sm" data-rs="' + esc(e.emp_no) + '">복직</button></td></tr>';
-      }).join('') || '<tr><td colspan="9" class="note" style="padding:16px;text-align:center">' + (S.dates ? '이 기간에 해당하는 사람이 없습니다.' : '입사일·퇴사일 열 추가(db/update_v1.8.sql) 후 조회할 수 있습니다.') + '</td></tr>';
+          '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(ymd(e.joined_at)) + estH(e, 'joined') + '</td><td>' + tagH(srcOf(e.emp_no, 'add'), 'gray') + '</td><td>' + (pc ? tagH('연동됨', 'ok') : tagH('미연동', 'warn')) + '</td></tr>' :
+          '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(ymd(e.left_at)) + estH(e, 'left') + '</td><td>' + tagH(srcOf(e.emp_no, 'out'), 'gray') + '</td><td>' + (pc ? '<b style="color:#c42b1c">PC ' + pc + '대 회수 필요</b>' : '<span style="color:#1e8e3e">PC 없음</span>') + '</td><td><button class="btn sm" data-rs="' + esc(e.emp_no) + '">복직</button></td></tr>';
+      }).join('') || '<tr><td colspan="9" class="note" style="padding:16px;text-align:center">' + (S.dates ? '이 기간에 해당하는 사람이 없습니다.' : '입사일·퇴사일 열 추가(db/update_v1.8.sql, update_v1.9.sql) 후 조회할 수 있습니다.') + '</td></tr>';
       body = '<div class="card pbox"><b>기간</b><input type="date" id="p_from" value="' + P[0] + '"><span>~</span><input type="date" id="p_to" value="' + P[1] + '"><span class="chips">' + chips + '</span><span class="grow"></span><span class="note">' + (isNew ? '신규 입사자' : '퇴사자') + ' <b style="font-size:14px;color:#1a1a1a">' + list.length + '명</b></span><button class="btn" id="p_xl">엑셀 내려받기</button></div>' + mbar +
         '<div style="overflow:auto"><table class="tbl">' + th(isNew ? ['사번(인사ID)', '이름', '조직명', '본부/팀', '호칭', '입사일', '등록 방법', 'PC 연동'] : ['사번(인사ID)', '이름', '조직명', '본부/팀', '호칭', '퇴사일', '처리 방법', '사용 PC', '관리']) + '<tbody>' + rows + '</tbody></table></div>' +
         '<div class="note" style="margin-top:6px">' + (isNew ? '입사일은 엑셀의 입사일 항목이 있으면 그 값을, 없으면 명단에 처음 반영한 날(적용일)입니다. 사번 [수정]에서 고칠 수 있습니다. "PC 연동"이 미연동인 사람은 아직 PC 프로그램에서 사번 확인을 하지 않은 사람입니다.' : '"사용 PC"는 해당 사번으로 연동된 PC 수입니다. 회수·초기화가 끝나면 자산 상세에서 사용자를 정리하세요. 퇴사일은 엑셀에서 빠진 날(적용일) 또는 [퇴사 처리]한 날입니다.') + ' v1.8 이전에 올라온 명단은 입사일·퇴사일이 비어 있어 기간 조회에 나타나지 않습니다.</div>';
@@ -828,14 +884,14 @@
         var rows = list.slice(0, 300).map(function (e) {
           var btn = tab === 'all' && e.active === false ? '<button class="btn sm" data-ed="' + esc(e.emp_no) + '">수정</button> <button class="btn sm" data-rs="' + esc(e.emp_no) + '">복직</button>' : '<button class="btn sm" data-ed="' + esc(e.emp_no) + '">수정</button> <button class="btn sm" data-out="' + esc(e.emp_no) + '">퇴사 처리</button>';
           return '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(e.sales_title || '') + '</td><td>' + esc(e.duty || '') + '</td><td>' + esc(e.ext_no || '') + '</td>' +
-            (tab === 'all' ? '<td>' + (e.active === false ? tagH('퇴사', 'bad') : tagH('재직', 'ok')) + '</td>' : '') + '<td>' + (e.joined_at ? esc(ymd(e.joined_at)) : '<span class="note">미등록</span>') + '</td>' + (tab === 'all' ? '<td>' + (e.left_at ? esc(ymd(e.left_at)) : '—') + '</td>' : '') + '<td>' + btn + '</td></tr>';
+            (tab === 'all' ? '<td>' + (e.active === false ? tagH('퇴사', 'bad') : tagH('재직', 'ok')) + '</td>' : '') + '<td>' + (e.joined_at ? esc(ymd(e.joined_at)) + estH(e, 'joined') : '<span class="note">미등록</span>') + '</td>' + (tab === 'all' ? '<td>' + (e.left_at ? esc(ymd(e.left_at)) + estH(e, 'left') : '—') + '</td>' : '') + '<td>' + btn + '</td></tr>';
         }).join('') || '<tr><td colspan="12" class="note" style="padding:16px;text-align:center">표시할 명단이 없습니다.</td></tr>';
         $('#emp_tbl').innerHTML = '<div class="note" style="margin-bottom:6px">' + list.length.toLocaleString() + '명' + (list.length > 300 ? ' (상위 300명만 표시, 검색으로 좁혀 보세요)' : '') + '</div><div style="overflow:auto"><table class="tbl">' + th(['사번(인사ID)', '이름', '조직명', '본부/팀', '호칭', '영업직책', '업무', '내선'].concat(tab === 'all' ? ['상태'] : []).concat(['입사일']).concat(tab === 'all' ? ['퇴사일'] : []).concat(['관리'])) + '<tbody>' + rows + '</tbody></table></div>';
         $$('[data-ed]').forEach(function (b) { b.onclick = function () { empForm(b.dataset.ed, tab); }; });
         $$('[data-out]').forEach(function (b) { b.onclick = function () { empQuick(b.dataset.out, false, tab); }; });
         $$('[data-rs]').forEach(function (b) { b.onclick = function () { empQuick(b.dataset.rs, true, tab); }; });
       };
-      $('#emp_q').oninput = function () { EMPV.q = this.value; drawList(); }; drawList();
+      $('#emp_q').oninput = function (e) { EMPV.q = this.value; if (e && e.isComposing) return; drawList(); }; $('#emp_q').addEventListener('compositionend', function () { EMPV.q = this.value; drawList(); }); drawList();
       $('#emp_new').onclick = function () { empForm(null, tab); };
       $$('[data-st]').forEach(function (c) { c.onclick = function () { EMPV.st = c.dataset.st; pageEmployees('all'); }; });
       return;

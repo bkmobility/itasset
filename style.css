@@ -120,3 +120,15 @@ a.kpi{display:block;color:inherit}a.kpi:hover{border-color:#bcd7f2}
 .dsec{font-size:12.5px;font-weight:600;margin:2px 0 6px;display:flex;align-items:center;gap:8px}
 .dsec i{width:4px;height:14px;background:#2f7df6;border-radius:2px;display:block}
 .dsep{height:1px;background:#e5e8ee;margin:14px 0}
+/* v1.9 */
+.basebox{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#f3f8fd;border:1px solid #bcd7f2;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:12px}
+.basebox input[type=date]{width:140px}
+.chips .chip{font-family:inherit}
+.ucard{margin-bottom:12px}
+.uspec{display:flex;gap:26px;flex-wrap:wrap;background:#f7f9fc;border-radius:8px;padding:10px 14px}
+.uk{font-size:12.5px;max-width:260px}
+.ucands{display:flex;gap:12px;flex-wrap:wrap}
+.ucand{flex:1;min-width:300px;border:2px solid #e5e8ee;background:#fff;border-radius:10px;padding:12px 14px;cursor:pointer;display:block}
+.ucand.on{border-color:#0f6cbd;background:#f3f8fd}
+.ucand .ut{margin-bottom:4px;font-size:14px}
+.ucand .uw{font-size:11.5px;line-height:1.6;border-top:1px dashed #d8dde5;margin-top:6px;padding-top:6px}
