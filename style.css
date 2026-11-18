@@ -176,3 +176,56 @@ a.kpi.on{box-shadow:0 0 0 2px #0f6cbd;background:#fbfdff}
 a.kpi.warn.on{box-shadow:0 0 0 2px #d46b08}a.kpi.ok.on{box-shadow:0 0 0 2px #1e8e3e}
 .kpi .go-a{float:right;color:#0f6cbd}
 .who{font-weight:600}
+
+/* ===== v1.9.3 ===== */
+th.srt{cursor:pointer;user-select:none;white-space:nowrap}
+th.srt i{font-style:normal;font-size:9px;color:#9aa3af}
+th.srt:hover{background:#eef4fb}
+th.srt.on{background:#e6f1fc;color:#0f6cbd}
+th.srt.on i{color:#0f6cbd}
+.sortbar{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:12px}
+.sortbar a{color:#0f6cbd;font-size:12px}
+.fchip.on{background:#e6f1fc;color:#0f6cbd;border-color:#cfe2f7}
+.who{display:flex;align-items:center;gap:8px;font-weight:600}
+.rchip{display:inline-block;border-radius:10px;padding:1px 9px;font-size:11px;font-weight:700}
+.rchip.a{background:#e7f1fb;color:#0f6cbd}.rchip.v{background:#eef1f5;color:#5c5c5c}
+.rchip2{display:inline-block;border-radius:3px;padding:1px 8px;font-size:11px;font-weight:700}
+.rchip2.m{background:#fde7d6;color:#b45309}.rchip2.a{background:#e7f1fb;color:#0f6cbd}.rchip2.v{background:#eef1f5;color:#5c5c5c}
+.vbanner{background:#fff8e1;border:1px solid #f1dc9a;color:#7a5b00;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:10px}
+body.viewer #qrtop,body.viewer #b-qr,body.viewer #b-status,body.viewer #supremote,body.viewer #supwork,body.viewer #supdone,body.viewer #supreopen,body.viewer #emp_new,body.viewer [data-ed],body.viewer [data-out],body.viewer [data-rs],body.viewer [data-fix],body.viewer [data-unl],body.viewer [data-rv],body.viewer .fix,body.viewer .hold{display:none!important}
+.pwbox{display:flex;gap:8px;align-items:center;background:#f7f9fb;border:1px solid #cfd6df;border-radius:6px;padding:8px 10px}
+.pwbox code{flex:1;font-family:Consolas,monospace;font-size:14px;letter-spacing:.5px}
+.rrow{display:flex;gap:8px;align-items:flex-start;padding:5px 0;cursor:pointer}
+.rrow i{font-style:normal;font-size:11.5px;color:#8a8a8a}
+.rrow.dis{opacity:.5;cursor:default}
+.adres{border:1px solid #e5e8ee;border-radius:6px;margin-top:4px;max-height:210px;overflow:auto}
+.adres:empty{display:none}
+.ares{display:flex;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid #f0f2f5;cursor:pointer;font-size:12.5px}
+.ares:hover{background:#f3f8fd}.ares.on{background:#e6f1fc}.ares.dis{opacity:.55;cursor:default}
+.ares .tg{font-style:normal;background:#eef1f5;color:#5c5c5c;border-radius:3px;padding:0 7px;font-size:11px;font-weight:600}
+.pickd{background:#f3f8fd;border:1px solid #d6e4f5;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;line-height:1.7}
+.admact a{color:#0f6cbd}
+
+/* ===== v1.9.3 추가: 이력 관리 · 모니터 연결 · 실사 · QR 스캔 ===== */
+.abx{display:inline-block;border-radius:3px;padding:1px 8px;font-size:11px;font-weight:600;white-space:nowrap}
+.a-login,.a-logout{background:#e7f1fb;color:#0f6cbd}.a-login_fail,.a-delete{background:#fbe9e7;color:#c42b1c}.a-create{background:#e6f4ea;color:#1e8e3e}.a-update,.a-import{background:#fff4d6;color:#a15c00}.a-change,.a-scan{background:#efe7fb;color:#6b3fb0}.a-export{background:#eef1f5;color:#5c5c5c}
+.audf .fl{font-size:10.5px;color:#8a8a8a}.audf input{height:28px;font-size:12px}
+.achip{border:1px solid #cfd6df;background:#fff;color:#5c5c5c;border-radius:14px;padding:3px 11px;font-size:11.5px;margin-right:5px;cursor:pointer}.achip.on{border-color:#0f6cbd;background:#e7f1fb;color:#0f6cbd;font-weight:700}
+.warnbox{background:#fdecea;color:#c42b1c;border-radius:6px;padding:7px 10px;font-size:12px;line-height:1.6;margin-bottom:10px}
+.pickl{max-height:300px;overflow:auto;margin-top:6px}.pickr{padding:8px 10px;border:1px solid #e5e8ee;border-radius:6px;margin-bottom:5px;cursor:pointer;font-size:12.5px}.pickr:hover{background:#f3f8fd;border-color:#0f6cbd}
+.ar.clk{cursor:pointer}.ar.clk:hover{background:#e6f1fc}.ar.clk:hover:after{content:'이력 관리에서 보기 ›';margin-left:auto;color:#0f6cbd;font-size:11.5px;font-weight:700;padding-right:6px}
+.kpis{display:flex;gap:10px;margin:10px 0}.kpi{flex:1}.kv2{font-size:22px;font-weight:800;margin:2px 0}
+.prow{display:flex;align-items:center;gap:8px;font-size:12px;margin:5px 0}.prow .pn{width:96px}.prow .pv{width:36px;text-align:right}
+.pb{display:inline-block;height:8px;background:#e8ecf1;border-radius:4px;overflow:hidden;flex:1}.pb i{display:block;height:100%;background:#0f6cbd}.pb.big{height:10px}
+.scl{max-height:160px;overflow:auto;border:1px solid #e5e8ee;border-radius:6px;padding:6px 10px;margin-top:6px}.scl label{display:block;font-size:12px;line-height:1.9}
+.qrtop{margin-left:10px;background:#0f6cbd;color:#fff;border-color:#0f6cbd}
+.scanov{position:fixed;inset:0;background:#111;z-index:120;display:flex;flex-direction:column;color:#fff}
+.scanov .sch{display:flex;align-items:center;padding:10px 14px;background:#000;font-size:14px}.scanov .scv{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#222}
+.scanov video{width:100%;height:100%;object-fit:cover}.scanov .scfr{position:absolute;width:min(60vw,260px);height:min(60vw,260px);border:3px solid #6bc16b;border-radius:14px;pointer-events:none}
+.scanov .scmsg{padding:8px 14px;font-size:13px;background:#000;text-align:center}.scanov .scman{display:flex;gap:8px;padding:10px 14px;background:#000}.scanov .scman input{flex:1;height:36px;border-radius:6px;border:0;padding:0 10px}
+.scanov .scsheet{background:#fff;color:#1a1a1a;padding:14px 16px;font-size:13px;max-height:55vh;overflow:auto;border-radius:14px 14px 0 0}
+.invb{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ib{height:44px;border:0;border-radius:8px;background:#e7f1fb;color:#0f6cbd;font-weight:700;font-size:13px;cursor:pointer}.ib.ok{background:#1e8e3e;color:#fff}.ib.bad{background:#fbe9e7;color:#c42b1c}
+.invlist .invrow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid #e5e8ee;border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;font-size:12.5px}
+.scanfab{position:sticky;bottom:10px;text-align:center;margin-top:10px}.btn.big{height:42px;padding:0 22px;font-size:14px}.scbtns{display:flex;gap:8px;flex-wrap:wrap}
+body.viewer .wonly{display:none!important}
+@media (max-width:760px){.layout{flex-direction:column;height:auto!important}.side{width:100%;padding:0;flex-direction:row;align-items:center;overflow-x:auto}.side .brand{padding:0 12px;white-space:nowrap}.nav{display:flex;flex-direction:row}.nav a{white-space:nowrap;height:40px;border-left:0}.nav .sep,.nav .soon{display:none}.top .gs{display:none}.kpis{flex-wrap:wrap}.kpi{min-width:44%}.cards{flex-direction:column}table.tbl{display:block;overflow-x:auto}}
