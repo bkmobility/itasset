@@ -1206,7 +1206,7 @@
 
   // ---------- 로그인 / 라우팅 ----------
   function pageLogin(msg) {
-    $app.innerHTML = '<div class="login"><h1>IT 자산관리시스템</h1><div class="note" style="margin:-6px 0 8px;text-align:center">관리자 로그인</div><label>사번</label><input type="text" id="sbn" autocomplete="username" autocapitalize="characters"><label>비밀번호</label><input type="password" id="pw" autocomplete="current-password"><div style="margin-top:16px"><button class="btn pri" id="go" style="width:100%;height:36px">로그인</button></div><div class="err" id="er">' + esc(msg || '') + '</div><div class="note" style="margin-top:10px;font-size:11px">비밀번호를 잊으셨다면 메인 관리자(전산지원파트)에게 초기화를 요청하세요.</div></div>';
+    $app.innerHTML = '<div class="login"><div class="lgh"><div class="lgt">IT 자산관리시스템</div><div class="lgs">관리자 로그인</div></div><label>사번</label><input type="text" id="sbn" autocomplete="username" autocapitalize="characters"><label>비밀번호</label><input type="password" id="pw" autocomplete="current-password"><div style="margin-top:16px"><button class="btn pri" id="go" style="width:100%;height:36px">로그인</button></div><div class="err" id="er">' + esc(msg || '') + '</div><div class="note" style="margin-top:10px;font-size:11px">비밀번호를 잊으셨다면 메인 관리자(전산지원파트)에게 초기화를 요청하세요.</div></div>';
     var busy = false;
     async function go() {
       if (busy) return;
