@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.7 - 관리자 웹 (정적 페이지, Supabase 연동) */
+/* IT 자산관리시스템 v1.8 - 관리자 웹 (정적 페이지, Supabase 연동) */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -114,11 +114,17 @@
     }
     return out;
   }
+  function demoDates() {
+    var n = new Date(), y = n.getFullYear(), m = n.getMonth();
+    S.employees.forEach(function (e, i) { if (e.joined_at === undefined) { e.joined_at = i < 4 ? dstr(new Date(y, m, 1 + i)) : (i < 8 ? dstr(new Date(y, m - 1, 5 + i)) : null); e.left_at = null; } });
+    var q = S.employees[S.employees.length - 1]; if (q && !q.__d) { q.__d = 1; q.active = false; q.left_at = dstr(new Date(y, m, 2)); }
+  }
   async function loadAll() {
-    if (DEMO) { var d = demoData(); S.assets = d.assets.map(function (a) { return a; }); S.employees = d.employees; S.devices = d.devices; S.history = d.history; S.support = d.support; S.imports = S.imports || []; rebuildAssets(); return; }
+    if (DEMO) { var d = demoData(); S.assets = d.assets.map(function (a) { return a; }); S.employees = d.employees; S.devices = d.devices; S.history = d.history; S.support = d.support; S.imports = S.imports || []; S.dates = true; demoDates(); rebuildAssets(); return; }
     var res = await Promise.all([fetchAll('assets', 'asset_no'), fetchAll('employees', 'emp_no'), fetchAll('devices', 'mac'),
       sb.from('asset_history').select('*').order('created_at', { ascending: false }).limit(50)]);
     S.assets = res[0]; S.employees = res[1]; S.devices = res[2]; S.history = res[3].data || [];
+    var dr = await sb.from('employees').select('joined_at,left_at').limit(1); S.dates = !dr.error;
     var ir = await sb.from('employee_imports').select('*').order('applied_at', { ascending: false }).limit(50);
     S.impErr = !!ir.error; S.imports = ir.error ? [] : ir.data;   // v1.6 DB 업데이트 전에도 나머지 화면은 동작
     var sr = await sb.from('support_requests').select('*').order('created_at', { ascending: false }).limit(300);
@@ -170,12 +176,12 @@
   }
 
   // ---------- 화면 틀 ----------
-  var ROUTES = [['dashboard', '대시보드'], ['assets', '자산'], ['check', 'PC 점검'], ['support', '지원 요청'], ['employees', '인사 명단'], ['import', '가져오기']];
+  var ROUTES = [['dashboard', '대시보드'], ['assets', '자산'], ['check', 'PC 점검'], ['support', '지원 요청'], ['employees', '인사 명단'], ['data', '데이터 관리']];
   function shell(active, html) {
     var nav = ROUTES.map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '실사(재물조사)', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.7</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.8</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="자산번호·사용자·PC 이름·사번 검색 (Enter)" value="' + esc(F.q) + '"><div class="sp"></div><div class="who">' + esc(S.user ? S.user.email : '데모 관리자') + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + html + '</div></div></div>';
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.cat = ''; F.status = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
     var lo = $('#logout'); if (lo) lo.onclick = async function () { await sb.auth.signOut(); location.reload(); };
@@ -232,7 +238,7 @@
       todoCard('미등록 PC', unreg, '관리번호 연결 필요', '연결하기', '#/check/unreg') +
       todoCard('7일 이상 미확인', stale, '프로그램 실행 확인 필요', '목록 보기', '#/check/stale') +
       todoCard('사용자 불일치', mism, '대장 vs 실제 사용자', '확인', '#/check/mismatch') +
-      todoCard('퇴사자 사번 PC', leaver.length, leaver.length ? esc(leaver.slice(0, 2).map(function (d) { return d.computer_name; }).join(', ')) + (leaver.length > 2 ? ' 외 ' + (leaver.length - 2) : '') + ' — 회수·초기화 확인' : '회수·초기화 확인', '명단 보기', '#/employees/list') + '</div>';
+      todoCard('퇴사자 사번 PC', leaver.length, leaver.length ? esc(leaver.slice(0, 2).map(function (d) { return d.computer_name; }).join(', ')) + (leaver.length > 2 ? ' 외 ' + (leaver.length - 2) : '') + ' — 회수·초기화 확인' : '회수·초기화 확인', '명단 보기', '#/employees/all') + '</div>';
     var coll = [['오늘 확인', today, '#1e8e3e'], ['7일 이내', within, '#2f7df6'], ['7일 이상 미확인', stale, '#c42b1c'], ['미수집 PC(대장)', noDev, '#b0b7c3']];
     var ctot = coll.reduce(function (t, p) { return t + p[1]; }, 0) || 1;
     var cbar = '<div class="sbar">' + coll.map(function (p) { return p[1] ? '<i style="flex:' + p[1] + ';background:' + p[2] + '" title="' + esc(p[0]) + ' ' + p[1] + '"></i>' : ''; }).join('') + '</div>';
@@ -309,7 +315,7 @@
   }
   function exportXlsx(list, name) {
     var rows = list.map(function (a) {
-      return { '관리번호': a.asset_no, '자산분류': a.category, '제조사': a.manufacturer, '모델명': a.model, '제조년월': a.mfg_ym, '자산상태': a.status, '사용자명': a.user_name, '사용자 ID': a.user_id, '소속명': a.dept, '직책': a.title, '위치': a.location, '구매일': a.purchase_date, '보증만료': a.warranty_end, '컴퓨터 이름': a.pc_name, 'IP': a.ip, 'MAC': a.mac, 'OS': a.os, 'CPU': a.cpu, 'RAM(GB)': a.ram_gb, '저장장치': a.storage, '그래픽카드': a.gpu, '최종 확인': a.last_seen ? ymd(a.last_seen) + ' ' + hm(a.last_seen) : '' };
+      return { '관리번호': a.asset_no, '자산분류': a.category, '제조사': a.manufacturer, '모델명': a.model, '제조년월': a.mfg_ym, '자산상태': a.status, '사용자명': a.user_name, '사용자 ID': a.user_id, '소속명': a.dept, '직책': a.title, '위치': a.location, '구매일': a.purchase_date, '보증만료': a.warranty_end, '컴퓨터 이름': a.pc_name, 'IP': a.ip, 'MAC': a.mac, 'OS': a.os, 'CPU': a.cpu, 'RAM(GB)': a.ram_gb, '저장장치': a.storage, '그래픽카드': a.gpu, '최종 확인': a.last_seen ? ymd(a.last_seen) + ' ' + hm(a.last_seen) : '', '비고': a.memo };
     });
     var ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, name); XLSX.writeFile(wb, name + '_' + ymd(new Date()) + '.xlsx');
@@ -393,13 +399,13 @@
     }; });
   }
 
-  // ---------- 가져오기 (엑셀/CSV) ----------
-  var ASSET_MAP = { asset_no: ['관리번호', '자산번호', 'QR번호'], category: ['자산분류', '분류', '자산유형'], manufacturer: ['제조사'], model: ['모델명', '모델'], mfg_ym: ['제조년월', '제조일'], status: ['자산상태', '상태'], user_name: ['사용자명', '사용자', '사용자 이름'], user_id: ['사용자 ID', '사용자ID', '사번'], dept: ['소속명', '부서', '부서명'], title: ['직책', '직위'], location: ['위치', '설치위치'], purchase_date: ['구매일', '구입일', '구매일자'], warranty_end: ['보증만료', '보증 만료', '보증만료일'], memo: ['비고', '메모'] };
+  // ---------- 데이터 관리 (엑셀 업로드/다운로드) ----------
+  var ASSET_MAP = { asset_no: ['관리번호', '자산번호', 'QR번호', '자산코드'], category: ['자산분류', '분류', '자산유형'], manufacturer: ['제조사'], model: ['모델명', '모델'], mfg_ym: ['제조년월', '제조일'], status: ['자산상태', '상태'], user_name: ['사용자명', '사용자', '사용자 이름'], user_id: ['사용자 ID', '사용자ID', '사번', '사용자ID(사번)'], dept: ['소속명', '부서', '부서명', '조직명'], title: ['직책', '직위'], location: ['위치', '설치위치', '소속위치'], purchase_date: ['구매일', '구입일', '구매일자', '입고일자', '취득일자'], warranty_end: ['보증만료', '보증 만료', '보증만료일'], memo: ['비고', '메모'] };
   var EMP_MAP = {
     emp_no: ['사번', '사원번호', '직원번호', '인사ID', '인사아이디'], name: ['성명', '이름'],
     dept: ['조직명', '부서', '부서명'], team: ['본부/팀', '소속', '본부', '소속명'],
     title: ['임직원호칭', '직책', '직위', '직급'], sales_title: ['영업직책'], duty: ['업무'],
-    ext_no: ['회사번호(내선번호)', '내선번호', '회사번호'], address: ['주소']
+    ext_no: ['회사번호(내선번호)', '내선번호', '회사번호'], address: ['주소'], joined_at: ['입사일', '입사일자'], status: ['재직상태', '재직구분']
   };
   var IMP = { assets: null, employees: null };
   function normDate(v) {
@@ -438,7 +444,7 @@
       var o = {};
       cols.forEach(function (f) {
         var v = r0[pick[f]];
-        if (f === 'purchase_date' || f === 'warranty_end') v = normDate(v);
+        if (f === 'purchase_date' || f === 'warranty_end' || f === 'joined_at') v = normDate(v);
         else if (f === 'mfg_ym') v = normYm(v);
         else {
           v = (v == null || String(v).trim() === '') ? null : String(v).trim();
@@ -507,44 +513,129 @@
     var ro = $('#supreopen'); if (ro) ro.onclick = async function () { try { await dbSupport(cur.id, { status: 'working' }); pageSupport(arg); } catch (er) { fail(er); } };
   }
 
-  function pageImport() {
-    function block(kind, title, desc, tplName) {
-      return '<div class="card" style="min-width:380px"><h3>' + title + '</h3><div class="note" style="margin-bottom:8px">' + desc + '</div>' +
-        '<div class="drop"><input type="file" id="f_' + kind + '" accept=".xlsx,.xls,.csv"><div class="note" style="margin-top:6px">엑셀(.xlsx) 또는 CSV 파일을 선택하세요.</div></div><div id="pv_' + kind + '" style="margin-top:10px"></div><div class="note" style="margin-top:8px">양식: <code>' + tplName + '</code> (설치 폴더의 templates)</div></div>';
-    }
-    shell('import', '<h1>가져오기</h1><div class="note" style="margin:6px 0 12px">기존 시스템의 "엑셀 다운로드" 파일을 그대로 올릴 수 있습니다. 같은 관리번호(사번)는 덮어쓰고, 파일에 없는 항목은 그대로 둡니다.</div><div class="cards">' +
-      block('assets', '자산 대장', '필수: 관리번호. 인식하는 항목: 자산분류, 제조사, 모델명, 제조년월, 자산상태, 사용자명, 사용자 ID, 소속명, 직책, 위치, 구매일, 보증만료.', 'assets_양식.csv') +
-      '<div class="card" style="min-width:380px"><h3>인사 명단</h3><div class="note" style="line-height:1.7">인사 명단은 미리보기·적용 이력·되돌리기가 있는 <a href="#/employees"><b>인사 명단</b></a> 메뉴에서 올려 주세요.</div></div></div>');
-    ['assets'].forEach(function (kind) {
-      $('#f_' + kind).onchange = function (e) {
-        var f = e.target.files[0]; if (!f) return;
-        var rd = new FileReader();
-        rd.onload = function () {
-          try {
-            var p = kind === 'assets' ? parseSheet(rd.result, ASSET_MAP, 'asset_no') : parseSheet(rd.result, EMP_MAP, 'emp_no');
-            IMP[kind] = p;
-            var need = kind === 'assets' ? ['asset_no'] : ['emp_no', 'name'], miss = need.filter(function (n) { return p.cols.indexOf(n) < 0; });
-            var pv = $('#pv_' + kind);
-            if (miss.length) { pv.innerHTML = '<div class="err">필수 항목(' + (kind === 'assets' ? '관리번호' : '사번, 성명') + ')을 찾지 못했습니다. 첫 줄이 항목 이름인지 확인하세요.</div>'; return; }
-            var head = p.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('');
-            var body = p.rows.slice(0, 5).map(function (r) { return '<tr>' + p.cols.map(function (c) { return '<td>' + esc(r[c]) + '</td>'; }).join('') + '</tr>'; }).join('');
-            pv.innerHTML = '<div style="margin-bottom:6px"><b>' + p.rows.length.toLocaleString() + '건</b> 인식' + (p.skipped ? ' · 키 값이 없어 제외 ' + p.skipped + '건' : '') + '</div><div style="overflow:auto"><table class="tbl"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div><div style="margin-top:8px"><button class="btn pri" id="go_' + kind + '">가져오기 실행</button></div>';
-            $('#go_' + kind).onclick = async function () {
-              var btn = this; btn.disabled = true; btn.textContent = '가져오는 중…';
-              try { await dbUpsert(kind === 'assets' ? 'assets' : 'employees', p.rows, kind === 'assets' ? 'asset_no' : 'emp_no'); await loadAll(); toast(p.rows.length + '건을 가져왔습니다.'); pv.innerHTML = '<div class="b-ok badge">완료: ' + p.rows.length.toLocaleString() + '건</div>'; }
-              catch (er) { fail(er); btn.disabled = false; btn.textContent = '가져오기 실행'; }
-            };
-          } catch (er) { fail(er); }
-        };
-        rd.readAsArrayBuffer(f);
+  function pageData() {
+    var cats = groupCount(S.assets, function (a) { return a.category; }).map(function (x) { return x[0]; });
+    var stats = groupCount(S.assets, function (a) { return a.status; }).map(function (x) { return x[0]; });
+    var act = S.employees.filter(function (e) { return e.active !== false; }).length;
+    function opts(ph, arr) { return '<option value="">' + ph + '</option>' + arr.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join(''); }
+    function sec(t, s) { return '<div class="dsec"><i></i>' + t + ' <span class="note">' + s + '</span></div>'; }
+    function drop(id, msg) { return '<div class="drop"><input type="file" id="' + id + '" accept=".xlsx,.xls,.csv"><div class="note" style="margin-top:6px;line-height:1.7">' + msg + '</div></div>'; }
+    shell('data', '<h1>데이터 관리</h1><div class="note" style="margin:4px 0 12px">자산 대장·인사 대장을 엑셀로 올리고 내려받습니다. 내려받은 파일은 올리는 파일과 같은 항목이라 그대로 다시 올릴 수 있습니다.</div>' +
+      (!S.dates ? '<div class="note" style="color:#c42b1c;margin-bottom:8px">입사일·퇴사일 열이 아직 없습니다. 신규 입사자·퇴사자 조회를 쓰려면 SQL Editor에서 db/update_v1.8.sql 을 한 번 실행하세요.</div>' : '') +
+      '<div class="dcards"><div class="card dcol"><h2>자산 대장</h2>' +
+      sec('업로드', '관리번호(자산코드) 기준으로 추가·덮어쓰기') + drop('f_assets', '필수: 관리번호(자산코드) · 읽는 항목: 자산분류, 제조사, 모델명, 제조년월, 자산상태, 사용자, 소속, 직책, 위치, 구매일, 보증만료, 메모<br>itmgr의 [전체 다운로드] 파일을 그대로 올릴 수 있습니다.') +
+      '<div class="dsep"></div>' + sec('다운로드', '현재 시스템에 등록된 자산') +
+      '<div class="row wrap"><select id="dl_cat">' + opts('자산분류: 전체', cats) + '</select><select id="dl_st">' + opts('자산상태: 전체', stats) + '</select><span class="note" id="dl_cnt"></span><span class="grow"></span><button class="btn pri" id="dl_assets">엑셀 내려받기</button></div>' +
+      '<div class="note" style="margin-top:8px">내려받은 파일은 위 업로드에 그대로 다시 올릴 수 있습니다. <button class="btn sm" id="tpl_assets">빈 양식 내려받기</button></div></div>' +
+      '<div class="card dcol"><h2>인사 대장</h2>' +
+      sec('업로드', '미리보기 → 적용 · 적용 이력에서 되돌리기') + drop('f_emp', '필수: 인사ID(사번), 이름(성명) · 읽는 항목: 본부/팀, 조직명, 임직원호칭, 영업직책, 업무, 회사번호(내선번호), 주소, 입사일<br><b>[적용]을 누르기 전에는 아무것도 바뀌지 않습니다.</b>') +
+      '<div class="dsep"></div>' + sec('다운로드', '현재 시스템에 등록된 인사 명단') +
+      '<div class="row wrap"><label style="font-size:12px"><input type="radio" name="dl_hr" value="act" checked> 재직자만 (' + act.toLocaleString() + '명)</label><label style="font-size:12px"><input type="radio" name="dl_hr" value="all"> 퇴사 포함 (' + S.employees.length.toLocaleString() + '명)</label><span class="grow"></span><button class="btn pri" id="dl_hr">엑셀 내려받기</button></div>' +
+      '<div class="note" style="margin-top:8px">퇴사 포함 파일을 다시 올려도 "재직상태"가 퇴사인 사람은 재직으로 되돌아가지 않습니다. <button class="btn sm" id="tpl_hr">빈 양식 내려받기</button></div></div></div>' +
+      '<div id="pv_wide" style="margin-top:12px"></div>');
+    function filt() { return S.assets.filter(function (a) { return (!$('#dl_cat').value || a.category === $('#dl_cat').value) && (!$('#dl_st').value || a.status === $('#dl_st').value); }); }
+    function cnt() { $('#dl_cnt').innerHTML = '해당 <b style="color:#1a1a1a">' + filt().length.toLocaleString() + '</b>건'; }
+    $('#dl_cat').onchange = cnt; $('#dl_st').onchange = cnt; cnt();
+    $('#dl_assets').onclick = function () { var l = filt(); if (!l.length) { toast('내려받을 자산이 없습니다.'); return; } exportXlsx(l, '자산대장'); };
+    $('#dl_hr').onclick = function () {
+      var all = document.querySelector('input[name=dl_hr]:checked').value === 'all';
+      var l = S.employees.filter(function (e) { return all || e.active !== false; }); if (!l.length) { toast('내려받을 명단이 없습니다.'); return; }
+      empXlsx(l, all ? '인사명단_퇴사포함' : '인사명단');
+    };
+    function tpl(heads, name) { var ws = XLSX.utils.aoa_to_sheet([heads]), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1'); XLSX.writeFile(wb, name + '.xlsx'); }
+    $('#tpl_assets').onclick = function () { tpl(['관리번호', '자산분류', '제조사', '모델명', '제조년월', '자산상태', '사용자명', '사용자 ID', '소속명', '직책', '위치', '구매일', '보증만료', '비고'], '자산대장_양식'); };
+    $('#tpl_hr').onclick = function () { tpl(['인사ID', '이름', '본부/팀', '조직명', '임직원호칭', '영업직책', '업무', '회사번호(내선번호)', '주소', '입사일'], '인사대장_양식'); };
+
+    // ---- 자산 대장 업로드
+    $('#f_assets').onchange = function (e) {
+      var f = e.target.files[0]; if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        try {
+          var p = parseSheet(rd.result, ASSET_MAP, 'asset_no'), pv = $('#pv_wide');
+          if (p.cols.indexOf('asset_no') < 0) { pv.innerHTML = '<div class="err">필수 항목(관리번호 또는 자산코드)을 찾지 못했습니다. 첫 줄이 항목 이름인지 확인하세요.</div>'; return; }
+          var head = p.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('');
+          var body = p.rows.slice(0, 5).map(function (r) { return '<tr>' + p.cols.map(function (c) { return '<td>' + esc(r[c]) + '</td>'; }).join('') + '</tr>'; }).join('');
+          pv.innerHTML = '<div class="card"><h3>자산 대장 미리보기 <span class="note" style="font-weight:400">· ' + esc(f.name) + '</span></h3><div style="margin-bottom:6px"><b>' + p.rows.length.toLocaleString() + '건</b> 인식' + (p.skipped ? ' · 관리번호가 없어 제외 ' + p.skipped + '건' : '') + ' · 같은 관리번호는 덮어쓰고, 파일에 없는 항목은 그대로 둡니다.</div><div style="overflow:auto"><table class="tbl"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div><div class="note">처음 5건만 보여 줍니다.</div><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="a_cancel">취소</button><button class="btn pri" id="a_go">가져오기 실행 (' + p.rows.length.toLocaleString() + '건)</button></div></div>';
+          $('#a_cancel').onclick = function () { pv.innerHTML = ''; $('#f_assets').value = ''; };
+          $('#a_go').onclick = async function () {
+            var btn = this; btn.disabled = true; btn.textContent = '가져오는 중…';
+            try { await dbUpsert('assets', p.rows, 'asset_no'); await loadAll(); toast(p.rows.length.toLocaleString() + '건을 가져왔습니다.'); pageData(); $('#pv_wide').innerHTML = '<div class="badge b-ok">완료: 자산 ' + p.rows.length.toLocaleString() + '건</div>'; }
+            catch (er) { fail(er); btn.disabled = false; btn.textContent = '다시 시도'; }
+          };
+        } catch (er) { fail(er); }
       };
-    });
+      rd.readAsArrayBuffer(f);
+    };
+
+    // ---- 인사 대장 업로드 (미리보기 → 적용)
+    $('#f_emp').onchange = function (ev) {
+      var f = ev.target.files[0]; if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        try {
+          var p = parseSheet(rd.result, EMP_MAP, 'emp_no'), pv = $('#pv_wide');
+          if (p.cols.indexOf('emp_no') < 0 || p.cols.indexOf('name') < 0) { pv.innerHTML = '<div class="err">필수 항목(사번 또는 인사ID, 성명 또는 이름)을 찾지 못했습니다. 항목 이름 줄을 확인하세요.</div>'; return; }
+          function draw(deact) {
+            var plan = planEmployees(p, deact);
+            var outPct = act ? plan.outs.length / act : 0;
+            var sum = '<div class="kpis"><div class="kpi ok"><div class="t">신규</div><div class="n">+' + plan.news.length + '</div></div><div class="kpi warn"><div class="t">변경</div><div class="n">' + plan.chgs.length + '</div></div><div class="kpi bad"><div class="t">퇴사(명단에서 빠짐)</div><div class="n">' + plan.outs.length + '</div></div><div class="kpi"><div class="t">오류·제외</div><div class="n">' + (plan.errs.length + p.skipped) + '</div><div class="s">동일 ' + plan.same + '명</div></div></div>';
+            var rows = [];
+            plan.chgs.forEach(function (x) { rows.push([x.r.emp_no, x.r.name, x.r.dept, x.r.team, x.r.title, x.r.sales_title, x.r.ext_no, tagH('변경 · ' + x.diffs.map(function (d) { return DF[d]; }).join('·'), 'warn')]); });
+            plan.news.forEach(function (x) { rows.push([x.r.emp_no, x.r.name, x.r.dept, x.r.team, x.r.title, x.r.sales_title, x.r.ext_no, tagH('신규', 'ok')]); });
+            plan.outs.forEach(function (x) { rows.push([x.c.emp_no, x.c.name, x.c.dept, x.c.team, x.c.title, x.c.sales_title, x.c.ext_no, tagH('퇴사 · 명단에서 빠짐', 'bad')]); });
+            var shown = rows.slice(0, 200).map(function (r) { return '<tr><td class="mono">' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + esc(r[2] || '') + '</td><td>' + esc(r[3] || '') + '</td><td>' + esc(r[4] || '') + '</td><td>' + esc(r[5] || '') + '</td><td>' + esc(r[6] || '') + '</td><td>' + r[7] + '</td></tr>'; }).join('') || '<tr><td colspan="8" class="note" style="padding:14px;text-align:center">바뀌는 내용이 없습니다.</td></tr>';
+            var err = plan.errs.length ? '<div class="err" style="margin:6px 0">오류 ' + plan.errs.length + '건은 제외됩니다: ' + esc(plan.errs.slice(0, 5).join(', ')) + (plan.errs.length > 5 ? ' …' : '') + '</div>' : '';
+            var big = deact && outPct > 0.3 ? '<div class="err" style="margin:6px 0">퇴사 처리가 재직 인원의 ' + Math.round(outPct * 100) + '%입니다. 일부 인원만 담긴 파일이 아닌지 확인하세요. 아래 체크를 눌러야 적용할 수 있습니다.<br><label><input type="checkbox" id="emp_ok"> 확인했습니다</label></div>' : '';
+            var total = plan.news.length + plan.chgs.length + plan.outs.length;
+            pv.innerHTML = '<div class="card"><h3>인사 대장 미리보기 <span class="note" style="font-weight:400">· ' + esc(f.name) + ' · ' + p.rows.length.toLocaleString() + '명 인식' + (p.skipped ? ' · 사번 없는 행 ' + p.skipped + '건 제외' : '') + '</span></h3>' + sum +
+              '<label style="font-size:12px;display:block;margin:6px 0"><input type="checkbox" id="emp_deact"' + (deact ? ' checked' : '') + '> 파일에 없는 사번은 퇴사 처리(사번 확인 불가)</label>' + err + big +
+              '<div style="overflow:auto;max-height:340px"><table class="tbl"><thead><tr><th>사번(인사ID)</th><th>이름</th><th>조직명</th><th>본부/팀</th><th>호칭</th><th>영업직책</th><th>내선</th><th>상태</th></tr></thead><tbody>' + shown + '</tbody></table></div>' + (rows.length > 200 ? '<div class="note">상위 200건만 표시 (전체 ' + rows.length + '건 모두 적용됩니다)</div>' : '') +
+              '<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="emp_cancel">취소</button><button class="btn pri" id="emp_go"' + (total ? '' : ' disabled') + '>적용 (신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ')</button></div></div>';
+            $('#emp_deact').onchange = function () { draw(this.checked); };
+            $('#emp_cancel').onclick = function () { pv.innerHTML = ''; $('#f_emp').value = ''; };
+            $('#emp_go').onclick = async function () {
+              var ok = $('#emp_ok'); if (big && !(ok && ok.checked)) { toast('퇴사 비율이 높습니다. 확인 체크가 필요합니다.'); return; }
+              var btn = this; btn.disabled = true; btn.textContent = '적용 중…';
+              try { await applyEmployees(plan, f.name, p.cols); toast('적용했습니다. (신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ')'); pageData(); $('#pv_wide').innerHTML = '<div class="badge b-ok">완료: 인사 대장 (신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ') — 인사 명단 > 적용 이력에서 되돌릴 수 있습니다.</div>'; }
+              catch (er) { fail(er); btn.disabled = false; btn.textContent = '다시 시도'; }
+            };
+          }
+          draw(true);
+        } catch (er) { fail(er); }
+      };
+      rd.readAsArrayBuffer(f);
+    };
   }
 
-  // ---------- 인사 명단 (엑셀 업로드 → 미리보기 → 적용 / 이력 / 중복 등록) ----------
+  // ---------- 인사 명단 (재적·전체·신규 입사자·퇴사자·적용 이력) ----------
   var EMP_FIELDS = ['name', 'dept', 'team', 'title', 'sales_title', 'duty', 'ext_no', 'address'];
-  function empSnap(c) { var o = { emp_no: c.emp_no, active: c.active !== false }; EMP_FIELDS.forEach(function (f) { o[f] = c[f] == null ? null : c[f]; }); return o; }
-  var EMPV = { file: null, plan: null, mode: 'upload' };   // 업로드 중인 파일의 계산 결과
+  function EF() { return S.dates ? EMP_FIELDS.concat(['joined_at', 'left_at']) : EMP_FIELDS; }
+  function tdy() { return ymd(new Date()); }
+  function empSnap(c) { var o = { emp_no: c.emp_no, active: c.active !== false }; EF().forEach(function (f) { o[f] = c[f] == null ? null : c[f]; }); return o; }
+  var EMPV = { q: '', st: 'all', from: null, to: null, chip: '이번 달' };
+  function pad2(n) { return ('0' + n).slice(-2); }
+  function dstr(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function periodFor(chip) {
+    var n = new Date(), y = n.getFullYear(), m = n.getMonth();
+    if (chip === '이번 달') return [dstr(new Date(y, m, 1)), dstr(new Date(y, m + 1, 0))];
+    if (chip === '지난 달') return [dstr(new Date(y, m - 1, 1)), dstr(new Date(y, m, 0))];
+    if (chip === '최근 3개월') return [dstr(new Date(y, m - 2, 1)), dstr(new Date(y, m + 1, 0))];
+    if (chip === '올해') return [y + '-01-01', y + '-12-31'];
+    return null;
+  }
+  function period() { if (!EMPV.from) { var p = periodFor('이번 달'); EMPV.from = p[0]; EMPV.to = p[1]; } return [EMPV.from, EMPV.to]; }
+  function inRange(d, p) { return !!d && String(d).slice(0, 10) >= p[0] && String(d).slice(0, 10) <= p[1]; }
+  function srcOf(no, kind) {
+    for (var i = 0; i < S.imports.length; i++) {
+      var x = S.imports[i]; if (x.reverted_at) continue;
+      var hit = kind === 'add' ? (x.added_keys || []).indexOf(no) >= 0 : (x.deactivated > 0 && (x.before_rows || []).some(function (b) { return b.emp_no === no; }));
+      if (hit) return /^직접/.test(x.file_name || '') ? (kind === 'add' ? '직접 등록' : '직접 처리') : '엑셀 적용';
+    }
+    return '—';
+  }
+  function devCount(no) { return S.devices.filter(function (d) { return d.emp_no === no; }).length; }
+  var EMPV_PLAN = null;
   function planEmployees(p, deactivateMissing) {
     var cur = {}; S.employees.forEach(function (e) { cur[e.emp_no] = e; });
     var seen = {}, plan = { rows: [], news: [], chgs: [], outs: [], same: 0, errs: [] };
@@ -553,28 +644,33 @@
       if (seen[r.emp_no]) { plan.errs.push(r.emp_no + ': 파일 안에서 중복'); return; }
       seen[r.emp_no] = 1;
       var c = cur[r.emp_no];
+      if (r.status && /퇴사|퇴직/.test(r.status)) { if (c && c.active !== false) plan.outs.push({ c: c }); else plan.same++; return; }   // 내려받은 파일의 '재직상태' 열
       if (!c) { plan.news.push({ r: r }); return; }
       var diffs = [];
-      EMP_FIELDS.forEach(function (f) { if (p.cols.indexOf(f) >= 0 && String(c[f] == null ? '' : c[f]) !== String(r[f] == null ? '' : r[f])) diffs.push(f); });
+      EF().forEach(function (f) { if (f === 'left_at') return; if (p.cols.indexOf(f) >= 0 && String(c[f] == null ? '' : c[f]) !== String(r[f] == null ? '' : r[f])) diffs.push(f); });
       if (c.active === false) diffs.push('active');
       if (diffs.length) plan.chgs.push({ r: r, c: c, diffs: diffs }); else plan.same++;
     });
     if (deactivateMissing) S.employees.forEach(function (e) { if (e.active !== false && !seen[e.emp_no]) plan.outs.push({ c: e }); });
     return plan;
   }
-  var DF = { name: '이름', dept: '조직명', team: '본부/팀', title: '호칭', sales_title: '영업직책', duty: '업무', ext_no: '내선', address: '주소', active: '재직 복귀' };
+  var DF = { name: '이름', dept: '조직명', team: '본부/팀', title: '호칭', sales_title: '영업직책', duty: '업무', ext_no: '내선', address: '주소', joined_at: '입사일', active: '재직 복귀' };
   function tagH(t, k) { return '<span class="badge b-' + k + '">' + esc(t) + '</span>'; }
   async function applyEmployees(plan, fileName, cols) {
-    var before = [], addedKeys = [], now = new Date().toISOString();
+    var before = [], addedKeys = [], now = new Date().toISOString(), td = tdy();
     var up = [];
     function mk(x, base) {
       var o = { emp_no: x.r.emp_no, active: true, updated_at: now };
       EMP_FIELDS.forEach(function (f) { o[f] = cols.indexOf(f) >= 0 ? (x.r[f] == null ? null : x.r[f]) : (base && base[f] != null ? base[f] : null); });
+      if (S.dates) {
+        o.joined_at = cols.indexOf('joined_at') >= 0 && x.r.joined_at ? x.r.joined_at : (base ? (base.joined_at || null) : td);
+        o.left_at = null;
+      }
       return o;
     }
     plan.news.forEach(function (x) { addedKeys.push(x.r.emp_no); up.push(mk(x, null)); });
     plan.chgs.forEach(function (x) { before.push(empSnap(x.c)); up.push(mk(x, x.c)); });
-    plan.outs.forEach(function (x) { before.push(empSnap(x.c)); var o = empSnap(x.c); o.active = false; o.updated_at = now; up.push(o); });
+    plan.outs.forEach(function (x) { before.push(empSnap(x.c)); var o = empSnap(x.c); o.active = false; o.updated_at = now; if (S.dates) o.left_at = td; up.push(o); });
     await dbUpsert('employees', up, 'emp_no');
     var rec = { applied_at: now, applied_by: S.user ? S.user.email : '데모 관리자', file_name: fileName, added: plan.news.length, changed: plan.chgs.length, deactivated: plan.outs.length, added_keys: addedKeys, before_rows: before, reverted_at: null };
     if (!DEMO) { var r = await sb.from('employee_imports').insert(rec).select().single(); if (r.error) throw r.error; rec = r.data; }
@@ -615,16 +711,16 @@
     if (DEMO || !S.impErr) S.imports.unshift(rec);
     if (!DEMO) await loadAll(); else rebuildAssets();
   }
-  async function empQuick(no, activate) {
+  async function empQuick(no, activate, tab) {
     var c = S.employees.filter(function (e) { return e.emp_no === no; })[0]; if (!c) return;
     if (!confirm(c.name + ' (' + no + ') 님을 ' + (activate ? '재직(복직) 상태로 되돌립니다.' : '퇴사 처리합니다.\n이후 PC 프로그램의 [사번 확인]에서 확인되지 않습니다. (적용 이력에서 되돌릴 수 있습니다)') + '\n계속할까요?')) return;
-    var o = empSnap(c); o.active = !!activate; o.updated_at = new Date().toISOString();
-    try { await saveManual([empSnap(c)], [], [o], '직접 등록 (' + (activate ? '복직' : '퇴사 처리') + ')', [0, activate ? 1 : 0, activate ? 0 : 1]); toast(activate ? '복직 처리했습니다.' : '퇴사 처리했습니다.'); pageEmployees('list'); } catch (er) { fail(er); }
+    var o = empSnap(c); o.active = !!activate; o.updated_at = new Date().toISOString(); if (S.dates) o.left_at = activate ? null : tdy();
+    try { await saveManual([empSnap(c)], [], [o], '직접 등록 (' + (activate ? '복직' : '퇴사 처리') + ')', [0, activate ? 1 : 0, activate ? 0 : 1]); toast(activate ? '복직 처리했습니다.' : '퇴사 처리했습니다.'); pageEmployees(tab); } catch (er) { fail(er); }
   }
-  function empForm(no) {
+  function empForm(no, tab) {
     var cur = no ? S.employees.filter(function (e) { return e.emp_no === no; })[0] : null;
     var old = $('#emp_dr'); if (old) old.remove();
-    function f(id, label, req, ph, val, ro) { return '<div class="ff"><label for="ef_' + id + '">' + label + (req ? ' <span style="color:#c42b1c">*</span>' : '') + '</label><input type="text" id="ef_' + id + '" placeholder="' + ph + '" value="' + esc(val == null ? '' : val) + '"' + (ro ? ' readonly style="background:#f3f4f6"' : '') + ' autocomplete="off"></div>'; }
+    function f(id, label, req, ph, val, ro, type) { return '<div class="ff"><label for="ef_' + id + '">' + label + (req ? ' <span style="color:#c42b1c">*</span>' : '') + '</label><input type="' + (type || 'text') + '" id="ef_' + id + '" placeholder="' + ph + '" value="' + esc(val == null ? '' : val) + '"' + (ro ? ' readonly style="background:#f3f4f6"' : '') + ' autocomplete="off"></div>'; }
     var v = cur || {};
     var d = document.createElement('div'); d.id = 'emp_dr'; d.className = 'drawer-wrap';
     d.innerHTML = '<div class="drawer-bg"></div><div class="drawer"><div class="row" style="margin-bottom:12px"><h2 style="flex:1">' + (cur ? '직원 정보 수정' : '직원 직접 등록') + '</h2><button class="btn sm" id="ef_x">✕</button></div>' +
@@ -633,7 +729,8 @@
       '<div class="two">' + f('title', '임직원호칭', false, '예: 사원', v.title) + f('sales_title', '영업직책', false, '예: TFA', v.sales_title) + '</div>' +
       '<div class="two">' + f('duty', '업무', false, '예: IT 지원', v.duty) + f('ext_no', '회사번호(내선번호)', false, '예: 02-2009-5620', v.ext_no) + '</div>' +
       f('address', '주소', false, '예: 서울 강남구 테헤란로4길 14', v.address) +
-      '<div class="note" id="ef_msg" style="background:#f3f8fd;border-radius:6px;padding:8px 10px;margin:8px 0 12px">· 사번이 이미 있으면 "수정"으로 저장되고, 없으면 신규로 등록됩니다.<br>· 저장하면 바로 반영되고, 적용 이력에 "직접 등록"으로 남아 되돌릴 수 있습니다.</div>' +
+      (S.dates ? '<div class="two">' + f('joined_at', '입사일', false, '', v.joined_at, false, 'date') + f('left_at', '퇴사일', false, '', v.left_at, false, 'date') + '</div>' : '') +
+      '<div class="note" id="ef_msg" style="background:#f3f8fd;border-radius:6px;padding:8px 10px;margin:8px 0 12px">· 사번이 이미 있으면 "수정"으로 저장되고, 없으면 신규로 등록됩니다.' + (S.dates ? ' 입사일을 비워 두면 오늘 날짜로 기록됩니다.' : '') + '<br>· 저장하면 바로 반영되고, 적용 이력에 "직접 등록"으로 남아 되돌릴 수 있습니다.</div>' +
       '<div class="row" style="justify-content:flex-end"><button class="btn" id="ef_cancel">취소</button><button class="btn pri" id="ef_save">저장</button></div></div>';
     document.body.appendChild(d);
     function close() { d.remove(); document.removeEventListener('keydown', esc2); }
@@ -647,31 +744,60 @@
       if (!key || !nm) { msg.style.cssText += ';background:#fdecea;color:#c42b1c'; msg.textContent = '사번(인사ID)과 이름은 꼭 입력해야 합니다.'; return; }
       var ex = S.employees.filter(function (e) { return e.emp_no === key; })[0];
       if (!cur && ex && !confirm(key + ' 는 이미 등록된 사번입니다 (' + ex.name + ').\n입력한 내용으로 수정할까요?')) return;
-      var o = { emp_no: key, active: true, updated_at: new Date().toISOString() };
+      var o = { emp_no: key, active: ex ? ex.active !== false : true, updated_at: new Date().toISOString() };
       EMP_FIELDS.forEach(function (fl) { o[fl] = fl === 'name' ? nm : (g(fl) || null); });
+      if (S.dates) { var jd = g('joined_at') || null, ld = g('left_at') || null; if (!ex && !jd) jd = tdy(); o.joined_at = jd; o.left_at = ld; }
       var btn = this; btn.disabled = true; btn.textContent = '저장 중…';
       try {
         if (ex) await saveManual([empSnap(ex)], [], [o], '직접 등록 (수정)', [0, 1, 0]);
         else await saveManual([], [key], [o], '직접 등록 (신규)', [1, 0, 0]);
-        close(); toast(ex ? '수정했습니다.' : '등록했습니다.'); pageEmployees('list');
+        close(); toast(ex ? '수정했습니다.' : '등록했습니다.'); pageEmployees(tab);
       } catch (er) { fail(er); btn.disabled = false; btn.textContent = '저장'; }
     };
   }
+  function empXlsx(list, name) {
+    var rows = list.map(function (e) { return { '인사ID': e.emp_no, '이름': e.name, '본부/팀': e.team, '조직명': e.dept, '임직원호칭': e.title, '영업직책': e.sales_title, '업무': e.duty, '회사번호(내선번호)': e.ext_no, '주소': e.address, '입사일': e.joined_at, '퇴사일': e.left_at, '재직상태': e.active === false ? '퇴사' : '재직' }; });
+    var ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, name); XLSX.writeFile(wb, name + '_' + ymd(new Date()) + '.xlsx');
+  }
   function pageEmployees(arg) {
-    var tab = arg === 'history' ? 'history' : arg === 'list' ? 'list' : 'upload';
-    var active = S.employees.filter(function (e) { return e.active !== false; }).length;
-    var last = S.imports.filter(function (x) { return !x.reverted_at; })[0];
+    var tab = { all: 'all', 'new': 'new', out: 'out', history: 'history' }[arg] || 'act';
+    var P = period();
+    var act = S.employees.filter(function (e) { return e.active !== false; });
+    var nw = S.employees.filter(function (e) { return inRange(e.joined_at, P); });
+    var outs = S.employees.filter(function (e) { return e.active === false && inRange(e.left_at, P); });
     var dups = dupGroups();
-    var warn = S.impErr ? '<div class="note" style="color:#c42b1c;margin-bottom:8px">적용 이력 표를 읽지 못했습니다. db/update_v1.6.sql 을 SQL Editor에서 실행했는지 확인하세요. (인사 명단 업로드는 이력 없이도 가능하지만 되돌리기는 사용할 수 없습니다.)</div>' : '';
-    function tabA(id, t, n) { return '<a href="#/employees' + (id === 'history' ? '/history' : id === 'list' ? '/list' : '') + '" class="' + (tab === id ? 'on' : '') + '">' + t + (n != null ? '<span class="c">' + n + '</span>' : '') + '</a>'; }
-    var kpi = '<div class="kpis"><div class="kpi"><div class="t">등록 인원(재직)</div><div class="n">' + active.toLocaleString() + '</div><div class="s">명</div></div>' +
-      '<div class="kpi"><div class="t">마지막 적용</div><div class="n" style="font-size:18px">' + (last ? esc(ymd(last.applied_at).slice(5) + ' ' + hm(last.applied_at)) : '—') + '</div><div class="s">' + esc(last ? last.applied_by || '' : '아직 없음') + '</div></div>' +
-      '<div class="kpi ' + (dups.length ? 'warn' : '') + '"><div class="t">여러 PC에 등록된 사번</div><div class="n">' + dups.length + '</div><div class="s">적용 이력 탭에서 확인</div></div></div>';
+    var warn = S.impErr ? '<div class="note" style="color:#c42b1c;margin-bottom:8px">적용 이력 표를 읽지 못했습니다. db/update_v1.6.sql 을 SQL Editor에서 실행했는지 확인하세요.</div>' : '';
+    var warn2 = !S.dates ? '<div class="note" style="color:#c42b1c;margin-bottom:8px">입사일·퇴사일 열이 아직 없습니다. SQL Editor에서 db/update_v1.8.sql 을 한 번 실행하면 신규 입사자·퇴사자 기간 조회가 켜집니다. (그 전에도 나머지 기능은 동작합니다.)</div>' : '';
+    function tabA(id, t, n) { return '<a href="#/employees/' + id + '" class="' + (tab === id ? 'on' : '') + '">' + t + (n != null ? '<span class="c">' + n + '</span>' : '') + '</a>'; }
+    function kc(id, t, n, s, cls) { return '<a class="kpi ' + (cls || '') + (tab === id ? ' sel' : '') + '" href="#/employees/' + id + '"><div class="t">' + t + '</div><div class="n">' + n + '</div><div class="s">' + s + '</div></a>'; }
+    var pl = EMPV.chip === '직접 선택' ? '선택 기간' : EMPV.chip;
+    var kpi = '<div class="kpis">' + kc('act', '재적 인원', act.length.toLocaleString(), '현재 명단') + kc('all', '전체 인원', S.employees.length.toLocaleString(), '퇴사자 포함') +
+      kc('new', '신규 입사자', '+' + nw.length, pl + ' · 기간 조회', 'ok') + kc('out', '퇴사자', outs.length.toLocaleString(), pl + ' · 기간 조회', 'bad') +
+      kc('history', '여러 PC에 등록된 사번', dups.length, '적용 이력 탭에서 확인', 'warn') + '</div>';
+    var tabsH = '<div class="tabs">' + tabA('act', '재적 인원', act.length.toLocaleString()) + tabA('all', '전체 인원 (퇴사자 포함)', S.employees.length.toLocaleString()) + tabA('new', '신규 입사자', nw.length) + tabA('out', '퇴사자', outs.length) + tabA('history', '적용 이력·중복 등록', S.imports.length + '/' + dups.length) + '</div>';
+    function th(cols) { return '<thead><tr>' + cols.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead>'; }
     var body = '';
-    if (tab === 'list') {
-      body = '<div class="row" style="margin-bottom:8px"><input type="search" id="emp_q" placeholder="사번·이름·조직·내선 검색" style="width:280px;height:30px;padding:0 8px" value="' + esc(EMPV.q || '') + '"> <label style="font-size:12px;margin-left:8px"><input type="checkbox" id="emp_all"> 퇴사 포함</label><span class="grow"></span><button class="btn" id="emp_xl">엑셀 내려받기</button> <button class="btn pri" id="emp_new">＋ 직접 등록</button></div><div id="emp_tbl"></div>';
-    } else if (tab === 'upload') {
-      body = '<div class="card"><div class="drop"><input type="file" id="f_emp" accept=".xlsx,.xls,.csv"><div class="note" style="margin-top:6px">엑셀(.xlsx) 또는 CSV를 선택하면 아래에 미리보기가 나옵니다. <b>[적용]을 누르기 전에는 아무것도 바뀌지 않습니다.</b><br>필수: 인사ID(사번), 이름(성명) / 읽는 항목: 본부/팀, 조직명, 임직원호칭, 영업직책, 업무, 회사번호(내선번호), 주소 — 그 외 열(대표연락처·팩스·우편번호 등)은 읽지 않고 저장하지 않습니다. 양식: <code>employees_양식.csv</code></div></div><div id="emp_pv" style="margin-top:12px"></div></div>';
+    if (tab === 'act' || tab === 'all') {
+      body = '<div class="row" style="margin-bottom:8px"><input type="search" id="emp_q" placeholder="사번·이름·조직·내선 검색" style="width:280px;height:30px;padding:0 8px" value="' + esc(EMPV.q || '') + '">' +
+        (tab === 'all' ? '<span class="chips">' + [['all', '전체'], ['in', '재직'], ['out', '퇴사']].map(function (c) { return '<span class="chip' + (EMPV.st === c[0] ? ' on' : '') + '" data-st="' + c[0] + '">' + c[1] + '</span>'; }).join('') + '</span>' : '') +
+        '<span class="grow"></span><button class="btn pri" id="emp_new">＋ 직접 등록</button></div><div id="emp_tbl"></div>';
+    } else if (tab === 'new' || tab === 'out') {
+      var isNew = tab === 'new', list = isNew ? nw : outs;
+      var chips = ['이번 달', '지난 달', '최근 3개월', '올해', '직접 선택'].map(function (c) { return '<span class="chip' + (EMPV.chip === c ? ' on' : '') + '" data-chip="' + c + '">' + c + '</span>'; }).join('');
+      var now = new Date(), months = [];
+      for (var i = 5; i >= 0; i--) { var dm = new Date(now.getFullYear(), now.getMonth() - i, 1); months.push([dm.getFullYear() + '-' + pad2(dm.getMonth() + 1), (dm.getMonth() + 1) + '월']); }
+      var cnt = months.map(function (m) { return S.employees.filter(function (e) { return isNew ? String(e.joined_at || '').slice(0, 7) === m[0] : (e.active === false && String(e.left_at || '').slice(0, 7) === m[0]); }).length; });
+      var mx = Math.max.apply(null, cnt.concat([1]));
+      var mbar = '<div class="card mbar"><div class="ml"><b>' + (isNew ? '신규 입사자' : '퇴사자') + '</b><div class="note">월별 추이 (참고)</div></div>' + months.map(function (m, i) { return '<div class="mc"><span>' + cnt[i] + '</span><i style="height:' + (4 + Math.round(46 * cnt[i] / mx)) + 'px;background:' + (isNew ? '#1e8e3e' : '#c42b1c') + '"></i><span class="note">' + m[1] + '</span></div>'; }).join('') + '</div>';
+      var rows = list.sort(function (a, b) { return String(isNew ? b.joined_at : b.left_at).localeCompare(String(isNew ? a.joined_at : a.left_at)); }).slice(0, 300).map(function (e) {
+        var pc = devCount(e.emp_no);
+        return isNew ?
+          '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(ymd(e.joined_at)) + '</td><td>' + tagH(srcOf(e.emp_no, 'add'), 'gray') + '</td><td>' + (pc ? tagH('연동됨', 'ok') : tagH('미연동', 'warn')) + '</td></tr>' :
+          '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(ymd(e.left_at)) + '</td><td>' + tagH(srcOf(e.emp_no, 'out'), 'gray') + '</td><td>' + (pc ? '<b style="color:#c42b1c">PC ' + pc + '대 회수 필요</b>' : '<span style="color:#1e8e3e">PC 없음</span>') + '</td><td><button class="btn sm" data-rs="' + esc(e.emp_no) + '">복직</button></td></tr>';
+      }).join('') || '<tr><td colspan="9" class="note" style="padding:16px;text-align:center">' + (S.dates ? '이 기간에 해당하는 사람이 없습니다.' : '입사일·퇴사일 열 추가(db/update_v1.8.sql) 후 조회할 수 있습니다.') + '</td></tr>';
+      body = '<div class="card pbox"><b>기간</b><input type="date" id="p_from" value="' + P[0] + '"><span>~</span><input type="date" id="p_to" value="' + P[1] + '"><span class="chips">' + chips + '</span><span class="grow"></span><span class="note">' + (isNew ? '신규 입사자' : '퇴사자') + ' <b style="font-size:14px;color:#1a1a1a">' + list.length + '명</b></span><button class="btn" id="p_xl">엑셀 내려받기</button></div>' + mbar +
+        '<div style="overflow:auto"><table class="tbl">' + th(isNew ? ['사번(인사ID)', '이름', '조직명', '본부/팀', '호칭', '입사일', '등록 방법', 'PC 연동'] : ['사번(인사ID)', '이름', '조직명', '본부/팀', '호칭', '퇴사일', '처리 방법', '사용 PC', '관리']) + '<tbody>' + rows + '</tbody></table></div>' +
+        '<div class="note" style="margin-top:6px">' + (isNew ? '입사일은 엑셀의 입사일 항목이 있으면 그 값을, 없으면 명단에 처음 반영한 날(적용일)입니다. 사번 [수정]에서 고칠 수 있습니다. "PC 연동"이 미연동인 사람은 아직 PC 프로그램에서 사번 확인을 하지 않은 사람입니다.' : '"사용 PC"는 해당 사번으로 연동된 PC 수입니다. 회수·초기화가 끝나면 자산 상세에서 사용자를 정리하세요. 퇴사일은 엑셀에서 빠진 날(적용일) 또는 [퇴사 처리]한 날입니다.') + ' v1.8 이전에 올라온 명단은 입사일·퇴사일이 비어 있어 기간 조회에 나타나지 않습니다.</div>';
     } else {
       var hrows = S.imports.map(function (x, i) {
         var canRevert = !x.reverted_at && S.imports.filter(function (y) { return !y.reverted_at; })[0] === x;
@@ -690,87 +816,55 @@
         '<table class="tbl"><thead><tr><th>사번</th><th>성명</th><th>PC</th><th>마지막 확인</th><th></th></tr></thead><tbody>' + drows + '</tbody></table>' +
         '<div class="note" style="margin-top:10px;line-height:1.6">인사 명단에서 빠진(퇴사) 사번은 PC 프로그램의 [사번 확인]에서 확인되지 않습니다. 틀린 사번·성명을 짧은 시간에 여러 번 조회하면 잠시 조회가 막힙니다(같은 PC 5분에 5회, 같은 사번 10분에 10회).</div>';
     }
-    shell('employees', '<h1>인사 명단</h1><div class="note" style="margin:4px 0 10px">엑셀 업로드 → 미리보기 → 적용. PC 프로그램은 사번과 성명이 이 명단과 모두 일치할 때만 서버와 연동됩니다.</div>' + warn + kpi +
-      '<div class="tabs">' + tabA('upload', '업로드', null) + tabA('list', '명단 보기', active) + tabA('history', '적용 이력·중복 등록', S.imports.length + dups.length ? S.imports.length + '/' + dups.length : null) + '</div>' + body);
-    if (tab === 'list') {
+    shell('employees', '<h1>인사 명단</h1><div class="note" style="margin:4px 0 10px">명단 확인·직접 등록·수정. 엑셀 올리기·내려받기는 <a href="#/data"><b>데이터 관리</b></a> 메뉴에서 합니다. PC 프로그램은 사번과 성명이 이 명단과 모두 일치할 때만 서버와 연동됩니다.</div>' + warn + warn2 + kpi + tabsH + body);
+    if (tab === 'act' || tab === 'all') {
       var drawList = function () {
-        var q = ($('#emp_q').value || '').trim().toLowerCase(), all = $('#emp_all').checked;
-        var list = S.employees.filter(function (e) {
-          if (!all && e.active === false) return false;
+        var q = ($('#emp_q').value || '').trim().toLowerCase();
+        var list = (tab === 'act' ? act : S.employees).filter(function (e) {
+          if (tab === 'all' && EMPV.st === 'in' && e.active === false) return false;
+          if (tab === 'all' && EMPV.st === 'out' && e.active !== false) return false;
           return !q || [e.emp_no, e.name, e.dept, e.team, e.title, e.sales_title, e.duty, e.ext_no].join(' ').toLowerCase().indexOf(q) >= 0;
         });
         var rows = list.slice(0, 300).map(function (e) {
-          return '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(e.sales_title || '') + '</td><td>' + esc(e.duty || '') + '</td><td>' + esc(e.ext_no || '') + '</td><td>' + esc(e.address || '') + '</td><td>' + (e.active === false ? tagH('퇴사', 'bad') : '') + '</td><td><button class="btn sm" data-ed="' + esc(e.emp_no) + '">수정</button> ' + (e.active === false ? '<button class="btn sm" data-rs="' + esc(e.emp_no) + '">복직</button>' : '<button class="btn sm" data-out="' + esc(e.emp_no) + '">퇴사 처리</button>') + '</td></tr>';
-        }).join('') || '<tr><td colspan="11" class="note" style="padding:16px;text-align:center">표시할 명단이 없습니다.</td></tr>';
-        $('#emp_tbl').innerHTML = '<div class="note" style="margin-bottom:6px">' + list.length.toLocaleString() + '명' + (list.length > 300 ? ' (상위 300명만 표시, 검색으로 좁혀 보세요)' : '') + '</div><div style="overflow:auto"><table class="tbl"><thead><tr><th>사번(인사ID)</th><th>이름</th><th>조직명</th><th>본부/팀</th><th>호칭</th><th>영업직책</th><th>업무</th><th>내선</th><th>주소</th><th></th><th>관리</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
-        $$('[data-ed]').forEach(function (b) { b.onclick = function () { empForm(b.dataset.ed); }; });
-        $$('[data-out]').forEach(function (b) { b.onclick = function () { empQuick(b.dataset.out, false); }; });
-        $$('[data-rs]').forEach(function (b) { b.onclick = function () { empQuick(b.dataset.rs, true); }; });
+          var btn = tab === 'all' && e.active === false ? '<button class="btn sm" data-ed="' + esc(e.emp_no) + '">수정</button> <button class="btn sm" data-rs="' + esc(e.emp_no) + '">복직</button>' : '<button class="btn sm" data-ed="' + esc(e.emp_no) + '">수정</button> <button class="btn sm" data-out="' + esc(e.emp_no) + '">퇴사 처리</button>';
+          return '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(e.sales_title || '') + '</td><td>' + esc(e.duty || '') + '</td><td>' + esc(e.ext_no || '') + '</td>' +
+            (tab === 'all' ? '<td>' + (e.active === false ? tagH('퇴사', 'bad') : tagH('재직', 'ok')) + '</td>' : '') + '<td>' + (e.joined_at ? esc(ymd(e.joined_at)) : '<span class="note">미등록</span>') + '</td>' + (tab === 'all' ? '<td>' + (e.left_at ? esc(ymd(e.left_at)) : '—') + '</td>' : '') + '<td>' + btn + '</td></tr>';
+        }).join('') || '<tr><td colspan="12" class="note" style="padding:16px;text-align:center">표시할 명단이 없습니다.</td></tr>';
+        $('#emp_tbl').innerHTML = '<div class="note" style="margin-bottom:6px">' + list.length.toLocaleString() + '명' + (list.length > 300 ? ' (상위 300명만 표시, 검색으로 좁혀 보세요)' : '') + '</div><div style="overflow:auto"><table class="tbl">' + th(['사번(인사ID)', '이름', '조직명', '본부/팀', '호칭', '영업직책', '업무', '내선'].concat(tab === 'all' ? ['상태'] : []).concat(['입사일']).concat(tab === 'all' ? ['퇴사일'] : []).concat(['관리'])) + '<tbody>' + rows + '</tbody></table></div>';
+        $$('[data-ed]').forEach(function (b) { b.onclick = function () { empForm(b.dataset.ed, tab); }; });
+        $$('[data-out]').forEach(function (b) { b.onclick = function () { empQuick(b.dataset.out, false, tab); }; });
+        $$('[data-rs]').forEach(function (b) { b.onclick = function () { empQuick(b.dataset.rs, true, tab); }; });
       };
-      $('#emp_q').oninput = function () { EMPV.q = this.value; drawList(); }; $('#emp_all').onchange = drawList; drawList();
-      $('#emp_new').onclick = function () { empForm(null); };
-      $('#emp_xl').onclick = function () {
-        var rows = S.employees.filter(function (e) { return e.active !== false; }).map(function (e) { return { '인사ID': e.emp_no, '이름': e.name, '본부/팀': e.team, '조직명': e.dept, '임직원호칭': e.title, '영업직책': e.sales_title, '업무': e.duty, '회사번호(내선번호)': e.ext_no, '주소': e.address }; });
-        var ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '인사명단'); XLSX.writeFile(wb, '인사명단_' + ymd(new Date()) + '.xlsx');
-      };
+      $('#emp_q').oninput = function () { EMPV.q = this.value; drawList(); }; drawList();
+      $('#emp_new').onclick = function () { empForm(null, tab); };
+      $$('[data-st]').forEach(function (c) { c.onclick = function () { EMPV.st = c.dataset.st; pageEmployees('all'); }; });
       return;
     }
-    if (tab === 'history') {
-      $$('[data-rv]').forEach(function (b) { b.onclick = async function () {
-        var rec = S.imports[+b.dataset.rv];
-        if (!confirm('이 적용(' + ymd(rec.applied_at) + ' ' + hm(rec.applied_at) + ')을 되돌립니다.\n변경·퇴사 처리된 사번은 적용 전 값으로 돌아가고, 새로 들어온 사번은 비활성 처리됩니다.\n계속할까요?')) return;
-        try { await revertImport(rec); toast('되돌렸습니다.'); pageEmployees('history'); } catch (er) { fail(er); }
-      }; });
-      $$('[data-fix]').forEach(function (b) { b.onclick = async function () {
-        var d = S.devices.filter(function (x) { return x.id === b.dataset.fix; })[0]; if (!d) return;
-        var n = (prompt(d.computer_name + ' 의 올바른 사번을 입력하세요.', '') || '').trim().toUpperCase(); if (!n) return;
-        if (!S.empBy[n]) { toast('인사 명단에 없는 사번입니다.'); return; }
-        try { await dbDevEmp(d.id, n, '관리자 사번 수정: ' + d.emp_no + ' → ' + n); toast('수정했습니다.'); pageEmployees('history'); } catch (er) { fail(er); }
-      }; });
-      $$('[data-unl]').forEach(function (b) { b.onclick = async function () {
-        var d = S.devices.filter(function (x) { return x.id === b.dataset.unl; })[0]; if (!d) return;
-        if (!confirm(d.computer_name + ' 의 사번 연동을 해제할까요? (PC 정보는 그대로 남고 사용자만 비워집니다. 다음 실행 때 다시 사번 확인을 하면 연결됩니다.)')) return;
-        try { await dbDevEmp(d.id, null, '관리자 연동 해제: ' + d.emp_no); toast('해제했습니다.'); pageEmployees('history'); } catch (er) { fail(er); }
-      }; });
+    if (tab === 'new' || tab === 'out') {
+      $$('[data-chip]').forEach(function (c) { c.onclick = function () { var p = periodFor(c.dataset.chip); EMPV.chip = c.dataset.chip; if (p) { EMPV.from = p[0]; EMPV.to = p[1]; } pageEmployees(tab); }; });
+      var pf = $('#p_from'), pt = $('#p_to');
+      function chg() { if (pf.value && pt.value) { EMPV.from = pf.value; EMPV.to = pt.value; EMPV.chip = '직접 선택'; pageEmployees(tab); } }
+      pf.onchange = chg; pt.onchange = chg;
+      $('#p_xl').onclick = function () { empXlsx(tab === 'new' ? nw : outs, tab === 'new' ? '신규입사자' : '퇴사자'); };
+      $$('[data-rs]').forEach(function (b) { b.onclick = function () { empQuick(b.dataset.rs, true, tab); }; });
       return;
     }
-    $('#f_emp').onchange = function (ev) {
-      var f = ev.target.files[0]; if (!f) return;
-      var rd = new FileReader();
-      rd.onload = function () {
-        try {
-          var p = parseSheet(rd.result, EMP_MAP, 'emp_no'), pv = $('#emp_pv');
-          if (p.cols.indexOf('emp_no') < 0 || p.cols.indexOf('name') < 0) { pv.innerHTML = '<div class="err">필수 항목(사번 또는 인사ID, 성명 또는 이름)을 찾지 못했습니다. 항목 이름 줄을 확인하세요.</div>'; return; }
-          function draw(deact) {
-            var plan = planEmployees(p, deact);
-            var outPct = active ? plan.outs.length / active : 0;
-            var sum = '<div class="kpis"><div class="kpi ok"><div class="t">신규</div><div class="n">+' + plan.news.length + '</div></div><div class="kpi warn"><div class="t">변경</div><div class="n">' + plan.chgs.length + '</div></div><div class="kpi bad"><div class="t">퇴사(명단에서 빠짐)</div><div class="n">' + plan.outs.length + '</div></div><div class="kpi"><div class="t">오류·제외</div><div class="n">' + (plan.errs.length + p.skipped) + '</div><div class="s">동일 ' + plan.same + '명</div></div></div>';
-            var rows = [];
-            plan.chgs.forEach(function (x) { rows.push([x.r.emp_no, x.r.name, x.r.dept, x.r.team, x.r.title, x.r.sales_title, x.r.ext_no, tagH('변경 · ' + x.diffs.map(function (d) { return DF[d]; }).join('·'), 'warn')]); });
-            plan.news.forEach(function (x) { rows.push([x.r.emp_no, x.r.name, x.r.dept, x.r.team, x.r.title, x.r.sales_title, x.r.ext_no, tagH('신규', 'ok')]); });
-            plan.outs.forEach(function (x) { rows.push([x.c.emp_no, x.c.name, x.c.dept, x.c.team, x.c.title, x.c.sales_title, x.c.ext_no, tagH('퇴사 · 명단에서 빠짐', 'bad')]); });
-            var shown = rows.slice(0, 200).map(function (r) { return '<tr><td class="mono">' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + esc(r[2] || '') + '</td><td>' + esc(r[3] || '') + '</td><td>' + esc(r[4] || '') + '</td><td>' + esc(r[5] || '') + '</td><td>' + esc(r[6] || '') + '</td><td>' + r[7] + '</td></tr>'; }).join('') || '<tr><td colspan="8" class="note" style="padding:14px;text-align:center">바뀌는 내용이 없습니다.</td></tr>';
-            var err = plan.errs.length ? '<div class="err" style="margin:6px 0">오류 ' + plan.errs.length + '건은 제외됩니다: ' + esc(plan.errs.slice(0, 5).join(', ')) + (plan.errs.length > 5 ? ' …' : '') + '</div>' : '';
-            var big = deact && outPct > 0.3 ? '<div class="err" style="margin:6px 0">퇴사 처리가 재직 인원의 ' + Math.round(outPct * 100) + '%입니다. 일부 인원만 담긴 파일이 아닌지 확인하세요. 아래 체크를 눌러야 적용할 수 있습니다.<br><label><input type="checkbox" id="emp_ok"> 확인했습니다</label></div>' : '';
-            var total = plan.news.length + plan.chgs.length + plan.outs.length;
-            pv.innerHTML = '<div style="margin-bottom:8px"><b>' + esc(f.name) + '</b> · ' + p.rows.length.toLocaleString() + '명 인식' + (p.skipped ? ' · 사번 없는 행 ' + p.skipped + '건 제외' : '') + '</div>' + sum +
-              '<label style="font-size:12px;display:block;margin:6px 0"><input type="checkbox" id="emp_deact"' + (deact ? ' checked' : '') + '> 파일에 없는 사번은 퇴사 처리(사번 확인 불가)</label>' + err + big +
-              '<div style="overflow:auto;max-height:340px"><table class="tbl"><thead><tr><th>사번(인사ID)</th><th>이름</th><th>조직명</th><th>본부/팀</th><th>호칭</th><th>영업직책</th><th>내선</th><th>상태</th></tr></thead><tbody>' + shown + '</tbody></table></div>' + (rows.length > 200 ? '<div class="note">상위 200건만 표시 (전체 ' + rows.length + '건 모두 적용됩니다)</div>' : '') +
-              '<div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="emp_cancel">취소</button><button class="btn pri" id="emp_go"' + (total ? '' : ' disabled') + '>적용 (신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ')</button></div>';
-            $('#emp_deact').onchange = function () { draw(this.checked); };
-            $('#emp_cancel').onclick = function () { pv.innerHTML = ''; $('#f_emp').value = ''; };
-            $('#emp_go').onclick = async function () {
-              var ok = $('#emp_ok'); if (big && !(ok && ok.checked)) { toast('퇴사 비율이 높습니다. 확인 체크가 필요합니다.'); return; }
-              var btn = this; btn.disabled = true; btn.textContent = '적용 중…';
-              try { await applyEmployees(plan, f.name, p.cols); toast('적용했습니다. (신규 ' + plan.news.length + ' · 변경 ' + plan.chgs.length + ' · 퇴사 ' + plan.outs.length + ')'); pageEmployees(''); }
-              catch (er) { fail(er); btn.disabled = false; btn.textContent = '다시 시도'; }
-            };
-          }
-          draw(true);
-        } catch (er) { fail(er); }
-      };
-      rd.readAsArrayBuffer(f);
-    };
+    $$('[data-rv]').forEach(function (b) { b.onclick = async function () {
+      var rec = S.imports[+b.dataset.rv];
+      if (!confirm('이 적용(' + ymd(rec.applied_at) + ' ' + hm(rec.applied_at) + ')을 되돌립니다.\n변경·퇴사 처리된 사번은 적용 전 값으로 돌아가고, 새로 들어온 사번은 비활성 처리됩니다.\n계속할까요?')) return;
+      try { await revertImport(rec); toast('되돌렸습니다.'); pageEmployees('history'); } catch (er) { fail(er); }
+    }; });
+    $$('[data-fix]').forEach(function (b) { b.onclick = async function () {
+      var d = S.devices.filter(function (x) { return x.id === b.dataset.fix; })[0]; if (!d) return;
+      var n = (prompt(d.computer_name + ' 의 올바른 사번을 입력하세요.', '') || '').trim().toUpperCase(); if (!n) return;
+      if (!S.empBy[n]) { toast('인사 명단에 없는 사번입니다.'); return; }
+      try { await dbDevEmp(d.id, n, '관리자 사번 수정: ' + d.emp_no + ' → ' + n); toast('수정했습니다.'); pageEmployees('history'); } catch (er) { fail(er); }
+    }; });
+    $$('[data-unl]').forEach(function (b) { b.onclick = async function () {
+      var d = S.devices.filter(function (x) { return x.id === b.dataset.unl; })[0]; if (!d) return;
+      if (!confirm(d.computer_name + ' 의 사번 연동을 해제할까요? (PC 정보는 그대로 남고 사용자만 비워집니다. 다음 실행 때 다시 사번 확인을 하면 연결됩니다.)')) return;
+      try { await dbDevEmp(d.id, null, '관리자 연동 해제: ' + d.emp_no); toast('해제했습니다.'); pageEmployees('history'); } catch (er) { fail(er); }
+    }; });
   }
 
   // ---------- 로그인 / 라우팅 ----------
@@ -792,7 +886,7 @@
       else if (p === 'check') pageCheck(arg);
       else if (p === 'support') pageSupport(arg);
       else if (p === 'employees') pageEmployees(arg);
-      else if (p === 'import') pageImport();
+      else if (p === 'data' || p === 'import') pageData();
       else pageDashboard();
     } catch (e) { fail(e); }
   }
