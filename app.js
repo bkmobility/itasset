@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.4 - 관리자 웹 (정적 페이지, Supabase 연동) */
+/* IT 자산관리시스템 v1.9.5 - 관리자 웹 (정적 페이지, Supabase 연동) */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -119,6 +119,7 @@
         devices.push({ id: 'd' + i, mac: 'A4-BB-6D-' + ('0' + (i * 7 % 256).toString(16)).slice(-2).toUpperCase() + '-3F-90', computer_name: 'ENTIA_' + ('00' + i).slice(-3), ip: '192.168.0.' + (20 + i), os: i % 4 === 0 ? 'Windows 10 Pro' : 'Windows 11 Pro', cpu: ['Intel(R) Core(TM) i7-10700F CPU @ 2.90GHz', 'Intel(R) Core(TM) i5-12400 CPU', 'Intel(R) Core(TM) i3-8100 CPU @ 3.60GHz'][i % 3], ram_gb: [8, 16, 32][i % 3], storage: ['SSD 512 GB', 'SSD 256 GB', 'HDD 500 GB'][i % 3], gpu: '내장 그래픽', agent_version: '1.2.0.0', emp_no: who.emp_no, asset_no: a.asset_no, link_source: 'auto', first_seen: new Date(now - 90 * 86400000).toISOString(), last_seen: new Date(now - age * 86400000 - (i % 5) * 3600000).toISOString() });
       }
     }
+    devices.push({ id: 'dX2', mac: 'D8-BB-C1-45-2E-99', computer_name: 'ENTIA_APLUS', ip: '192.168.1.13', os: 'Windows 11 Pro', cpu: 'Intel(R) Core(TM) i5-13400', ram_gb: 16, storage: 'SSD 512 GB', gpu: '내장 그래픽', agent_version: '1.9.5.0', emp_no: '99999012', asset_no: null, link_source: null, first_seen: new Date().toISOString(), last_seen: new Date().toISOString() });
     devices.push({ id: 'dX1', mac: 'D8-BB-C1-45-2E-18', computer_name: 'ENTIA_NEW01', ip: '192.168.0.201', os: 'Windows 11 Pro', cpu: 'Intel(R) Core(TM) i5-13400', ram_gb: 16, storage: 'SSD 512 GB', gpu: '내장 그래픽', agent_version: '1.2.0.0', emp_no: 'A20231', asset_no: null, link_source: null, first_seen: new Date().toISOString(), last_seen: new Date().toISOString() });
     hist.push({ id: 1, asset_no: 'A-NB-000102', kind: 'spec', detail: 'RAM(GB): 8 → 16', created_at: new Date(now - 86400000).toISOString() });
     hist.push({ id: 2, asset_no: 'A-PC-000100', kind: 'ip', detail: 'IP: 192.168.0.19 → 192.168.0.20', created_at: new Date(now - 2 * 86400000).toISOString() });
@@ -293,7 +294,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.4</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.5</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.status = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -1401,7 +1402,7 @@
   }
   function demoAudit() {
     var t = function (h, m) { var d = new Date(); d.setHours(h, m, 12, 0); return d.toISOString(); };
-    var W = function (s, n, dp, ti, r) { return { actor_sabun: s, actor_name: n, actor_dept: dp, actor_title: ti, actor_role: r, ip: '10.0.1.' + (20 + (s.length * 7) % 40), ua: 'Chrome · Windows' }; };
+    var W = function (s, n, dp, ti, r) { return { actor_sabun: s, actor_name: n, actor_dept: dp, actor_title: ti, actor_role: r, ip: '121.134.13.253', ua: 'Chrome · Windows' }; };
     var main = W('99999012', '배병욱', '전산지원파트', '파트장', 'main'), kim = W('A10442', '김형범', '전산지원파트', '차장', 'admin'), seo = W('A20871', '김서연', 'IT지원팀', '사원', 'admin');
     var L = [
       Object.assign({ id: 'a1', at: t(21, 56), action: 'login', target: '웹 로그인', summary: '로그인 성공 (Chrome · Windows)' }, main),
@@ -1411,6 +1412,7 @@
       Object.assign({ id: 'a5', at: t(20, 51), action: 'change', target: '지원 요청 R-20261118-001 (자산 A-PC-2020-043)', summary: '지원 요청 상태 진행중→완료 · 처리 내용: 크롬 오류로 재설치', detail: { changes: [{ k: '상태', from: '진행중', to: '완료' }] } }, seo),
       Object.assign({ id: 'a6', at: t(20, 30), action: 'export', target: '자산 목록', summary: '엑셀 내보내기 · 70건' }, seo),
       { id: 'a7', at: t(20, 11), action: 'login_fail', target: '웹 로그인', summary: '비밀번호 오류 5회 → 15분 잠김', actor_sabun: '99999013', actor_name: null, actor_role: null, ip: '203.0.113.9', ua: 'Chrome · Windows' },
+      { id: 'a9', at: t(21, 59), action: 'change', target: '자산 A-PC-2020-043', summary: '프로그램 종료 · PC ENTIA_APLUS · 사번 99999012', actor_sabun: '99999012', actor_name: 'PC 프로그램', actor_role: 'program', ip: '13.125.82.49', ip_local: '192.168.1.13' },
       Object.assign({ id: 'a8', at: t(19, 5), action: 'import', target: '인사 명단', summary: '인사 명단 업로드 · 신규 1 · 변경 0 · 퇴사 0' }, main)
     ];
     return L;
@@ -1420,7 +1422,7 @@
   function audCtx(c) { c.t = Date.now(); if (DEMO) auditPost(c); else AC = c; }
   function auditPost(r) {
     var row = { action: r.action || 'update', target: r.target || null, summary: r.summary || null, detail: r.detail || null, reason: r.reason || null };
-    if (DEMO) { S.audit = S.audit || demoAudit(); var w = whoParts(); S.audit.unshift(Object.assign({ id: 'd' + Date.now() + Math.random(), at: new Date().toISOString(), actor_sabun: S.me.sabun, actor_role: S.me.role, actor_name: w.name, actor_dept: w.dept, actor_title: w.title, ip: '10.0.1.21', ua: 'Chrome · Windows' }, row)); return Promise.resolve(); }
+    if (DEMO) { S.audit = S.audit || demoAudit(); var w = whoParts(); S.audit.unshift(Object.assign({ id: 'd' + Date.now() + Math.random(), at: new Date().toISOString(), actor_sabun: S.me.sabun, actor_role: S.me.role, actor_name: w.name, actor_dept: w.dept, actor_title: w.title, ip: '121.134.13.253', ua: 'Chrome · Windows' }, row)); return Promise.resolve(); }
     return Promise.resolve(sb.from('audit_log').insert(row)).then(function () { }, function (e) { console.warn('이력 저장 실패', e); });
   }
   function auditWrite(t, m, args, b) {
@@ -1504,17 +1506,28 @@
   async function loadAuditList() {
     var box = $('#audres'); if (!box) return;
     var res;
-    try { res = await auditFetch(AUDV.page, AUD_PS); } catch (e) { box.innerHTML = '<div class="note" style="color:#c42b1c;padding:14px">' + esc(e.message || e) + '<br>v1.9.4 SQL(update_v1.9.3.sql)을 실행했는지 확인하세요.</div>'; return; }
+    try { res = await auditFetch(AUDV.page, AUD_PS); } catch (e) { box.innerHTML = '<div class="note" style="color:#c42b1c;padding:14px">' + esc(e.message || e) + '<br>v1.9.5 SQL(update_v1.9.5.sql)을 실행했는지 확인하세요.</div>'; return; }
     var rows = res.rows, pages = Math.max(1, Math.ceil(res.count / AUD_PS));
     var trs = rows.map(function (r, i) {
-      return '<tr class="clk" data-i="' + i + '"><td style="white-space:nowrap">' + esc(ymd(r.at).slice(5) + ' ' + hm(r.at)) + '</td><td>' + actorHtml(r) + '</td><td>' + actBadge(r.action) + '</td><td>' + esc(r.target || '') + '</td><td>' + esc(r.summary || '') + (r.reason ? ' <span class="note">· 사유: ' + esc(r.reason) + '</span>' : '') + '</td><td class="mono note">' + esc(r.ip || '') + '</td></tr>';
-    }).join('') || '<tr><td colspan="6" class="note" style="padding:22px;text-align:center">조건에 맞는 이력이 없습니다.' + (AUDV.target ? '<br>(PC 프로그램이 자동으로 올리는 점검·사양 변경은 이력 관리에 기록하지 않으며, 자산 상세의 "변경 이력"에서 확인합니다.)' : '') + '</td></tr>';
+      return '<tr class="clk" data-i="' + i + '"><td style="white-space:nowrap">' + esc(ymd(r.at).slice(5) + ' ' + hm(r.at)) + '</td><td>' + actorHtml(r) + '</td><td>' + actBadge(r.action) + '</td><td>' + esc(r.target || '') + '</td><td>' + esc(r.summary || '') + (r.reason ? ' <span class="note">· 사유: ' + esc(r.reason) + '</span>' : '') + '</td><td>' + ipLocalHtml(r) + '</td><td class="mono">' + esc(r.ip || '') + '</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="note" style="padding:22px;text-align:center">조건에 맞는 이력이 없습니다.' + (AUDV.target ? '<br>(PC 프로그램이 자동으로 올리는 점검·사양 변경은 이력 관리에 기록하지 않으며, 자산 상세의 "변경 이력"에서 확인합니다.)' : '') + '</td></tr>';
     box.innerHTML = '<div class="note" style="margin:8px 0">검색 결과 ' + res.count.toLocaleString() + '건 · 최근순 · 한 번에 ' + AUD_PS + '건' + (AUDV.target ? ' · <span class="fchip">대상: ' + esc(AUDV.target) + '</span>' : '') + '</div>' +
-      '<table class="tbl"><thead><tr><th>일시</th><th>작업자</th><th>구분</th><th>대상</th><th>내용</th><th>접속 IP</th></tr></thead><tbody>' + trs + '</tbody></table>' +
+      '<table class="tbl audtb"><colgroup><col style="width:7%"><col style="width:12%"><col style="width:8%"><col style="width:12%"><col style="width:35%"><col style="width:14%"><col style="width:12%"></colgroup><thead><tr><th>일시</th><th>작업자</th><th>구분</th><th>대상</th><th>내용</th><th class="ipth">접속 IP (내부)</th><th class="ipth">접속 IP (공인)</th></tr></thead><tbody>' + trs + '</tbody></table>' +
       '<div class="row" style="justify-content:center;gap:10px;margin:10px 0"><button class="btn sm" id="au_pv"' + (AUDV.page <= 0 ? ' disabled' : '') + '>‹ 이전</button><span class="note">' + (AUDV.page + 1) + ' / ' + pages + '쪽</span><button class="btn sm" id="au_nx"' + (AUDV.page + 1 >= pages ? ' disabled' : '') + '>다음 ›</button></div>' +
       '<div class="card"><div class="note" style="line-height:1.8">· 행을 누르면 상세(누가·언제·무엇을·어떻게·왜·어디서)가 열립니다<br>· 이력은 <b>수정·삭제할 수 없고</b> 추가만 됩니다 (메인 관리자도 불가) · 이 메뉴는 메인 관리자에게만 보입니다<br>· PC 프로그램이 자동으로 올리는 점검 정보는 건수가 많아 기록하지 않고, 모니터 연결·분리만 기록합니다</div></div>';
     $$('tr.clk', box).forEach(function (tr) { tr.onclick = function () { auditDetail(rows[+tr.dataset.i]); }; });
     $('#au_pv', box).onclick = function () { AUDV.page--; loadAuditList(); }; $('#au_nx', box).onclick = function () { AUDV.page++; loadAuditList(); };
+  }
+  // v1.9.5: 접속 IP (내부) — PC 프로그램 기록은 프로그램이 보낸 값, 그 외(웹 접속)는 같은 사번 PC의 최근 내부 IP를 'PC 기준'으로 표시
+  function ipLocal(r) {
+    if (r.ip_local) return { ip: r.ip_local, est: false };
+    var best = null;
+    (S.devices || []).forEach(function (d) { if (d.ip && r.actor_sabun && d.emp_no === r.actor_sabun && (!best || new Date(d.last_seen || 0) > new Date(best.last_seen || 0))) best = d; });
+    return best ? { ip: best.ip, est: true } : null;
+  }
+  function ipLocalHtml(r) {
+    var x = ipLocal(r);
+    return x ? (x.est ? '<span class="mono note">' + esc(x.ip) + '</span> <span class="ipb">PC 기준</span>' : '<span class="mono">' + esc(x.ip) + '</span>') : '<span class="note">확인 불가</span>';
   }
   function auditHow(r) {
     var ch = r.detail && r.detail.changes, via = (r.detail && r.detail.via) || '';
@@ -1528,7 +1541,7 @@
     var w = r.actor_name ? '<span class="rchip a">' + (r.actor_role === 'viewer' ? '조회' : '관리자') + '</span> ' + esc([r.actor_dept, r.actor_name, r.actor_title].filter(Boolean).join(' ')) + ' <span class="note">(사번 ' + esc(r.actor_sabun || '') + (actorRole(r.actor_role) ? ' · ' + actorRole(r.actor_role) : '') + ')</span>' : esc(r.actor_sabun ? '알 수 없음 (입력한 사번 ' + r.actor_sabun + ')' : '—');
     var m = openModal('<div class="mh"><b>이력 상세</b> ' + actBadge(r.action) + '<span style="flex:1"></span><button class="mx" type="button">✕</button></div>' +
       kv('누가', w) + kv('언제', esc(ymd(r.at) + ' ' + hm(r.at) + ':' + ('0' + new Date(r.at).getSeconds()).slice(-2))) + kv('무엇을', esc(r.target || '') + (r.summary ? '<div class="note">' + esc(r.summary) + '</div>' : '')) +
-      kv('어떻게', auditHow(r)) + kv('왜 (사유)', r.reason ? esc(r.reason) : '<span class="note">입력된 사유 없음</span>') + kv('어디서', esc((r.ip || '—') + (r.ua ? ' · ' + r.ua : ''))) +
+      kv('어떻게', auditHow(r)) + kv('왜 (사유)', r.reason ? esc(r.reason) : '<span class="note">입력된 사유 없음</span>') + kv('어디서', '공인 IP ' + esc(r.ip || '—') + '<br>내부 IP ' + (function () { var x = ipLocal(r); return x ? esc(x.ip) + ' <span class="note">(' + (x.est ? '출처: 같은 사번 PC의 최근 내부 IP · PC 기준' : '출처: PC 프로그램이 직접 보낸 값') + ')</span>' : '<span class="note">확인 불가</span>'; })() + (r.ua ? '<div class="note">' + esc(r.ua) + '</div>' : '')) +
       '<div class="mf"><button class="btn" id="ad_t" type="button">이 대상 이력만 보기</button><button class="btn pri" id="ad_x" type="button">닫기</button></div>', 520);
     $('#ad_x', m.d).onclick = m.close;
     $('#ad_t', m.d).onclick = function () { AUDV.target = r.target || ''; AUDV.page = 0; m.close(); pageAudit(); };
@@ -1537,7 +1550,7 @@
     var v = AUDV, m = openModal('<div class="mh"><b>이력 내보내기</b><button class="mx" type="button">✕</button></div>' +
       '<div class="note" style="margin-bottom:8px">현재 화면의 <b>기간·구분·작업자·대상·검색 조건</b> 그대로 내보냅니다.</div><div class="kv"><div class="k">기간</div><div class="v">' + esc((v.from || '전체') + ' ~ ' + (v.to || '전체')) + '</div></div>' +
       '<div class="ms">파일 형식</div><label style="margin-right:14px"><input type="radio" name="aef" value="xlsx" checked> 엑셀 (.xlsx)</label><label><input type="radio" name="aef" value="csv"> CSV (.csv)</label>' +
-      '<div class="note" style="margin-top:8px">포함 항목: 일시 · 작업자(사번·권한·부서·성명·직책) · 구분 · 대상 · 내용 · 변경 전→후 · 사유 · 접속 IP<br>※ 내보낸 사실도 이력에 "내보내기"로 남습니다. (최대 20,000건)</div>' +
+      '<div class="note" style="margin-top:8px">포함 항목: 일시 · 작업자(사번·권한·부서·성명·직책) · 구분 · 대상 · 내용 · 변경 전→후 · 사유 · 접속 IP (내부) · 접속 IP (공인)<br>※ 내보낸 사실도 이력에 "내보내기"로 남습니다. (최대 20,000건)</div>' +
       '<div class="mf"><button class="btn" id="ae_x" type="button">취소</button><button class="btn pri" id="ae_ok" type="button">내보내기</button></div>', 460);
     $('#ae_x', m.d).onclick = m.close;
     $('#ae_ok', m.d).onclick = async function () {
@@ -1547,7 +1560,7 @@
         for (; pg < 20; pg++) { var r = await auditFetch(pg, 1000); all = all.concat(r.rows); if (r.rows.length < 1000) break; }
         var rows = all.map(function (r) {
           var ch = r.detail && r.detail.changes ? r.detail.changes.map(function (c) { return c.k + ': ' + c.from + ' → ' + c.to; }).join(' / ') : '';
-          return { '일시': ymd(r.at) + ' ' + hm(r.at) + ':' + ('0' + new Date(r.at).getSeconds()).slice(-2), '작업자 사번': r.actor_sabun || '', '권한': actorRole(r.actor_role), '부서': r.actor_dept || '', '성명': r.actor_name || '', '직책': r.actor_title || '', '구분': ACT_L[r.action] || r.action, '대상': r.target || '', '내용': r.summary || '', '변경 전→후': ch, '사유': r.reason || '', '접속 IP': r.ip || '', '브라우저': r.ua || '' };
+          return { '일시': ymd(r.at) + ' ' + hm(r.at) + ':' + ('0' + new Date(r.at).getSeconds()).slice(-2), '작업자 사번': r.actor_sabun || '', '권한': actorRole(r.actor_role), '부서': r.actor_dept || '', '성명': r.actor_name || '', '직책': r.actor_title || '', '구분': ACT_L[r.action] || r.action, '대상': r.target || '', '내용': r.summary || '', '변경 전→후': ch, '사유': r.reason || '', '접속 IP (내부)': (function () { var x = ipLocal(r); return x ? x.ip + (x.est ? ' (PC 기준)' : '') : ''; })(), '접속 IP (공인)': r.ip || '', '브라우저': r.ua || '' };
         });
         var name = '이력관리_' + (v.from || 'all').replace(/-/g, '') + '-' + (v.to || 'all').replace(/-/g, '');
         if (fmt === 'xlsx') { var ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '이력'); XLSX.writeFile(wb, name + '.xlsx'); }
@@ -1726,7 +1739,7 @@
     return Object.keys(g).sort(function (a, b) { return g[b].n - g[a].n; }).slice(0, 5).map(function (k) { var p = Math.round(g[k].d / g[k].n * 100), c = p >= 90 ? '#1e8e3e' : p < 40 ? '#a15c00' : '#0f6cbd'; return '<div class="prow"><span class="pn">' + esc(k) + '</span><span class="pb"><i style="width:' + p + '%;background:' + c + '"></i></span><span class="pv">' + p + '%</span></div>'; }).join('') || '<div class="note">대상이 없습니다.</div>';
   }
   async function pageInventory() {
-    var invs; try { invs = await invList(); } catch (e) { shell('inventory', '<h1>실사 (재물조사)</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message || e) + '<br>v1.9.4 SQL(update_v1.9.3.sql)을 실행했는지 확인하세요.</div>'); return; }
+    var invs; try { invs = await invList(); } catch (e) { shell('inventory', '<h1>실사 (재물조사)</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message || e) + '<br>v1.9.5 SQL(update_v1.9.5.sql)을 실행했는지 확인하세요.</div>'); return; }
     var cur = invs.filter(function (x) { return x.status === 'open'; })[0] || null, items = cur ? await invItems(cur.id) : [], st = invStats(items);
     var head = '<div class="row wrap"><h1>실사 (재물조사)</h1><span class="note">장부의 자산이 실제 있는지 확인합니다</span><div class="grow"></div><button class="btn pri wonly" id="in_new" type="button">새 실사 만들기</button></div>';
     var curH = cur ? '<div class="card"><div class="row wrap"><b style="font-size:14px">' + esc(cur.name) + '</b>' + badge('진행 중', 'blue') + '<span class="note">' + esc((cur.start_date || '') + ' ~ ' + (cur.end_date || '')) + ' · 대상 ' + st.total.toLocaleString() + '대</span><div class="grow"></div><button class="btn wonly" id="in_scan" type="button">현장 스캔</button><button class="btn pri" id="in_det" type="button">결과 · 마감</button></div>' +

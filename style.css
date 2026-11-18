@@ -262,3 +262,11 @@ body.viewer .wonly{display:none!important}
 .rcols{display:flex;gap:12px;align-items:flex-start;margin-top:10px;flex-wrap:wrap}.rcols .rtb{flex:1;min-width:320px}
 .tbl.ctr td[style*="text-align:left"]{text-align:left}
 @media print{.layout{display:block}.main{padding:0}.rgrid{grid-template-columns:1fr}}
+
+/* v1.9.5 이력 관리 열 너비 + 접속 IP 2칸 */
+.tbl.audtb{table-layout:fixed}
+.tbl.audtb td,.tbl.audtb th{word-break:break-all}
+.tbl.audtb td:nth-child(1),.tbl.audtb td:nth-child(3){white-space:nowrap}
+.tbl.audtb td:nth-child(5){word-break:keep-all;overflow-wrap:anywhere}
+.tbl.audtb th.ipth{background:#fff7d6}
+.ipb{display:inline-block;background:#eef1f5;color:#6a6a6a;border-radius:3px;padding:0 4px;font-size:9.5px;vertical-align:1px}
