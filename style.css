@@ -133,7 +133,7 @@ a.kpi{display:block;color:inherit}a.kpi:hover{border-color:#bcd7f2}
 .ucand .ut{margin-bottom:4px;font-size:14px}
 .ucand .uw{font-size:11.5px;line-height:1.6;border-top:1px dashed #d8dde5;margin-top:6px;padding-top:6px}
 
-/* ===== v1.9.1 ===== */
+/* ===== v1.9.2 ===== */
 .bar.go,.lg.go{cursor:pointer;border-radius:6px;padding-left:4px;padding-right:4px;margin-left:-4px;margin-right:-4px}
 .bar.go:hover,.lg.go:hover{background:#e7f1fb}.lg.go:hover span{color:#0f6cbd;text-decoration:underline}
 .bar.go:hover .l{color:#0f6cbd;font-weight:600}
@@ -168,3 +168,11 @@ mark{background:#fff2a8;padding:0 1px;border-radius:2px}
 .notice{position:fixed;right:24px;bottom:24px;width:300px;background:#1f2937;color:#fff;border-radius:10px;padding:12px 14px;font-size:12.5px;line-height:1.6;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:95;cursor:pointer}
 .notice .nsub{color:#cbd5e1;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gs{width:460px!important}
+
+/* v1.9.2 */
+a.kpi.go{display:block;color:inherit;text-decoration:none;cursor:pointer}
+a.kpi.go:hover{background:#f7fbff}
+a.kpi.on{box-shadow:0 0 0 2px #0f6cbd;background:#fbfdff}
+a.kpi.warn.on{box-shadow:0 0 0 2px #d46b08}a.kpi.ok.on{box-shadow:0 0 0 2px #1e8e3e}
+.kpi .go-a{float:right;color:#0f6cbd}
+.who{font-weight:600}

@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.1 - 관리자 웹 (정적 페이지, Supabase 연동) */
+/* IT 자산관리시스템 v1.9.2 - 관리자 웹 (정적 페이지, Supabase 연동) */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -185,13 +185,15 @@
   }
 
   // ---------- 화면 틀 ----------
+  // v1.9.2: 로그인 계정을 "부서명 성명"으로 표시 (admin_users.name/dept 등록 전에는 이메일)
+  function adminLabel() { var m = S.me; if (m && m.name) return (m.dept ? m.dept + ' ' : '') + m.name; return S.user ? S.user.email : '데모 관리자'; }
   var ROUTES = [['dashboard', '대시보드'], ['assets', '자산'], ['check', 'PC 점검'], ['support', '지원 요청'], ['employees', '인사 명단'], ['data', '데이터 관리']];
   function shell(active, html) {
     var nav = ROUTES.map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '실사(재물조사)', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.1</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
-      '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><div class="sp"></div><div class="who">' + esc(S.user ? S.user.email : '데모 관리자') + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + html + '</div></div></div>';
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.2</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><div class="sp"></div><div class="who" title="' + esc(S.user ? S.user.email : '') + '">' + esc(adminLabel()) + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + html + '</div></div></div>';
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.status = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
     var lo = $('#logout'); if (lo) lo.onclick = async function () { await sb.auth.signOut(); location.reload(); };
   }
@@ -271,7 +273,7 @@
   }
 
   // ---------- 자산 목록 ----------
-  // ---------- 검색 (v1.9.1: 자산 상세 화면의 모든 항목) ----------
+  // ---------- 검색 (v1.9.2: 자산 상세 화면의 모든 항목) ----------
   function searchFields(a) {
     var d = a._dev, e = a._emp;
     return [['관리번호', a.asset_no], ['자산분류', a.category], ['제조사', a.manufacturer], ['모델명', a.model], ['제조년월', a.mfg_ym], ['자산상태', a.status],
@@ -346,15 +348,26 @@
       '<div style="overflow:auto"><table class="tbl"><thead><tr><th><input type="checkbox" id="all"></th><th>관리번호</th>' + (qLow ? '<th>일치한 항목</th>' : '') + '<th>자산분류</th><th>제조사</th><th>모델명</th><th>제조년월</th><th>자산상태</th><th>사용자명</th><th>소속명</th><th>직책</th><th>보증 (제조년월+5년)</th><th class="auto">컴퓨터 이름</th><th class="auto">IP</th><th class="auto">사양 (CPU / RAM / 저장)</th><th class="auto">최종 확인</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="pager"><span>' + (list.length ? ((F.page - 1) * PS + 1) + '–' + Math.min(list.length, F.page * PS) : 0) + ' / ' + list.length.toLocaleString() + '건</span><span><button class="btn sm" id="prev"' + (F.page <= 1 ? ' disabled' : '') + '>‹ 이전</button> ' + F.page + ' / ' + pages + ' <button class="btn sm" id="next"' + (F.page >= pages ? ' disabled' : '') + '>다음 ›</button></span></div>'
     );
-    if (partial && $('#alist')) { $('#alist').innerHTML = innerHtml; bindList(); return; }
+    // v1.9.2: 위쪽 [QR코드 출력] — 선택한 항목이 있으면 선택한 것만, 없으면 검색·조건으로 걸러진 목록 전체
+    function updTop() {
+      var b = $('#qrtop'); if (!b) return;
+      b.textContent = 'QR코드 출력 (' + (nIn > 0 ? '선택 ' + nIn.toLocaleString() + '개' : hasFilter ? '조회 ' + list.length.toLocaleString() + '건' : '전체 ' + list.length.toLocaleString() + '건') + ')';
+      b.disabled = !list.length;
+      b.onclick = function () {
+        if (!nIn && !hasFilter && !confirm('조건이 없어 전체 ' + list.length.toLocaleString() + '건이 출력 대상입니다. 계속할까요?')) return;
+        openQrDialog(list);
+      };
+    }
+    if (partial && $('#alist')) { $('#alist').innerHTML = innerHtml; bindList(); updTop(); return; }
     shell('assets', '<div class="row wrap"><h1>자산</h1><span class="badge b-gray">전체 ' + S.assets.length.toLocaleString() + '</span><div class="grow"></div>' +
       '<input type="text" id="q" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목)" style="width:330px" value="' + esc(F.q) + '">' +
       sel('cat', '자산분류: 전체', cats, F.cat) + sel('status', '자산상태: 전체', stats, F.status) +
       '<select id="collect"><option value="">수집상태: 전체</option><option value="today"' + (F.collect === 'today' ? ' selected' : '') + '>오늘 확인</option><option value="stale"' + (F.collect === 'stale' ? ' selected' : '') + '>7일 이상 미확인</option><option value="none"' + (F.collect === 'none' ? ' selected' : '') + '>미수집 PC</option><option value="mismatch"' + (F.collect === 'mismatch' ? ' selected' : '') + '>사용자 불일치</option></select>' +
-      '<button class="btn" id="xl">엑셀 다운로드</button></div>' +
+      '<button class="btn pri" id="qrtop">QR코드 출력</button><button class="btn" id="xl">엑셀 다운로드</button></div>' +
       '<div class="note" style="margin:6px 0">기존 시스템 항목 · <span style="color:#0f6cbd">파란 배경 = 프로그램이 자동으로 채우는 항목</span> · <span class="dot" style="background:#1e8e3e"></span>오늘 <span class="dot" style="background:#faad14"></span>3일 이상 <span class="dot" style="background:#c42b1c"></span>7일 이상 미확인</div>' +
       '<div id="alist">' + innerHtml + '</div>');
     function sel(id, ph, opts, cur) { return '<select id="' + id + '"><option value="">' + ph + '</option>' + opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>'; }
+    updTop();
     var qEl = $('#q');
     qEl.oninput = function () { F.q = qEl.value; F.page = 1; pageAssets(true); };   // 입력칸은 다시 그리지 않고 목록만 갱신 (한글 조합 유지)
     ['cat', 'status', 'collect'].forEach(function (id) { $('#' + id).onchange = function (e) { F[id] = e.target.value; F.page = 1; pageAssets(); }; });
@@ -391,7 +404,7 @@
     var ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, name); XLSX.writeFile(wb, name + '_' + ymd(new Date()) + '.xlsx');
   }
-  // ---------- QR 라벨 출력 (v1.9.1: 출력 대상·라벨 크기·여러 쪽) ----------
+  // ---------- QR 라벨 출력 (v1.9.2: 출력 대상·라벨 크기·여러 쪽) ----------
   var QRS = { small: { n: '작게', mm: 25, qr: 18, cols: 6, rows: 10 }, normal: { n: '보통', mm: 35, qr: 26, cols: 5, rows: 7 }, large: { n: '크게', mm: 45, qr: 36, cols: 4, rows: 5 } };
   var QRO = { size: 'normal', text: true, border: true, crisp: false }, QR_CHUNK = 500;
   function printQr(nos, o) {
@@ -614,18 +627,23 @@
     var x = S.support.filter(function (q) { return q.id === id; })[0]; if (x) Object.assign(x, patch);
   }
   function pageSupport(arg) {
-    var f = (arg || '').split('/'), tab = f[0] === 'all' || f[0] === 'done' ? f[0] : 'open', sel = f[1] || '';
+    var f = (arg || '').split('/'), sel = f[1] || '';
     var open = S.support.filter(function (x) { return x.status !== 'done'; }), done = S.support.filter(function (x) { return x.status === 'done'; });
-    var list = tab === 'all' ? S.support : tab === 'done' ? done : open;
+    var todayL = S.support.filter(function (x) { return dayDiff(x.created_at) <= 0; }), today = todayL.length;
+    var recL = S.support.filter(function (x) { return x.status === 'received'; }), wkL = S.support.filter(function (x) { return x.status === 'working'; });
+    var rec = recL.length, wk = wkL.length;
+    var TABS = ['received', 'working', 'done', 'today', 'all'];
+    var tab = TABS.indexOf(f[0]) >= 0 ? f[0] : (rec ? 'received' : wk ? 'working' : S.support.length ? 'all' : 'received');   // 카드·탭으로 이동 (v1.9.2)
+    var list = tab === 'received' ? recL : tab === 'working' ? wkL : tab === 'done' ? done : tab === 'today' ? todayL : S.support;
     var cur = S.support.filter(function (x) { return x.id === sel; })[0] || list[0] || null;
+    if (cur && list.indexOf(cur) < 0) cur = list[0] || null;
     function tabA(id, t, n) { return '<a href="#/support/' + id + '" class="' + (tab === id ? 'on' : '') + '">' + t + '<span class="c">' + n + '</span></a>'; }
-    var today = S.support.filter(function (x) { return dayDiff(x.created_at) <= 0; }).length;
-    var rec = S.support.filter(function (x) { return x.status === 'received'; }).length, wk = S.support.filter(function (x) { return x.status === 'working'; }).length;
-    var kpi = '<div class="kpis"><div class="kpi warn"><div class="t">접수 대기</div><div class="n">' + rec + '</div></div><div class="kpi"><div class="t">진행중</div><div class="n">' + wk + '</div></div><div class="kpi ok"><div class="t">완료</div><div class="n">' + done.length + '</div></div><div class="kpi"><div class="t">오늘 접수</div><div class="n">' + today + '</div></div></div>';
+    function kc(id, cls, t, n) { return '<a class="kpi go ' + cls + (tab === id ? ' on' : '') + '" href="#/support/' + id + '" title="누르면 ' + t + ' 목록으로 이동"><div class="t">' + t + '<span class="go-a">›</span></div><div class="n">' + n + '</div></a>'; }
+    var kpi = '<div class="kpis">' + kc('received', 'warn', '접수 대기', rec) + kc('working', '', '진행중', wk) + kc('done', 'ok', '완료', done.length) + kc('today', '', '오늘 접수', today) + '</div>';
     var rows = list.map(function (x) {
       var e = S.empBy[x.emp_no], st = SUP_ST[x.status] || SUP_ST.received;
       return '<tr class="' + (cur && cur.id === x.id ? 'sel' : '') + '" data-id="' + esc(x.id) + '" style="cursor:pointer"><td class="mono">' + esc(x.req_no) + '</td><td>' + esc(ymd(x.created_at).slice(5) + ' ' + hm(x.created_at)) + '</td><td>' + esc(e ? e.name + ' / ' + e.dept : x.emp_no) + '</td><td>' + esc(x.computer_name) + '</td><td>' + esc(x.symptom || '—') + '</td><td>' + badge(st[0], st[1]) + '</td></tr>';
-    }).join('') || '<tr><td colspan="6" class="note" style="padding:20px;text-align:center">접수된 요청이 없습니다.</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="note" style="padding:20px;text-align:center">해당 요청이 없습니다.</td></tr>';
     var side = '';
     if (cur) {
       var e = S.empBy[cur.emp_no], a = S.assets.filter(function (z) { return z.asset_no === cur.asset_no; })[0], dv = S.devices.filter(function (z) { return z.computer_name === cur.computer_name; })[0] || (a && a._dev);
@@ -635,19 +653,20 @@
         '<textarea id="supnote" class="ln" rows="2" placeholder="처리 메모 (완료 시 자산 이력에 기록)" style="width:100%;margin-top:8px;box-sizing:border-box">' + esc(cur.note || '') + '</textarea>' +
         '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm pri" id="supremote">원격 접속 열기</button>' +
         (cur.status === 'received' ? '<button class="btn sm" id="supwork">처리 시작</button>' : '') + (cur.status !== 'done' ? '<button class="btn sm" id="supdone">완료 처리</button>' : '<button class="btn sm" id="supreopen">다시 열기</button>') + '</div></div>' +
-        '<div class="card" style="margin-top:10px"><h3 style="margin:0 0 6px;font-size:13px">접속 방법</h3><div class="note" style="line-height:1.7">1. [원격 접속 열기] → 원격지원 서비스 상담원 화면이 새 창으로 열림<br>2. 직원에게 접수 알림 → 직원이 대기 중인 상담원 번호를 선택<br>3. 상담원 화면에서 해당 직원 PC 접속 연결<br>4. 처리 후 [완료 처리] + 메모 → 자산 이력에 기록</div></div>';
+        '<div class="card" style="margin-top:10px"><h3 style="margin:0 0 6px;font-size:13px">접속 방법</h3><div class="note" style="line-height:1.7">1. [원격 접속 열기] → 원격 접속 매니저(ezHelpManager)가 실행됨<br>2. 로그인 후 대기 목록의 접속코드 6자리를 확인<br>3. 접속코드를 직원에게 전화·메신저로 안내 → 직원이 입력하면 연결<br>4. 처리 후 [완료 처리] + 메모 → 자산 이력에 기록<br><span style="color:#8a8a8a">※ 이 PC에 \"IT 자산 확인\" 프로그램이 한 번 실행된 적이 있어야 합니다. 별도 프로그램은 필요 없습니다.</span></div></div>';
     }
     var warn = S.supportErr ? '<div class="note" style="color:#c42b1c;margin-bottom:8px">지원 요청 표를 읽지 못했습니다. db/update_v1.1.sql 을 SQL Editor에서 실행했는지 확인하세요.</div>' : '';
-    shell('support', '<h1>지원 요청</h1>' + warn + kpi + '<div class="tabs">' + tabA('open', '처리 필요', open.length) + tabA('done', '완료', done.length) + tabA('all', '전체', S.support.length) + '</div>' +
+    shell('support', '<h1>지원 요청</h1>' + warn + kpi + '<div class="tabs">' + tabA('received', '접수 대기', rec) + tabA('working', '진행중', wk) + tabA('done', '완료', done.length) + tabA('today', '오늘 접수', today) + tabA('all', '전체', S.support.length) + '</div>' +
       '<div style="display:flex;gap:14px;align-items:flex-start"><div style="flex:1;min-width:0"><table class="tbl"><thead><tr><th>접수번호</th><th>접수 시각</th><th>사용자</th><th>컴퓨터 이름</th><th>증상</th><th>상태</th></tr></thead><tbody>' + rows + '</tbody></table></div><div style="width:320px;flex:none">' + side + '</div></div>');
     $$('tr[data-id]').forEach(function (tr) { tr.onclick = function () { location.hash = '#/support/' + tab + '/' + tr.dataset.id; }; });
     if (!cur) return;
     var note = function () { var n = $('#supnote'); return n ? n.value.trim() : ''; };
-    var who = function () { return S.user ? S.user.email : '데모 관리자'; };
+    var who = adminLabel;
     var rm = $('#supremote'); if (rm) rm.onclick = function () {
-      var u = (cfg.REMOTE_ADMIN_URL || '').trim();
-      if (!/^https?:\/\//i.test(u)) { toast('config.js 의 REMOTE_ADMIN_URL 에 원격지원 상담원 화면 주소를 입력하세요.'); return; }
-      window.open(u, '_blank', 'noopener');
+      // v1.9.2: IT 자산 확인.exe 가 ezHelpManager 를 실행 (설치되어 있지 않으면 내장 설치 파일로 설치 후 실행)
+      var fr = document.createElement('iframe'); fr.style.display = 'none'; fr.src = 'itasset-remote://open'; document.body.appendChild(fr);
+      setTimeout(function () { fr.remove(); }, 3000);
+      toast('원격 접속을 실행합니다. 아무 반응이 없으면 이 PC에서 "IT 자산 확인" 프로그램을 한 번 실행한 뒤 다시 눌러 주세요.');
     };
     var w = $('#supwork'); if (w) w.onclick = async function () { try { await dbSupport(cur.id, { status: 'working', handler: who() }); pageSupport(arg); } catch (er) { fail(er); } };
     var dn = $('#supdone'); if (dn) dn.onclick = async function () {
@@ -831,7 +850,7 @@
     plan.chgs.forEach(function (x) { before.push(empSnap(x.c)); up.push(mk(x, x.c)); });
     plan.outs.forEach(function (x) { before.push(empSnap(x.c)); var o = empSnap(x.c); o.active = false; o.updated_at = now; if (S.dates) o.left_at = outD; if (S.est) o.left_est = true; up.push(o); });
     await dbUpsert('employees', up, 'emp_no');
-    var rec = { applied_at: now, applied_by: S.user ? S.user.email : '데모 관리자', file_name: fileName, added: plan.news.length, changed: plan.chgs.length, deactivated: plan.outs.length, added_keys: addedKeys, before_rows: before, reverted_at: null };
+    var rec = { applied_at: now, applied_by: adminLabel(), file_name: fileName, added: plan.news.length, changed: plan.chgs.length, deactivated: plan.outs.length, added_keys: addedKeys, before_rows: before, reverted_at: null };
     if (!DEMO) { var r = await sb.from('employee_imports').insert(rec).select().single(); if (r.error) throw r.error; rec = r.data; }
     else rec.id = Date.now();
     S.imports.unshift(rec);
@@ -863,7 +882,7 @@
   async function saveManual(rowsBefore, addedKeys, up, label, counts) {
     await dbUpsert('employees', up, 'emp_no');
     var now = new Date().toISOString();
-    var rec = { applied_at: now, applied_by: S.user ? S.user.email : '데모 관리자', file_name: label, added: counts[0], changed: counts[1], deactivated: counts[2], added_keys: addedKeys, before_rows: rowsBefore, reverted_at: null };
+    var rec = { applied_at: now, applied_by: adminLabel(), file_name: label, added: counts[0], changed: counts[1], deactivated: counts[2], added_keys: addedKeys, before_rows: rowsBefore, reverted_at: null };
     if (!DEMO) {
       if (!S.impErr) { var r = await sb.from('employee_imports').insert(rec).select().single(); if (r.error) throw r.error; rec = r.data; }
     } else rec.id = Date.now();
@@ -1038,6 +1057,7 @@
     $('#go').onclick = go; $('#pw').onkeydown = function (e) { if (e.key === 'Enter') go(); };
   }
   function route() {
+    $$('.mdl').forEach(function (m) { m.remove(); });   // 화면을 옮기면 열려 있던 창(QR 출력 등)을 닫음
     var h = (location.hash || '#/dashboard').replace(/^#\//, '').split('/'), p = h[0], arg = h.slice(1).join('/');
     try {
       if (p === 'assets') pageAssets();
@@ -1049,7 +1069,7 @@
       else pageDashboard();
     } catch (e) { fail(e); }
   }
-  // ---------- 지원 요청 자동 확인 (v1.9.1: 1분마다, 새 요청이면 메뉴 숫자·알림) ----------
+  // ---------- 지원 요청 자동 확인 (v1.9.2: 1분마다, 새 요청이면 메뉴 숫자·알림) ----------
   var supSeen = {};
   function supBadge() {
     var n = S.support.filter(function (x) { return x.status === 'received'; }).length, a = $('.nav a[href="#/support"]');
@@ -1083,7 +1103,9 @@
         var s = await sb.auth.getSession();
         if (!s.data.session) { pageLogin(); return; }
         S.user = s.data.session.user;
-        var adm = await sb.from('admin_users').select('user_id').eq('user_id', S.user.id).maybeSingle();
+        var adm = await sb.from('admin_users').select('user_id,name,dept').eq('user_id', S.user.id).maybeSingle();
+        if (adm.error) adm = await sb.from('admin_users').select('user_id').eq('user_id', S.user.id).maybeSingle();   // v1.9.2 SQL 실행 전에도 동작
+        S.me = adm.data || null;
         if (!adm.data) { await sb.auth.signOut(); pageLogin('관리자 권한이 없는 계정입니다. 관리자에게 등록을 요청하세요.'); return; }
       }
       $app.innerHTML = '<div style="padding:40px;text-align:center;color:#5c5c5c">불러오는 중…</div>';
