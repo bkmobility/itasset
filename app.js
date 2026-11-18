@@ -377,6 +377,21 @@
 
   // ---------- 자산 목록 ----------
   // ---------- 검색 (v1.9.2: 자산 상세 화면의 모든 항목) ----------
+  // v1.9.3: 목록에서 모니터 ↔ PC 연동 상태 (연결됨=초록, 미연결=분홍)
+  function monLink(a) {
+    if (a.category === '모니터') {
+      var pcNo = a.linked_pc, pc = pcNo ? S.assets.filter(function (x) { return x.asset_no === pcNo; })[0] : null;
+      var rec = (S.monitors || []).filter(function (m) { return m.asset_no === a.asset_no; })[0];
+      return { mon: true, pc: pc || null, pcNo: pcNo || null, how: rec ? (rec.link_source === 'manual' ? '수동 연결' : '시리얼 일치(자동)') : '연결됨' };
+    }
+    if (isPc(a)) { var n = a._dev ? (S.monitors || []).filter(function (m) { return m.device_id === a._dev.id; }).length : 0; return { mon: false, n: n }; }
+    return null;
+  }
+  function monBadge(a) {
+    var L = monLink(a); if (!L) return '';
+    if (L.mon) return L.pcNo ? '<span class="lkb ok">' + esc(L.pcNo) + ' · ' + L.how + '</span>' : '<span class="lkb no">PC 미연결</span>';
+    return L.n ? '<span class="lkb gray">연결 모니터 ' + L.n + '대</span>' : '';
+  }
   function searchFields(a) {
     var d = a._dev, e = a._emp;
     return [['관리번호', a.asset_no], ['자산분류', a.category], ['제조사', a.manufacturer], ['모델명', a.model], ['제조년월', a.mfg_ym], ['자산상태', a.status],
@@ -431,11 +446,14 @@
     var pageRows = list.slice((F.page - 1) * PS, F.page * PS), qLow = F.q.trim().toLowerCase();
     var rows = pageRows.map(function (a) {
       var hitCell = '';
-      if (qLow) { var hs = searchHits(a, qLow).filter(function (f) { return HID[f[0]]; }).slice(0, 2); hitCell = '<td class="hit">' + (hs.map(function (f) { return '<span><b>' + esc(f[0]) + '</b> ' + hl(f[1], qLow) + '</span>'; }).join('<br>') || '<span class="note">—</span>') + '</td>'; }
+      if (qLow) { var hs = searchHits(a, qLow).filter(function (f) { return HID[f[0]]; }).slice(0, 2); hitCell = '<td class="hit">' + (hs.map(function (f) { return '<span>' + hl(f[1], qLow) + '</span>'; }).join('<br>') || '<span class="note">—</span>') + (monBadge(a) ? '<div>' + monBadge(a) + '</div>' : '') + '</td>'; }
+      var L = monLink(a), dPc = L && L.mon && L.pc ? L.pc : null;   // 연결된 모니터는 PC 값으로 표시
+      var cName = a.pc_name || (dPc && dPc.pc_name) || '—', cIp = a.ip || (dPc && dPc.ip) || '—', cSeen = a.last_seen || (dPc && dPc.last_seen);
+      var nameExtra = (!qLow && monBadge(a) ? '<div>' + monBadge(a) + '</div>' : '');
       return '<tr class="clk" data-no="' + esc(a.asset_no) + '"><td><input type="checkbox" class="sel" data-no="' + esc(a.asset_no) + '"' + (F.sel[a.asset_no] ? ' checked' : '') + '></td>' +
         '<td class="mono">' + esc(a.asset_no) + '</td>' + hitCell + '<td>' + esc(a.category) + '</td><td>' + esc(a.manufacturer) + '</td><td>' + esc(a.model) + '</td><td>' + esc(a.mfg_ym) + '</td><td>' + esc(a.status) + '</td>' +
         '<td>' + esc(a.user_name) + (a.user_mismatch ? ' ' + badge('불일치', 'warn') : '') + '</td><td>' + esc(a.dept) + '</td><td>' + esc(a.title) + '</td><td>' + warrantyBadge(a.warr_end, a.warr_calc) + '</td>' +
-        '<td class="auto">' + esc(a.pc_name || '—') + '</td><td class="auto mono">' + esc(a.ip || '—') + '</td><td class="auto">' + esc(specStr(a)) + '</td><td class="auto">' + seenHtml(a.last_seen) + '</td></tr>';
+        '<td class="auto">' + esc(cName) + nameExtra + '</td><td class="auto mono">' + esc(cIp) + '</td><td class="auto">' + esc(specStr(a)) + '</td><td class="auto">' + (cSeen ? seenHtml(cSeen) + (!a.last_seen && dPc ? '<div class="note" style="font-size:10.5px">연결 PC 기준</div>' : '') : seenHtml(a.last_seen)) + '</td></tr>';
     }).join('') || '<tr><td colspan="16" class="note" style="padding:24px;text-align:center">조건에 맞는 자산이 없습니다.</td></tr>';
     var nsel = Object.keys(F.sel).length;
     var hasFilter = !!(qLow || F.dept || F.cat || F.status || F.collect);
@@ -1566,7 +1584,7 @@
       var ms = monsOf(d);
       if (!ms.length) return h + '<div class="note">아직 읽어 온 모니터 정보가 없습니다. (PC 프로그램 v1.9.3 이상이 실행되면 자동으로 채워집니다)</div></div>';
       return h + '<table class="tbl"><thead><tr><th>모니터(모델)</th><th>시리얼 번호</th><th>제조 년월</th><th>해상도</th><th>연결 상태</th><th>최종 확인</th></tr></thead><tbody>' + ms.map(function (m) {
-        var st = m.asset_no ? badge('자산 연결됨', 'ok') + ' <a href="#/asset/' + encodeURIComponent(m.asset_no) + '" class="mono">' + esc(m.asset_no) + '</a> <a href="#" class="mon-un" data-m="' + esc(m.id) + '">해제</a>' : badge('자산 미연결', 'warn') + ' <a href="#" class="mon-ln" data-m="' + esc(m.id) + '">모니터 자산 선택</a>';
+        var st = m.asset_no ? badge('자산 연결됨', 'ok') + ' <a href="#/asset/' + encodeURIComponent(m.asset_no) + '" class="mono">' + esc(m.asset_no) + '</a> <a href="#" class="mon-un" data-m="' + esc(m.id) + '">해제</a>' : badge('자산 미연결', 'pink') + ' <a href="#" class="mon-ln" data-m="' + esc(m.id) + '">모니터 자산 선택</a>';
         return '<tr><td>' + esc([m.maker, m.model].filter(Boolean).join(' ')) + '</td><td class="mono">' + esc(m.serial || '—') + '</td><td>' + esc(m.made_ym || '—') + '</td><td>' + esc(m.resolution || '—') + '</td><td>' + st + '</td><td>' + esc(ymd(m.last_seen).slice(5) + ' ' + hm(m.last_seen)) + '</td></tr>';
       }).join('') + '</tbody></table><div class="note" style="margin-top:6px">시리얼이 모니터 자산의 시리얼 번호와 같으면 자동으로 연결됩니다. 자동 연결이 안 되는 모니터는 [모니터 자산 선택] 또는 모니터 QR 스캔으로 연결하세요.</div></div>';
     }
@@ -1948,7 +1966,7 @@
     var viewer = isViewer(), mon = kind === 'PC' ? monsOf(a._dev) : [];
     shell('scan', '<div class="row wrap"><a href="#/scan">‹ 다시 스캔</a><h1 class="mono">' + esc(no) + '</h1>' + badge(a.category || '—', 'gray') + badge(a.status || '—', a.status === '사용중' ? 'ok' : 'gray') + '</div>' +
       '<div class="card"><div style="line-height:1.9"><b>' + esc((a.manufacturer || '') + ' ' + (a.model || '')) + '</b><br>위치 ' + esc(a.location || '—') + ' · 사용자 ' + esc((a.user_name || '—') + (a.dept ? ' · ' + a.dept : '')) + '<br>보증 ' + warrantyBadge(a.warr_end, a.warr_calc) + (a.pc_name ? '<br>컴퓨터 이름 ' + esc(a.pc_name) + ' · 최종 확인 ' + seenHtml(a.last_seen) : '') + (kind === '모니터' ? '<br>연결 PC ' + (a.linked_pc ? '<a class="mono" href="#/asset/' + encodeURIComponent(a.linked_pc) + '">' + esc(a.linked_pc) + '</a>' : '<span class="note">없음</span>') : '') + '</div></div>' +
-      (kind === 'PC' ? '<div class="card"><h3>연관 모니터</h3>' + (mon.length ? mon.map(function (m) { return '<div style="padding:4px 0">' + esc((m.maker || '') + ' ' + (m.model || '')) + ' · ' + esc(m.serial || '시리얼 없음') + ' ' + (m.asset_no ? badge('연결됨 ' + m.asset_no, 'ok') : badge('미연결', 'warn')) + '</div>'; }).join('') : '<div class="note">읽어 온 모니터 정보가 없습니다.</div>') + '</div>' : '') +
+      (kind === 'PC' ? '<div class="card"><h3>연관 모니터</h3>' + (mon.length ? mon.map(function (m) { return '<div style="padding:4px 0">' + esc((m.maker || '') + ' ' + (m.model || '')) + ' · ' + esc(m.serial || '시리얼 없음') + ' ' + (m.asset_no ? badge('연결됨 ' + m.asset_no, 'ok') : badge('미연결', 'pink')) + '</div>'; }).join('') : '<div class="note">읽어 온 모니터 정보가 없습니다.</div>') + '</div>' : '') +
       '<div id="sc_inv"></div><div class="card"><div class="scbtns">' +
       (viewer ? '' : '<button class="btn" id="s_chg" type="button">위치·사용자 변경</button><button class="btn" id="s_sup" type="button">지원 요청 등록</button>' + (kind === '모니터' && !a.linked_pc ? '<button class="btn pri" id="s_mon" type="button">PC와 연결</button>' : '')) +
       '<a class="btn" href="#/asset/' + encodeURIComponent(no) + '">이력·상세 보기</a></div>' + (viewer ? '<div class="note" style="margin-top:6px">조회 전용 계정은 정보·이력 보기만 가능합니다.</div>' : '') + '</div>');

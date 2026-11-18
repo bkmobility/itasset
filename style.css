@@ -234,3 +234,8 @@ body.viewer .wonly{display:none!important}
 .login .lgh{text-align:center;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #eef0f3}
 .login .lgt{font-size:24px;font-weight:800;color:#0f6cbd;letter-spacing:-.5px}
 .login .lgs{margin-top:6px;font-size:13px;color:#6b7280}
+
+.lkb{display:inline-block;border-radius:4px;padding:1px 6px;font-size:11px;white-space:nowrap;margin-top:3px}
+.lkb.ok{background:#e6f4ea;color:#1e8e3e}.lkb.no{background:#fde7f1;color:#b4226b}.lkb.gray{background:#eef1f5;color:#5c5c5c}
+.b-pink{background:#fde7f1;color:#b4226b}
+.hit mark,.hit span{font-weight:500}
