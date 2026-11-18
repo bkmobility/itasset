@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.3 - 관리자 웹 (정적 페이지, Supabase 연동) */
+/* IT 자산관리시스템 v1.9.4 - 관리자 웹 (정적 페이지, Supabase 연동) */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -12,7 +12,7 @@
   var S = { assets: [], employees: [], devices: [], history: [], support: [], supportErr: false, imports: [], impErr: false, user: null };
   var F = { q: '', dept: '', cat: '', status: '', collect: '', page: 1, sel: {} };
   var HOLD_KEY = 'itam_hold_v1';
-  // v1.9.3: 조회 전용 계정은 쓰기를 화면에서도 막음 (서버 RLS가 최종으로 막음)
+  // v1.9.4: 조회 전용 계정은 쓰기를 화면에서도 막음 (서버 RLS가 최종으로 막음)
   if (sb) {
     var _from = sb.from.bind(sb);
     sb.from = function (t) {
@@ -161,8 +161,8 @@
     var sr = await sb.from('support_requests').select('*').order('created_at', { ascending: false }).limit(300);
     S.supportErr = !!sr.error; S.support = sr.error ? [] : sr.data;   // v1.0 DB(표 없음)에서도 나머지 화면은 동작
     var mr = await sb.from('device_monitors').select('*').eq('gone', false).limit(5000);
-    S.monErr = !!mr.error; S.monitors = mr.error ? [] : mr.data;   // v1.9.3 SQL 실행 전에도 나머지 화면은 동작
-    rebuildAssets();
+    S.monErr = !!mr.error; S.monitors = mr.error ? [] : mr.data;   // v1.9.4 SQL 실행 전에도 나머지 화면은 동작
+    rebuildAssets(); snapDaily();
   }
   // 자산 + 연결된 PC + 사용자 불일치를 클라이언트에서 계산 (v_assets 와 같은 규칙)
   function rebuildAssets() {
@@ -218,7 +218,7 @@
     }
   }
 
-  // ---------- v1.9.3: 표 정렬 (제목 칸 클릭: ▲ 오름 → ▼ 내림 → 해제) ----------
+  // ---------- v1.9.4: 표 정렬 (제목 칸 클릭: ▲ 오름 → ▼ 내림 → 해제) ----------
   var SORT = {};
   function cmpV(a, b, t) {
     if (t === 'n') return (parseFloat(a) || 0) - (parseFloat(b) || 0);
@@ -255,7 +255,7 @@
     $$('[data-sclr="' + key + '"]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); delete SORT[key]; redo(); }; });
   }
 
-  // ---------- v1.9.3: 로그인 계정(사번)·권한 ----------
+  // ---------- v1.9.4: 로그인 계정(사번)·권한 ----------
   function isViewer() { return !!(S.me && S.me.role === 'viewer'); }
   function isMain() { return !!(S.me && S.me.role === 'main'); }
   function needWrite() { if (isViewer()) throw new Error('조회 전용 계정은 수정·업로드·처리를 할 수 없습니다.'); }
@@ -277,7 +277,7 @@
   }
 
   // ---------- 화면 틀 ----------
-  // v1.9.3: 로그인 계정 표시 = 권한 · 부서명 · 성명 · 직책 (부서·성명·직책은 인사 명단에서 자동 반영)
+  // v1.9.4: 로그인 계정 표시 = 권한 · 부서명 · 성명 · 직책 (부서·성명·직책은 인사 명단에서 자동 반영)
   function whoParts() {
     var m = S.me || {}, e = m.sabun && S.empBy && S.empBy[m.sabun];
     return { dept: e ? e.dept : m.dept, name: e ? e.name : m.name, title: e ? e.title : m.title };
@@ -287,13 +287,13 @@
     var w = whoParts(), role = isViewer() ? '조회' : '관리자';
     return '<span class="rchip ' + (isViewer() ? 'v' : 'a') + '">' + role + '</span><span>' + esc(adminLabel()) + '</span>';
   }
-  var ROUTES = [['dashboard', '대시보드'], ['assets', '자산'], ['check', 'PC 점검'], ['support', '지원 요청'], ['employees', '인사 명단'], ['data', '데이터 관리'], ['inventory', '실사(재물조사)']];
-  function navRoutes() { return isMain() ? ROUTES.concat([['audit', '이력 관리'], ['admins', '관리자 등록']]) : ROUTES; }
+  var ROUTES = [['dashboard', '대시보드'], ['assets', '자산 관리'], ['check', '현황 점검'], ['support', '원격 지원'], ['employees', '인사 정보'], ['data', '데이터 관리'], ['inventory', '실사 (재물조사)']];
+  function navRoutes() { return (isMain() ? ROUTES.concat([['audit', '이력 관리'], ['admins', '관리자']]) : ROUTES).concat([['reports', '보고서']]); }
   function shell(active, html) {
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.3</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.4</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.status = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -377,7 +377,7 @@
 
   // ---------- 자산 목록 ----------
   // ---------- 검색 (v1.9.2: 자산 상세 화면의 모든 항목) ----------
-  // v1.9.3: 목록에서 모니터 ↔ PC 연동 상태 (연결됨=초록, 미연결=분홍)
+  // v1.9.4: 목록에서 모니터 ↔ PC 연동 상태 (연결됨=초록, 미연결=분홍)
   function monLink(a) {
     if (a.category === '모니터') {
       var pcNo = a.linked_pc, pc = pcNo ? S.assets.filter(function (x) { return x.asset_no === pcNo; })[0] : null;
@@ -455,8 +455,8 @@
       var cName = a.pc_name || (dPc && dPc.pc_name) || '—', cIp = a.ip || (dPc && dPc.ip) || '—', cSeen = a.last_seen || (dPc && dPc.last_seen);
       var nameExtra = (!qLow && monBadge(a) ? '<div>' + monBadge(a) + '</div>' : '');
       return '<tr class="clk" data-no="' + esc(a.asset_no) + '"><td><input type="checkbox" class="sel" data-no="' + esc(a.asset_no) + '"' + (F.sel[a.asset_no] ? ' checked' : '') + '></td>' +
-        '<td class="mono">' + esc(a.asset_no) + '</td>' + hitCell + '<td>' + esc(a.category) + '</td><td>' + esc(a.manufacturer) + '</td><td>' + esc(a.model) + '</td><td>' + esc(a.mfg_ym) + '</td><td>' + esc(a.status) + '</td>' +
-        '<td>' + esc(a.user_name) + (a.user_mismatch ? ' ' + badge('불일치', 'warn') : '') + '</td><td>' + esc(a.dept) + '</td><td>' + esc(a.title) + '</td><td>' + warrantyBadge(a.warr_end, a.warr_calc) + '</td>' +
+        '<td class="mono">' + esc(a.asset_no) + '</td>' + hitCell + '<td>' + esc(a.category) + '</td><td>' + esc(a.manufacturer) + '</td><td>' + esc(a.model) + '</td><td>' + esc(a.mfg_ym) + '</td><td>' + esc(a.status) + '</td><td>' + warrantyBadge(a.warr_end, a.warr_calc) + '</td>' +
+        '<td>' + esc(a.user_name) + (a.user_mismatch ? ' ' + badge('불일치', 'warn') : '') + '</td><td>' + esc(a.dept) + '</td><td>' + esc(a.title) + '</td>' +
         '<td class="auto">' + esc(cName) + nameExtra + '</td><td class="auto mono">' + esc(cIp) + '</td><td class="auto">' + esc(a.category === '모니터' ? monSpec(a) : specStr(a)) + '</td><td class="auto">' + (cSeen ? seenHtml(cSeen) + (!a.last_seen && dPc ? '<div class="note" style="font-size:10.5px">연결 PC 기준</div>' : '') : seenHtml(a.last_seen)) + '</td></tr>';
     }).join('') || '<tr><td colspan="16" class="note" style="padding:24px;text-align:center">조건에 맞는 자산이 없습니다.</td></tr>';
     var nsel = Object.keys(F.sel).length;
@@ -479,7 +479,7 @@
     }
     var innerHtml = (
       chipHtml + bulk +
-      sortBar('assets', AC, list.length) + '<div style="overflow:auto"><table class="tbl"><thead><tr><th><input type="checkbox" id="all"></th>' + thS('assets', 'asset_no', '관리번호') + (qLow ? '<th>일치한 항목</th>' : '') + thS('assets', 'category', '자산분류') + thS('assets', 'manufacturer', '제조사') + thS('assets', 'model', '모델명') + thS('assets', 'mfg_ym', '제조년월') + thS('assets', 'status', '자산상태') + thS('assets', 'user_name', '사용자명') + thS('assets', 'dept', '소속명') + thS('assets', 'title', '직책') + thS('assets', 'warr', '보증 (제조년월+5년)') + thS('assets', 'pc_name', '컴퓨터 이름', 'auto') + thS('assets', 'ip', 'IP', 'auto') + thS('assets', 'spec', '사양', 'auto') + thS('assets', 'last_seen', '최종 확인', 'auto') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      sortBar('assets', AC, list.length) + '<div style="overflow:auto"><table class="tbl ctr"><thead><tr><th><input type="checkbox" id="all"></th>' + thS('assets', 'asset_no', '관리번호') + (qLow ? '<th>일치한 항목</th>' : '') + thS('assets', 'category', '자산분류') + thS('assets', 'manufacturer', '제조사') + thS('assets', 'model', '모델명') + thS('assets', 'mfg_ym', '제조년월') + thS('assets', 'status', '자산상태') + thS('assets', 'warr', '보증 (제조년월+5년)') + thS('assets', 'user_name', '사용자명') + thS('assets', 'dept', '소속명') + thS('assets', 'title', '직책') + thS('assets', 'pc_name', '컴퓨터 이름', 'auto') + thS('assets', 'ip', 'IP', 'auto') + thS('assets', 'spec', '사양', 'auto') + thS('assets', 'last_seen', '최종 확인', 'auto') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="pager"><span>' + (list.length ? ((F.page - 1) * PS + 1) + '–' + Math.min(list.length, F.page * PS) : 0) + ' / ' + list.length.toLocaleString() + '건</span><span><button class="btn sm" id="prev"' + (F.page <= 1 ? ' disabled' : '') + '>‹ 이전</button> ' + F.page + ' / ' + pages + ' <button class="btn sm" id="next"' + (F.page >= pages ? ' disabled' : '') + '>다음 ›</button></span></div>'
     );
     // v1.9.2: 위쪽 [QR코드 출력] — 선택한 항목이 있으면 선택한 것만, 없으면 검색·조건으로 걸러진 목록 전체
@@ -493,11 +493,11 @@
       };
     }
     if (partial && $('#alist')) { $('#alist').innerHTML = innerHtml; bindList(); updTop(); return; }
-    shell('assets', '<div class="row wrap"><h1>자산</h1><span class="badge b-gray">전체 ' + S.assets.length.toLocaleString() + '</span><div class="grow"></div>' +
+    shell('assets', '<div class="row wrap"><h1>자산 관리</h1><span class="badge b-gray">전체 ' + S.assets.length.toLocaleString() + '</span><div class="grow"></div>' +
       '<input type="text" id="q" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목)" style="width:330px" value="' + esc(F.q) + '">' +
       sel('cat', '자산분류: 전체', cats, F.cat) + sel('status', '자산상태: 전체', stats, F.status) +
       '<select id="collect"><option value="">수집상태: 전체</option><option value="today"' + (F.collect === 'today' ? ' selected' : '') + '>오늘 확인</option><option value="stale"' + (F.collect === 'stale' ? ' selected' : '') + '>7일 이상 미확인</option><option value="none"' + (F.collect === 'none' ? ' selected' : '') + '>미수집 PC</option><option value="mismatch"' + (F.collect === 'mismatch' ? ' selected' : '') + '>사용자 불일치</option></select>' +
-      '<button class="btn pri" id="qrtop">QR코드 출력</button><button class="btn" id="xl">엑셀 다운로드</button></div>' +
+      '<button class="btn pri" id="qrtop">QR코드 출력</button><button class="btn" id="xl">엑셀 다운로드</button><button class="btn pri wonly" id="a_new" type="button">＋ 직접 등록</button></div>' +
       '<div class="note" style="margin:6px 0">기존 시스템 항목 · <span style="color:#0f6cbd">파란 배경 = 프로그램이 자동으로 채우는 항목</span> · <span class="dot" style="background:#1e8e3e"></span>오늘 <span class="dot" style="background:#faad14"></span>3일 이상 <span class="dot" style="background:#c42b1c"></span>7일 이상 미확인</div>' +
       '<div id="alist">' + innerHtml + '</div>');
     function sel(id, ph, opts, cur) { return '<select id="' + id + '"><option value="">' + ph + '</option>' + opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>'; }
@@ -531,6 +531,7 @@
     }
     bindList();
     $('#xl').onclick = function () { exportXlsx(filtered(), '자산목록'); };
+    $('#a_new').onclick = function () { location.hash = '#/asset-new'; };
   }
   function exportXlsx(list, name) {
     var rows = list.map(function (a) {
@@ -612,7 +613,7 @@
       (d ? kv('컴퓨터 이름', esc(d.computer_name)) + kv('OS', esc(d.os)) + kv('IP / MAC', esc(d.ip) + ' / ' + esc(d.mac)) + kv('CPU', esc(d.cpu)) + kv('RAM / 저장장치', esc((d.ram_gb || '—') + ' GB / ' + (d.storage || '—'))) + kv('그래픽카드', esc(d.gpu)) + kv('최종 확인', seenHtml(d.last_seen)) +
         kv('실행 사번', e ? esc(d.emp_no + ' (' + e.name + ', ' + (e.dept || '') + ')') : esc(d.emp_no)) +
         '<div style="margin-top:8px">' + (a.user_mismatch ? badge('대장 사용자와 다름', 'warn') : badge('대장 사용자와 일치', 'ok')) + ' ' + badge(d.link_source === 'auto' ? '자동 연결' : '수동 연결', 'gray') + ' <button class="btn sm" id="unlink">연결 해제</button></div>'
-        : '<div class="note">이 자산에 연결된 PC가 없습니다. 사용자가 프로그램을 실행하면 자동으로 연결되거나, <a href="#/check/unreg">PC 점검 &gt; 미등록 PC</a>에서 연결할 수 있습니다.' + (isPc(a) ? '' : '<br>(모니터·서버 등은 자동 수집 대상이 아닙니다)') + '</div>') + '</div></div>' +
+        : '<div class="note">이 자산에 연결된 PC가 없습니다. 사용자가 프로그램을 실행하면 자동으로 연결되거나, <a href="#/check/unreg">현황 점검 &gt; 미등록 PC</a>에서 연결할 수 있습니다.' + (isPc(a) ? '' : '<br>(모니터·서버 등은 자동 수집 대상이 아닙니다)') + '</div>') + '</div></div>' +
       monCardHtml(a, d) +
       '<div class="card" style="margin-top:12px"><h3>변경 이력</h3>' + (hist.map(function (h) { return '<div class="hist"><span class="d"></span><span class="t">' + esc(ymd(h.created_at) + ' ' + hm(h.created_at)) + '</span><span>' + esc(h.detail) + '</span></div>'; }).join('') || '<div class="note">이력이 없습니다.</div>') + '</div>');
     $('#qr').onclick = function () { printQr([no]); };
@@ -695,7 +696,7 @@
         }).join('') || '<div class="note" style="padding:20px;text-align:center">미등록 PC가 없습니다.</div>') +
         '<div class="note">추천은 참고용입니다. CPU 출시 연도와 대장의 제조년월·구매일을 비교해 가장 가까운 후보를 미리 선택해 둡니다. 연결 후에는 이 PC에서 프로그램을 실행할 때마다 해당 자산이 자동으로 갱신됩니다.</div>';
     }
-    shell('check', '<h1>PC 점검</h1><div class="tabs">' + tabA('mismatch', '사용자 불일치', mism.length) + tabA('stale', '7일 이상 미확인', stale.length) + tabA('unreg', '미등록 PC', unreg.length) + '</div>' + body);
+    shell('check', '<h1>현황 점검</h1><div class="tabs">' + tabA('mismatch', '사용자 불일치', mism.length) + tabA('stale', '7일 이상 미확인', stale.length) + tabA('unreg', '미등록 PC', unreg.length) + '</div>' + body);
     bindSort('chk1', function () { pageCheck(tab); }); bindSort('chk2', function () { pageCheck(tab); });
     var urs = $('#ursort'); if (urs) urs.onchange = function () { if (!urs.value) delete SORT.chk3; else { var p0 = urs.value.split('|'); SORT.chk3 = { k: p0[0], d: p0[1] }; } pageCheck('unreg'); };
     $$('.fix').forEach(function (b) { b.onclick = async function () {
@@ -823,7 +824,7 @@
         '<div class="card" style="margin-top:10px"><h3 style="margin:0 0 6px;font-size:13px">접속 방법</h3><div class="note" style="line-height:1.7">1. [원격 접속 열기] → 원격 접속 매니저(ezHelpManager)가 실행됨<br>2. 로그인 후 대기 목록의 접속코드 6자리를 확인<br>3. 접속코드를 직원에게 전화·메신저로 안내 → 직원이 입력하면 연결<br>4. 처리 후 [완료 처리] + 메모 → 자산 이력에 기록<br><span style="color:#8a8a8a">※ 이 PC에 \"IT 자산 확인\" 프로그램이 한 번 실행된 적이 있어야 합니다. 별도 프로그램은 필요 없습니다.</span></div></div>';
     }
     var warn = S.supportErr ? '<div class="note" style="color:#c42b1c;margin-bottom:8px">지원 요청 표를 읽지 못했습니다. db/update_v1.1.sql 을 SQL Editor에서 실행했는지 확인하세요.</div>' : '';
-    shell('support', '<h1>지원 요청</h1>' + warn + kpi + '<div class="tabs">' + tabA('received', '접수 대기', rec) + tabA('working', '진행중', wk) + tabA('done', '완료', done.length) + tabA('today', '오늘 접수', today) + tabA('all', '전체', S.support.length) + '</div>' +
+    shell('support', '<h1>원격 지원</h1>' + warn + kpi + '<div class="tabs">' + tabA('received', '접수 대기', rec) + tabA('working', '진행중', wk) + tabA('done', '완료', done.length) + tabA('today', '오늘 접수', today) + tabA('all', '전체', S.support.length) + '</div>' +
       sortBar('sup', SUPC, list.length) + '<div style="display:flex;gap:14px;align-items:flex-start"><div style="flex:1;min-width:0"><table class="tbl"><thead><tr>' + thS('sup', 'req_no', '접수번호') + thS('sup', 'created', '접수 시각') + thS('sup', 'user', '사용자') + thS('sup', 'pc', '컴퓨터 이름') + thS('sup', 'symptom', '증상') + thS('sup', 'status', '상태') + '</tr></thead><tbody>' + rows + '</tbody></table></div><div style="width:320px;flex:none">' + side + '</div></div>');
     bindSort('sup', function () { pageSupport(arg); });
     $$('tr[data-id]').forEach(function (tr) { tr.onclick = function () { location.hash = '#/support/' + tab + '/' + tr.dataset.id; }; });
@@ -1173,7 +1174,7 @@
         '<table class="tbl"><thead><tr><th>사번</th><th>성명</th><th>PC</th><th>마지막 확인</th><th></th></tr></thead><tbody>' + drows + '</tbody></table>' +
         '<div class="note" style="margin-top:10px;line-height:1.6">인사 명단에서 빠진(퇴사) 사번은 PC 프로그램의 [사번 확인]에서 확인되지 않습니다. 틀린 사번·성명을 짧은 시간에 여러 번 조회하면 잠시 조회가 막힙니다(같은 PC 5분에 5회, 같은 사번 10분에 10회).</div>';
     }
-    shell('employees', '<h1>인사 명단</h1><div class="note" style="margin:4px 0 10px">명단 확인·직접 등록·수정. 엑셀 올리기·내려받기는 <a href="#/data"><b>데이터 관리</b></a> 메뉴에서 합니다. PC 프로그램은 사번과 성명이 이 명단과 모두 일치할 때만 서버와 연동됩니다.</div>' + warn + warn2 + kpi + tabsH + body);
+    shell('employees', '<h1>인사 정보</h1><div class="note" style="margin:4px 0 10px">명단 확인·직접 등록·수정. 엑셀 올리기·내려받기는 <a href="#/data"><b>데이터 관리</b></a> 메뉴에서 합니다. PC 프로그램은 사번과 성명이 이 명단과 모두 일치할 때만 서버와 연동됩니다.</div>' + warn + warn2 + kpi + tabsH + body);
     if (tab === 'act' || tab === 'all') {
       var drawList = function () {
         var q = ($('#emp_q').value || '').trim().toLowerCase();
@@ -1246,7 +1247,7 @@
     $('#go').onclick = go; $('#pw').onkeydown = function (e) { if (e.key === 'Enter') go(); }; $('#sbn').onkeydown = function (e) { if (e.key === 'Enter') $('#pw').focus(); };
     $('#sbn').focus();
   }
-  // ---------- v1.9.3: 관리자 등록 (메인 관리자 전용) ----------
+  // ---------- v1.9.4: 관리자 등록 (메인 관리자 전용) ----------
   var ADM = { list: null, demo: null };
   function roleText(r) { return r === 'main' ? '메인 관리자' : r === 'viewer' ? '조회 전용' : '일반 관리자'; }
   function roleBadge(r) { return '<span class="rchip2 ' + (r === 'main' ? 'm' : r === 'viewer' ? 'v' : 'a') + '">' + roleText(r) + '</span>'; }
@@ -1289,7 +1290,7 @@
   async function pageAdmins() {
     if (!isMain()) { location.hash = '#/dashboard'; return; }
     var rows;
-    try { rows = (await admCall('list')).admins; } catch (e) { shell('admins', '<h1>관리자 등록</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message) + '</div>'); return; }
+    try { rows = (await admCall('list')).admins; } catch (e) { shell('admins', '<h1>관리자</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message) + '</div>'); return; }
     ADM.list = rows;
     var n = rows.length, nOn = rows.filter(function (x) { return x.active; }).length;
     var sorted = sortRows(rows, 'adm', ADC);
@@ -1300,7 +1301,7 @@
           '<a href="#" data-a="on" data-s="' + esc(x.sabun) + '">다시 사용</a> · <a href="#" data-a="del" data-s="' + esc(x.sabun) + '">삭제</a>');
       return '<tr><td class="mono">' + esc(x.sabun) + '</td><td>' + esc(admName(x) || '') + (me ? ' (나)' : '') + '</td><td>' + esc(admDept(x) || '') + '</td><td>' + roleBadge(x.role) + '</td><td>' + (x.active ? badge('사용 중', 'ok') : badge('사용 중지', 'bad')) + '</td><td>' + (x.last_login ? esc(ymd(x.last_login).slice(5) + ' ' + hm(x.last_login)) : '<span class="note">없음</span>') + '</td><td class="admact">' + act + '</td></tr>';
     }).join('') || '<tr><td colspan="7" class="note" style="padding:20px;text-align:center">등록된 관리자가 없습니다.</td></tr>';
-    shell('admins', '<div class="row wrap"><h1>관리자 등록</h1><span class="note">IT Asset 웹페이지에 로그인할 수 있는 사람과 권한을 관리합니다 · 로그인 ID = 사번</span><div class="grow"></div><button class="btn pri" id="adnew">관리자 등록</button></div>' +
+    shell('admins', '<div class="row wrap"><h1>관리자</h1><span class="note">IT Asset 웹페이지에 로그인할 수 있는 사람과 권한을 관리합니다 · 로그인 ID = 사번</span><div class="grow"></div><button class="btn pri" id="adnew">관리자 등록</button></div>' +
       '<div class="note" style="margin:6px 0">관리자 ' + n + '명 (사용 중 ' + nOn + ')</div>' + sortBar('adm', ADC, n) +
       '<table class="tbl"><thead><tr>' + thS('adm', 'sabun', '사번 (로그인 ID)') + thS('adm', 'name', '성명') + thS('adm', 'dept', '조직명') + thS('adm', 'role', '권한') + thS('adm', 'active', '상태') + thS('adm', 'last', '최근 접속') + '<th>관리</th></tr></thead><tbody>' + body + '</tbody></table>' +
       '<div class="card" style="margin-top:12px"><div class="note" style="line-height:1.8">· 메인 관리자는 1명이며 변경·중지·삭제할 수 없습니다 (Supabase에서 처음 한 번 등록)<br>· 인사 명단에서 <b>퇴사 처리된 사람은 관리자도 자동으로 사용 중지</b>되어 로그인할 수 없습니다<br>· [삭제]하면 Supabase 로그인 계정도 함께 지워집니다 (Supabase 화면은 직접 열 필요가 없습니다)</div></div>');
@@ -1328,7 +1329,7 @@
     $('#rcok', d).onclick = async function () { var v = $('input[name="rl"]:checked', d).value, rs = $('#rcr', d).value.trim(); if (!rs) { toast('사유를 입력하세요.'); return; } try { await admCall('setrole', { sabun: x.sabun, role: v, reason: rs }); close(); toast('권한을 변경했습니다.'); pageAdmins(); } catch (e) { fail(e); } };
   }
   function roleRadios(cur) {
-    return '<label class="rrow"><input type="radio" name="rl" value="admin"' + (cur === 'admin' ? ' checked' : '') + '><span><b>일반 관리자</b><br><i>자산·PC 점검·지원 요청·인사 명단·데이터 관리 사용</i></span></label>' +
+    return '<label class="rrow"><input type="radio" name="rl" value="admin"' + (cur === 'admin' ? ' checked' : '') + '><span><b>일반 관리자</b><br><i>자산 관리·현황 점검·원격 지원·인사 정보·데이터 관리 사용</i></span></label>' +
       '<label class="rrow"><input type="radio" name="rl" value="viewer"' + (cur === 'viewer' ? ' checked' : '') + '><span><b>조회 전용</b><br><i>화면 조회만 가능 (수정·업로드·완료 처리 불가)</i></span></label>' +
       '<label class="rrow dis"><input type="radio" disabled><span><b>메인 관리자</b><br><i>배병욱(99999012) 1명 고정 (선택 불가)</i></span></label>';
   }
@@ -1365,7 +1366,7 @@
     };
   }
   // =====================================================================
-  // v1.9.3: 공통 창 · 사유 입력 · 이력 기록
+  // v1.9.4: 공통 창 · 사유 입력 · 이력 기록
   // =====================================================================
   function openModal(html, width) {
     var d = document.createElement('div'); d.className = 'mdl';
@@ -1446,7 +1447,7 @@
   function logExport(target, n, extra) { auditPost({ action: 'export', target: target, summary: (extra || '엑셀 내보내기') + ' · ' + n + '건' }); }
 
   // =====================================================================
-  // v1.9.3: 이력 관리 (메인 관리자 전용)
+  // v1.9.4: 이력 관리 (메인 관리자 전용)
   // =====================================================================
   var AUDV = { from: '', to: '', actor: '', target: '', q: '', chip: 'all', page: 0 };
   var CHIPS = [['all', '전체', null], ['login', '로그인', ['login', 'logout']], ['fail', '로그인 실패', ['login_fail']], ['create', '생성', ['create']], ['update', '수정', ['update', 'import']], ['delete', '삭제', ['delete']], ['change', '변경', ['change', 'scan']], ['export', '내보내기', ['export']]];
@@ -1503,7 +1504,7 @@
   async function loadAuditList() {
     var box = $('#audres'); if (!box) return;
     var res;
-    try { res = await auditFetch(AUDV.page, AUD_PS); } catch (e) { box.innerHTML = '<div class="note" style="color:#c42b1c;padding:14px">' + esc(e.message || e) + '<br>v1.9.3 SQL(update_v1.9.3.sql)을 실행했는지 확인하세요.</div>'; return; }
+    try { res = await auditFetch(AUDV.page, AUD_PS); } catch (e) { box.innerHTML = '<div class="note" style="color:#c42b1c;padding:14px">' + esc(e.message || e) + '<br>v1.9.4 SQL(update_v1.9.3.sql)을 실행했는지 확인하세요.</div>'; return; }
     var rows = res.rows, pages = Math.max(1, Math.ceil(res.count / AUD_PS));
     var trs = rows.map(function (r, i) {
       return '<tr class="clk" data-i="' + i + '"><td style="white-space:nowrap">' + esc(ymd(r.at).slice(5) + ' ' + hm(r.at)) + '</td><td>' + actorHtml(r) + '</td><td>' + actBadge(r.action) + '</td><td>' + esc(r.target || '') + '</td><td>' + esc(r.summary || '') + (r.reason ? ' <span class="note">· 사유: ' + esc(r.reason) + '</span>' : '') + '</td><td class="mono note">' + esc(r.ip || '') + '</td></tr>';
@@ -1558,7 +1559,7 @@
   }
 
   // =====================================================================
-  // v1.9.3: 모니터 연결 (PC 프로그램 자동 감지 + QR 연결)
+  // v1.9.4: 모니터 연결 (PC 프로그램 자동 감지 + QR 연결)
   // =====================================================================
   function monsOf(dev) { return dev ? (S.monitors || []).filter(function (m) { return m.device_id === dev.id && !m.gone; }) : []; }
   function devOfMon(mon) { return S.devices.filter(function (d) { return d.id === mon.device_id; })[0] || null; }
@@ -1586,7 +1587,7 @@
     if (isPc(a)) {
       if (!d) return h + '<div class="note">연결된 PC 정보가 없어 모니터를 읽어 올 수 없습니다.</div></div>';
       var ms = monsOf(d);
-      if (!ms.length) return h + '<div class="note">아직 읽어 온 모니터 정보가 없습니다. (PC 프로그램 v1.9.3 이상이 실행되면 자동으로 채워집니다)</div></div>';
+      if (!ms.length) return h + '<div class="note">아직 읽어 온 모니터 정보가 없습니다. (PC 프로그램 v1.9.4 이상이 실행되면 자동으로 채워집니다)</div></div>';
       return h + '<table class="tbl"><thead><tr><th>모니터(모델)</th><th>시리얼 번호</th><th>제조 년월</th><th>해상도</th><th>연결 상태</th><th>최종 확인</th></tr></thead><tbody>' + ms.map(function (m) {
         var st = m.asset_no ? badge('자산 연결됨', 'ok') + ' <a href="#/asset/' + encodeURIComponent(m.asset_no) + '" class="mono">' + esc(m.asset_no) + '</a> <a href="#" class="mon-un" data-m="' + esc(m.id) + '">해제</a>' : badge('자산 미연결', 'pink') + ' <a href="#" class="mon-ln" data-m="' + esc(m.id) + '">모니터 자산 선택</a>';
         return '<tr><td>' + esc([m.maker, m.model].filter(Boolean).join(' ')) + '</td><td class="mono">' + esc(m.serial || '—') + '</td><td>' + esc(m.made_ym || '—') + '</td><td>' + esc(m.resolution || '—') + '</td><td>' + st + '</td><td>' + esc(ymd(m.last_seen).slice(5) + ' ' + hm(m.last_seen)) + '</td></tr>';
@@ -1626,7 +1627,7 @@
   }
 
   // =====================================================================
-  // v1.9.3: QR 스캔 (모든 전산장비 공통) — 카메라 + 직접 입력
+  // v1.9.4: QR 스캔 (모든 전산장비 공통) — 카메라 + 직접 입력
   // =====================================================================
   var SCAN = { stream: null, raf: 0, on: false };
   function scanStop() { SCAN.on = false; cancelAnimationFrame(SCAN.raf); if (SCAN.stream) SCAN.stream.getTracks().forEach(function (t) { t.stop(); }); SCAN.stream = null; }
@@ -1678,7 +1679,7 @@
   }
 
   // =====================================================================
-  // v1.9.3: 실사(재물조사)
+  // v1.9.4: 실사(재물조사)
   // =====================================================================
   var INVD = null;
   var ICOLS = 'id,inventory_id,asset_no,category,dept,user_name,location,result,method,changed,new_location,new_user,abn_type,note,checked_by,checked_name,checked_at,resolution,resolved_note';
@@ -1725,23 +1726,117 @@
     return Object.keys(g).sort(function (a, b) { return g[b].n - g[a].n; }).slice(0, 5).map(function (k) { var p = Math.round(g[k].d / g[k].n * 100), c = p >= 90 ? '#1e8e3e' : p < 40 ? '#a15c00' : '#0f6cbd'; return '<div class="prow"><span class="pn">' + esc(k) + '</span><span class="pb"><i style="width:' + p + '%;background:' + c + '"></i></span><span class="pv">' + p + '%</span></div>'; }).join('') || '<div class="note">대상이 없습니다.</div>';
   }
   async function pageInventory() {
-    var invs; try { invs = await invList(); } catch (e) { shell('inventory', '<h1>실사(재물조사)</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message || e) + '<br>v1.9.3 SQL(update_v1.9.3.sql)을 실행했는지 확인하세요.</div>'); return; }
+    var invs; try { invs = await invList(); } catch (e) { shell('inventory', '<h1>실사 (재물조사)</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message || e) + '<br>v1.9.4 SQL(update_v1.9.3.sql)을 실행했는지 확인하세요.</div>'); return; }
     var cur = invs.filter(function (x) { return x.status === 'open'; })[0] || null, items = cur ? await invItems(cur.id) : [], st = invStats(items);
-    var head = '<div class="row wrap"><h1>실사(재물조사)</h1><span class="note">장부의 자산이 실제 있는지 확인합니다</span><div class="grow"></div><button class="btn pri wonly" id="in_new" type="button">새 실사 만들기</button></div>';
+    var head = '<div class="row wrap"><h1>실사 (재물조사)</h1><span class="note">장부의 자산이 실제 있는지 확인합니다</span><div class="grow"></div><button class="btn pri wonly" id="in_new" type="button">새 실사 만들기</button></div>';
     var curH = cur ? '<div class="card"><div class="row wrap"><b style="font-size:14px">' + esc(cur.name) + '</b>' + badge('진행 중', 'blue') + '<span class="note">' + esc((cur.start_date || '') + ' ~ ' + (cur.end_date || '')) + ' · 대상 ' + st.total.toLocaleString() + '대</span><div class="grow"></div><button class="btn wonly" id="in_scan" type="button">현장 스캔</button><button class="btn pri" id="in_det" type="button">결과 · 마감</button></div>' +
       '<div class="row" style="margin-top:8px;gap:10px"><span style="width:60px;font-size:12px">전체 진행</span><span class="pb big"><i style="width:' + st.pct + '%"></i></span><b>' + st.pct + '%</b><span class="note">확인 ' + (st.auto + st.scan).toLocaleString() + ' / ' + st.total.toLocaleString() + '</span></div></div>' +
       '<div class="kpis">' + [['PC 프로그램 자동 확인', st.auto, '점검 정보로 자동 완료', '#0f6cbd'], ['현장 QR 스캔 확인', st.scan, '담당자가 스캔', '#1a1a1a'], ['미확인', st.pending, '마감일까지', '#a15c00'], ['이상 보고', st.abnormal, '분실 의심·파손·위치 불일치', '#c42b1c']].map(function (k) { return '<div class="card kpi"><div class="note">' + k[0] + '</div><div class="kv2" style="color:' + k[3] + '">' + k[1].toLocaleString() + '</div><div class="note">' + k[2] + '</div></div>'; }).join('') + '</div>' +
       '<div class="cards"><div class="card" style="flex:1"><h3>부서별 진행</h3>' + invBars(items, 'dept') + '</div><div class="card" style="flex:1"><h3>자산 분류별 진행</h3>' + invBars(items, 'category') + '</div></div>'
       : '<div class="card"><div class="note" style="padding:8px;line-height:1.8">진행 중인 실사가 없습니다. [새 실사 만들기]로 시작하세요.<br>· PC 프로그램이 최근 점검한 PC·노트북은 자동으로 확인 처리되고, 나머지는 담당자가 폰으로 QR 스티커를 스캔해 확인합니다.</div></div>';
-    var hist = '<table class="tbl"><thead><tr><th>회차</th><th>기간</th><th>대상</th><th>진행률</th><th>상태</th></tr></thead><tbody>' + invs.map(function (x) {
+    var hist = '<div class="bulk noprint" id="ih_bar" style="display:none"><b id="ih_n"></b><span>|</span><button class="btn sm dng" id="ih_del" type="button">선택 삭제</button><button class="btn sm" id="ih_all2" type="button">전체 선택</button><button class="btn sm" id="ih_clr" type="button">선택 해제</button></div><table class="tbl"><thead><tr><th class="wonly cbx"><input type="checkbox" id="ih_all" title="전체 선택"></th><th>회차</th><th>기간</th><th>대상</th><th>진행률</th><th>상태</th></tr></thead><tbody>' + invs.map(function (x) {
       var pct = x.status === 'open' ? st.pct : (x.summary && x.summary.pct != null ? x.summary.pct : ''), tot = x.status === 'open' ? st.total : (x.summary && x.summary.total);
-      return '<tr class="clk" data-id="' + x.id + '"><td>' + esc(x.name) + '</td><td>' + esc((x.start_date || '') + ' ~ ' + (x.end_date || '')) + '</td><td>' + (tot != null ? esc(Number(tot).toLocaleString() + '대') : '') + '</td><td>' + (pct !== '' ? pct + '%' : '') + '</td><td>' + (x.status === 'open' ? badge('진행 중', 'blue') : badge('마감', 'ok')) + '</td></tr>';
+      return '<tr class="clk" data-id="' + x.id + '"><td class="wonly cbx"><input type="checkbox" class="ih_c" value="' + x.id + '"></td><td>' + esc(x.name) + '</td><td>' + esc((x.start_date || '') + ' ~ ' + (x.end_date || '')) + '</td><td>' + (tot != null ? esc(Number(tot).toLocaleString() + '대') : '') + '</td><td>' + (pct !== '' ? pct + '%' : '') + '</td><td>' + (x.status === 'open' ? badge('진행 중', 'blue') : badge('마감', 'ok')) + '</td></tr>';
     }).join('') + '</tbody></table>';
     shell('inventory', head + curH + hist);
     var nb = $('#in_new'); if (nb) nb.onclick = invNewDialog;
     var sc = $('#in_scan'); if (sc) sc.onclick = function () { location.hash = '#/inv-scan/' + cur.id; };
     var dt = $('#in_det'); if (dt) dt.onclick = function () { location.hash = '#/inventory/' + cur.id; };
-    $$('tr.clk').forEach(function (tr) { tr.onclick = function () { location.hash = '#/inventory/' + tr.dataset.id; }; });
+    $$('tr.clk').forEach(function (tr) { tr.onclick = function (e) { if (e.target.closest && e.target.closest('td.cbx')) return; location.hash = '#/inventory/' + tr.dataset.id; }; });
+    // v1.9.4: 회차 선택 · 선택 삭제 (표를 다시 그리지 않고 막대만 갱신)
+    function chosen() { return $$('.ih_c').filter(function (c) { return c.checked; }).map(function (c) { return c.value; }); }
+    function sync() {
+      var ids = chosen(), all = $$('.ih_c'), bar = $('#ih_bar'); if (!bar) return;
+      bar.style.display = ids.length ? '' : 'none'; $('#ih_n').textContent = ids.length + '개 선택됨';
+      var ha = $('#ih_all'); if (ha) { ha.checked = all.length > 0 && ids.length === all.length; ha.indeterminate = ids.length > 0 && ids.length < all.length; }
+      $$('.ih_c').forEach(function (c) { c.closest('tr').classList.toggle('rsel', c.checked); });
+    }
+    $$('.ih_c').forEach(function (c) { c.onchange = sync; });
+    var ha = $('#ih_all'); if (ha) ha.onchange = function () { $$('.ih_c').forEach(function (c) { c.checked = ha.checked; }); sync(); };
+    var a2 = $('#ih_all2'); if (a2) a2.onclick = function () { $$('.ih_c').forEach(function (c) { c.checked = true; }); sync(); };
+    var cl0 = $('#ih_clr'); if (cl0) cl0.onclick = function () { $$('.ih_c').forEach(function (c) { c.checked = false; }); sync(); };
+    var dl0 = $('#ih_del'); if (dl0) dl0.onclick = function () { var ids = chosen(); invDelete(invs.filter(function (x) { return ids.indexOf(String(x.id)) >= 0; }), function () { pageInventory(); }); };
+  }
+  // v1.9.4: 실사 삭제 · 수정 · 재시작 (모두 사유 필수, 이력 관리에 기록)
+  async function invDelete(list, after) {
+    try { needWrite(); } catch (e) { fail(e); return; }
+    if (!list.length) return;
+    var counts = {}; try { for (var i = 0; i < list.length; i++) counts[list[i].id] = (await invItems(list[i].id)).length; } catch (e) { fail(e); return; }
+    var one = list.length === 1, key = one ? list[0].name : '삭제';
+    var m = openModal('<div class="mh"><b>' + (one ? '현재 실사 삭제' : '실사 ' + list.length + '개 삭제') + '</b><button class="mx" type="button">✕</button></div>' +
+      '<div class="warnbox">아래 회차와 <b>확인 결과가 모두 삭제되며 되돌릴 수 없습니다.</b><br>(이미 마감해서 자산에 반영된 내용은 그대로 남습니다)</div>' +
+      '<div style="line-height:1.9;margin:6px 0">' + list.map(function (x) { return '· <b>' + esc(x.name) + '</b> <span class="note">' + esc((x.start_date || '') + ' ~ ' + (x.end_date || '')) + ' · 대상 ' + counts[x.id].toLocaleString() + '대 · ' + (x.status === 'open' ? '진행 중' : '마감') + '</span>'; }).join('<br>') + '</div>' +
+      '<div class="ms">삭제 사유 (필수)</div><textarea id="dl_r" rows="2" style="width:100%;box-sizing:border-box" placeholder="예: 테스트로 만든 실사"></textarea>' +
+      '<div class="ms">확인을 위해 <b>' + esc(key) + '</b> 을(를) 그대로 입력하세요</div><input type="text" id="dl_n" autocomplete="off" style="width:100%;box-sizing:border-box">' +
+      '<div class="mf"><button class="btn" id="dl_x" type="button">취소</button><button class="btn dng sel" id="dl_ok" type="button" disabled>삭제</button></div>', 480);
+    function chk() { $('#dl_ok', m.d).disabled = !($('#dl_r', m.d).value.trim() && $('#dl_n', m.d).value.trim() === key); }
+    $('#dl_r', m.d).oninput = chk; $('#dl_n', m.d).oninput = chk; $('#dl_r', m.d).focus();
+    $('#dl_x', m.d).onclick = m.close;
+    $('#dl_ok', m.d).onclick = async function () {
+      var rs = $('#dl_r', m.d).value.trim(), btn = this; btn.disabled = true; btn.textContent = '삭제 중…';
+      try {
+        for (var i = 0; i < list.length; i++) {
+          var x = list[i];
+          audCtx({ table: 'inventories', action: 'delete', target: '실사 ' + x.name, summary: '실사 삭제 · ' + x.name + ' (대상 ' + counts[x.id] + '대, 확인 결과 포함)', reason: rs, detail: { via: '실사 · ' + (one ? '현재 실사 삭제' : '선택 삭제'), changes: [{ k: '회차', from: x.name, to: '삭제됨' }, { k: '기간', from: (x.start_date || '') + ' ~ ' + (x.end_date || ''), to: '-' }, { k: '상태', from: x.status === 'open' ? '진행 중' : '마감', to: '-' }] } });
+          if (DEMO) { var D = demoInvInit(); D.invs = D.invs.filter(function (v) { return v.id !== x.id; }); delete D.items[x.id]; }
+          else { var r = await sb.from('inventories').delete().eq('id', x.id); if (r.error) throw r.error; }
+        }
+        m.close(); toast('실사 ' + list.length + '개를 삭제했습니다.'); if (after) after();
+      } catch (e) { btn.disabled = false; btn.textContent = '삭제'; fail(e); }
+    };
+  }
+  function invEdit(inv, after) {
+    try { needWrite(); } catch (e) { fail(e); return; }
+    var m = openModal('<div class="mh"><b>실사 수정</b><button class="mx" type="button">✕</button></div>' +
+      '<div class="ms">실사 이름</div><input type="text" id="ie_n" value="' + esc(inv.name) + '" style="width:100%;box-sizing:border-box">' +
+      '<div class="ms">기간</div><input type="date" id="ie_s" value="' + esc(inv.start_date || '') + '"> ~ <input type="date" id="ie_e" value="' + esc(inv.end_date || '') + '">' +
+      '<div class="note" style="margin-top:6px">대상 범위·확인 결과는 여기서 바꾸지 않습니다. (처음부터 다시 하려면 [실사 재시작])</div>' +
+      '<div class="ms">수정 사유 (필수)</div><textarea id="ie_r" rows="2" style="width:100%;box-sizing:border-box" placeholder="예: 기간 연장 요청"></textarea>' +
+      '<div class="mf"><button class="btn" id="ie_x" type="button">취소</button><button class="btn pri" id="ie_ok" type="button">저장</button></div>', 460);
+    $('#ie_x', m.d).onclick = m.close;
+    $('#ie_ok', m.d).onclick = async function () {
+      var nm = $('#ie_n', m.d).value.trim(), s0 = $('#ie_s', m.d).value, e0 = $('#ie_e', m.d).value, rs = $('#ie_r', m.d).value.trim();
+      if (!nm) { toast('실사 이름을 입력하세요.'); return; } if (s0 && e0 && s0 > e0) { toast('마감일이 시작일보다 빠릅니다.'); return; } if (!rs) { toast('수정 사유를 입력하세요.'); return; }
+      var patch = { name: nm, start_date: s0 || null, end_date: e0 || null }, ch = [];
+      if (nm !== inv.name) ch.push({ k: '실사 이름', from: inv.name, to: nm }); if ((s0 || '') !== (inv.start_date || '')) ch.push({ k: '시작일', from: inv.start_date || '없음', to: s0 || '없음' }); if ((e0 || '') !== (inv.end_date || '')) ch.push({ k: '마감일', from: inv.end_date || '없음', to: e0 || '없음' });
+      if (!ch.length) { m.close(); return; }
+      var btn = this; btn.disabled = true;
+      try {
+        audCtx({ table: 'inventories', action: 'change', target: '실사 ' + inv.name, summary: '실사 수정: ' + chgText(ch), reason: rs, detail: { via: '실사 결과 · 수정', changes: ch } });
+        if (DEMO) Object.assign(inv, patch); else { var r = await sb.from('inventories').update(patch).eq('id', inv.id); if (r.error) throw r.error; }
+        m.close(); toast('수정했습니다.'); after();
+      } catch (e) { btn.disabled = false; fail(e); }
+    };
+  }
+  async function invRestart(inv, after) {
+    try { needWrite(); } catch (e) { fail(e); return; }
+    var others = (await invList()).filter(function (x) { return x.status === 'open' && x.id !== inv.id; });
+    if (others.length) { toast('진행 중인 다른 실사(' + others[0].name + ')가 있습니다. 먼저 마감하거나 삭제하세요.'); return; }
+    var open = inv.status === 'open';
+    var m = openModal('<div class="mh"><b>실사 재시작</b><button class="mx" type="button">✕</button></div>' +
+      (open ? '' : '<label style="display:block;margin:4px 0"><input type="radio" name="rsm" value="keep" checked> <b>확인 결과 유지</b>하고 다시 진행 중으로 열기<br><span class="note" style="margin-left:20px">마감을 풀고 미확인을 계속 확인합니다</span></label>') +
+      '<label style="display:block;margin:4px 0"><input type="radio" name="rsm" value="reset"' + (open ? ' checked' : '') + '> <b>모든 확인 결과 지우고</b> 처음부터 다시 시작<br><span class="note" style="margin-left:20px">확인·이상·변경 보고가 모두 초기화되고, PC 프로그램 자동 확인은 다시 계산됩니다</span></label>' +
+      '<div class="warnbox" id="rs_w" style="display:' + (open ? '' : 'none') + '">처음부터 다시 시작하면 지금까지의 확인 결과를 되돌릴 수 없습니다. 이미 마감으로 자산에 반영된 내용은 그대로 남습니다.</div>' +
+      '<div class="ms">재시작 사유 (필수)</div><textarea id="rs_r" rows="2" style="width:100%;box-sizing:border-box" placeholder="예: 기간 내 재확인 필요"></textarea>' +
+      '<div class="mf"><button class="btn" id="rs_x" type="button">취소</button><button class="btn pri" id="rs_ok" type="button">재시작</button></div>', 480);
+    $$('input[name=rsm]', m.d).forEach(function (r) { r.onchange = function () { $('#rs_w', m.d).style.display = $('input[name=rsm]:checked', m.d).value === 'reset' ? '' : 'none'; }; });
+    $('#rs_x', m.d).onclick = m.close;
+    $('#rs_ok', m.d).onclick = async function () {
+      var mode = $('input[name=rsm]:checked', m.d).value, rs = $('#rs_r', m.d).value.trim(); if (!rs) { toast('재시작 사유를 입력하세요.'); return; }
+      var btn = this; btn.disabled = true; btn.textContent = '처리 중…';
+      try {
+        if (mode === 'reset') {
+          var clr = { result: 'pending', method: null, changed: false, new_location: null, new_user: null, abn_type: null, note: null, photo: null, checked_by: null, checked_name: null, checked_at: null, resolution: null, resolved_note: null };
+          if (DEMO) demoInvInit().items[inv.id].forEach(function (it) { Object.assign(it, clr); });
+          else { var r0 = await sb.from('inventory_items').update(clr).eq('inventory_id', inv.id); if (r0.error) throw r0.error; }
+        }
+        var upd = { status: 'open', closed_at: null, closed_by: null, summary: null };
+        audCtx({ table: 'inventories', action: 'change', target: '실사 ' + inv.name, summary: '실사 재시작 · ' + (mode === 'reset' ? '확인 결과 모두 지우고 처음부터' : '확인 결과 유지하고 다시 진행 중으로'), reason: rs, detail: { via: '실사 결과 · 재시작', changes: [{ k: '상태', from: open ? '진행 중' : '마감', to: '진행 중' }, { k: '확인 결과', from: '-', to: mode === 'reset' ? '모두 초기화' : '유지' }] } });
+        if (DEMO) Object.assign(inv, upd); else { var r = await sb.from('inventories').update(upd).eq('id', inv.id); if (r.error) throw r.error; }
+        if (mode === 'reset') { var fresh = await invItems(inv.id); S._invItems = fresh; try { await invRefreshAuto(inv, fresh); } catch (e) { } }
+        m.close(); toast('실사를 다시 시작했습니다.'); after();
+      } catch (e) { btn.disabled = false; btn.textContent = '재시작'; fail(e); }
+    };
   }
   function invNewDialog() {
     needWrite();
@@ -1812,7 +1907,7 @@
     var cats = groupCount(items, function (i) { return i.category; }).map(function (x) { return x[0]; }), depts = groupCount(items, function (i) { return i.dept; }).map(function (x) { return x[0]; });
     var chips = [['pending', '미확인·이상'], ['abnormal', '이상만'], ['resolved', '처리됨'], ['all', '전체']];
     shell('inventory', '<div class="row wrap"><a href="#/inventory">‹ 실사</a><h1>결과 · 마감</h1><span class="note">' + esc(inv.name) + ' · ' + (open ? '마감 예정 ' + esc(inv.end_date || '') : '마감됨 ' + esc(ymd(inv.closed_at))) + '</span><div class="grow"></div>' +
-      (open ? '<button class="btn wonly" id="iv_sc" type="button">현장 스캔</button><button class="btn wonly" id="iv_re" type="button">자동 확인 다시 계산</button>' : '') + '<button class="btn" id="iv_ex" type="button">결과 내보내기</button>' + (open ? '<button class="btn pri wonly" id="iv_cl" type="button">실사 마감</button>' : badge('마감', 'ok')) + '</div>' +
+      (open ? '<button class="btn wonly" id="iv_sc" type="button">현장 스캔</button><button class="btn wonly" id="iv_re" type="button">자동 확인 다시 계산</button>' : '') + '<button class="btn wonly" id="iv_ed" type="button">수정</button><button class="btn wonly dng" id="iv_del" type="button">현재 실사 삭제</button><button class="btn wonly" id="iv_rs" type="button">실사 재시작</button><button class="btn" id="iv_ex" type="button">결과 내보내기</button>' + (open ? '<button class="btn pri wonly" id="iv_cl" type="button">실사 마감</button>' : badge('마감', 'ok')) + '</div>' +
       '<div class="kpis">' + [['확인 완료', st.auto + st.scan, st.pct + '%', '#1e8e3e'], ['미확인', st.pending, '처리 필요', '#a15c00'], ['이상', st.abnormal, '처리 필요', '#c42b1c'], ['변경 보고', chg.loc + chg.usr, '마감 시 반영', '#1a1a1a']].map(function (k) { return '<div class="card kpi"><div class="note">' + k[0] + '</div><div class="kv2" style="color:' + k[3] + '">' + k[1].toLocaleString() + '</div><div class="note">' + k[2] + '</div></div>'; }).join('') + '</div>' +
       '<div class="fchips" style="margin:6px 0">' + chips.map(function (c) { return '<button type="button" class="achip' + (v.chip === c[0] ? ' on' : '') + '" data-c="' + c[0] + '">' + c[1] + '</button>'; }).join('') + ' <select id="iv_cat"><option value="">분류 전체</option>' + cats.map(function (c) { return '<option' + (v.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select> <select id="iv_dept"><option value="">부서 전체</option>' + depts.map(function (c) { return '<option' + (v.dept === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' +
       (open && v.chip === 'pending' ? ' <button class="btn sm wonly" id="iv_bulk" type="button">현재 목록의 미확인 일괄 사유 입력</button>' : '') + '</div>' +
@@ -1825,6 +1920,9 @@
     var sc = $('#iv_sc'); if (sc) sc.onclick = function () { location.hash = '#/inv-scan/' + inv.id; };
     var re = $('#iv_re'); if (re) re.onclick = async function () { try { var n = await invRefreshAuto(inv, items); toast(n ? n + '건을 자동 확인으로 바꿨습니다.' : '새로 자동 확인할 항목이 없습니다.'); pageInvDetail(id); } catch (e) { fail(e); } };
     $('#iv_ex').onclick = function () { invExport(inv, items); };
+    $('#iv_ed').onclick = function () { invEdit(inv, function () { pageInvDetail(id); }); };
+    $('#iv_del').onclick = function () { invDelete([inv], function () { location.hash = '#/inventory'; }); };
+    $('#iv_rs').onclick = function () { invRestart(inv, function () { pageInvDetail(id); }); };
     var bk = $('#iv_bulk'); if (bk) bk.onclick = async function () {
       var ids = list.filter(function (i) { return i.result === 'pending'; }).map(function (i) { return i.id; }); if (!ids.length) { toast('일괄 처리할 미확인 항목이 없습니다.'); return; }
       var rs = await askReason('미확인 일괄 처리', '현재 목록의 미확인 <b>' + ids.length + '건</b>에 같은 사유를 입력합니다.', '일괄 처리'); if (!rs) return;
@@ -1993,17 +2091,318 @@
     var sm = $('#s_mon'); if (sm) sm.onclick = function () { pickPcMonitor(a, function () { pageScan(arg); }); };
   }
 
+  // ---------- v1.9.4: 자산 직접 등록 ----------
+  var CAT_CODE = { 'PC': 'PC', '모니터': 'MO', '노트북': 'NB', 'PC 본체': 'PC' };
+  function catCode(cat) {   // 기존 대장에서 같은 분류의 관리번호 코드(A-XX-...)를 배워 씀. 없으면 기본표
+    var hit = S.assets.filter(function (a) { return a.category === cat && /^A-[A-Z]+-/.test(a.asset_no || ''); })[0];
+    if (hit) return hit.asset_no.split('-')[1];
+    return CAT_CODE[cat] || '';
+  }
+  function nextAssetNo(cat, mfg) {
+    var code = catCode(cat); if (!code) return '';
+    var yr = /^\d{4}/.test(mfg || '') ? mfg.slice(0, 4) : String(new Date().getFullYear()), mx = 0;
+    S.assets.forEach(function (a) { var m = /^A-([A-Z]+)-\d{4}-(\d+)$/.exec(a.asset_no || ''); if (m && m[1] === code) mx = Math.max(mx, parseInt(m[2], 10)); });
+    return 'A-' + code + '-' + yr + '-' + ('00' + (mx + 1)).slice(-3);
+  }
+  function pageAssetNew() {
+    if (isViewer()) { shell('assets', '<h1>자산 직접 등록</h1><div class="note" style="margin-top:8px">조회 전용 계정은 자산을 등록할 수 없습니다.</div>'); return; }
+    var cats = groupCount(S.assets, function (a) { return a.category; }).map(function (x) { return x[0]; }).filter(Boolean);
+    Object.keys(CAT_CODE).forEach(function (c) { if (cats.indexOf(c) < 0) cats.push(c); });
+    var stats = groupCount(S.assets, function (a) { return a.status; }).map(function (x) { return x[0]; }).filter(Boolean); if (stats.indexOf('사용중') < 0) stats.unshift('사용중');
+    function fr(id, label, inner, req, hint) { return '<div class="frow"><div class="fl">' + label + (req ? ' <span style="color:#c42b1c">*</span>' : '') + '</div><div class="fv">' + inner + '<div class="note" id="h_' + id + '">' + (hint || '') + '</div></div></div>'; }
+    function inp(id, ph, type, w) { return '<input type="' + (type || 'text') + '" id="n_' + id + '" placeholder="' + (ph || '') + '" autocomplete="off"' + (w ? ' style="width:' + w + '"' : '') + '>'; }
+    var form = fr('category', '자산분류', '<input type="text" id="n_category" list="n_cats" placeholder="예: 모니터" autocomplete="off"><datalist id="n_cats">' + cats.map(function (c) { return '<option value="' + esc(c) + '">'; }).join('') + '</datalist>', true, '고르거나 직접 입력합니다. 선택하면 관리번호가 자동으로 정해집니다') +
+      fr('asset_no', '관리번호', '<input type="text" id="n_asset_no" class="mono" placeholder="분류를 선택하면 자동 부여" autocomplete="off" style="background:#f2f8fe;color:#0f6cbd;font-weight:700">', true, '분류·제조년도·다음 번호가 자동으로 붙습니다. 필요하면 직접 고칠 수 있고, 이미 있는 번호는 저장되지 않습니다') +
+      fr('manufacturer', '제조사', inp('manufacturer', '예: DELL'), true) + fr('model', '모델명', inp('model', '예: S275DS'), true) +
+      fr('mfg_ym', '제조년월', inp('mfg_ym', '예: 2025-01', 'text', '180px'), false, '입력하면 보증(제조년월+5년)이 자동 계산됩니다') +
+      fr('status', '자산상태', '<select id="n_status">' + stats.map(function (t) { return '<option' + (t === '사용중' ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>', true) +
+      fr('user_id', '사용자 ID', inp('user_id', '사번을 입력하면 아래가 자동으로 채워집니다', 'text', '260px'), false, '') +
+      fr('user_name', '사용자명', inp('user_name')) + fr('dept', '소속명', inp('dept')) + fr('title', '직책', inp('title')) + fr('location', '위치', inp('location')) +
+      fr('serial_no', '시리얼 번호', inp('serial_no'), false, '모니터는 PC 프로그램이 읽은 시리얼과 같으면 자동 연결됩니다') +
+      fr('purchase_date', '구매일', inp('purchase_date', '', 'date', '200px')) + fr('warranty_end', '보증 만료', inp('warranty_end', '', 'date', '200px'), false, '비워 두면 제조년월+5년으로 계산합니다') +
+      fr('memo', '메모', '<textarea id="n_memo" rows="3" style="width:100%"></textarea>');
+    shell('assets', '<div class="row wrap"><a href="#/assets" class="note">‹ 자산 관리</a><h1>자산 직접 등록</h1><div class="grow"></div><button class="btn" id="n_cancel" type="button">취소</button><button class="btn pri" id="n_save" type="button">등록</button></div>' +
+      '<div style="display:flex;align-items:flex-start;gap:14px"><div class="card" style="flex:1.6">' + form + '</div><div class="card" style="flex:1;line-height:1.85"><b>등록하면</b><br>① 관리번호가 확정되고 목록에 바로 나타납니다<br>② 상세 화면이 열리며 QR 코드를 바로 출력할 수 있습니다<br>③ 이력 관리에 "자산 직접 등록"이 남습니다<br><br><b>입력 확인</b><br>· 필수(*): 자산분류, 관리번호, 제조사, 모델명, 자산상태<br>· 같은 시리얼 번호가 이미 있으면 저장 전에 알려 드립니다<br>· 모니터는 등록 후 상세 화면의 "PC와 연결"로 수동 연결도 가능합니다<div id="n_msg" style="margin-top:10px"></div></div></div>');
+    var edited = false;
+    function V(id) { return $('#n_' + id).value.trim(); }
+    function msg(t, bad) { var m = $('#n_msg'); m.innerHTML = t ? '<div class="' + (bad ? 'warnbox' : 'note') + '" style="' + (bad ? '' : 'background:#e6f4ea;color:#1e8e3e;border-radius:6px;padding:6px 10px') + '">' + esc(t) + '</div>' : ''; }
+    function autoNo() { if (edited) return; var no = nextAssetNo(V('category'), V('mfg_ym')); $('#n_asset_no').value = no; $('#h_asset_no').textContent = no ? '분류·제조년도·다음 번호가 자동으로 붙습니다. 필요하면 직접 고칠 수 있고, 이미 있는 번호는 저장되지 않습니다' : '이 분류의 관리번호 규칙을 알 수 없습니다. 관리번호를 직접 입력하세요'; }
+    $('#n_category').oninput = autoNo; $('#n_category').onchange = autoNo; $('#n_mfg_ym').oninput = autoNo;
+    $('#n_asset_no').oninput = function () { edited = true; };
+    $('#n_user_id').oninput = function () {   // 값만 채우므로 입력 중인 칸은 다시 그리지 않음 (한글 입력 안전)
+      var e = S.empBy[V('user_id').toUpperCase()] || S.empBy[V('user_id')], h = $('#h_user_id');
+      if (e) { $('#n_user_name').value = e.name || ''; $('#n_dept').value = e.dept || ''; $('#n_title').value = e.title || ''; h.innerHTML = '<span style="background:#e6f4ea;color:#1e8e3e;border-radius:4px;padding:2px 8px">인사 정보 일치: ' + esc((e.name || '') + ' · ' + (e.dept || '') + ' · ' + (e.title || '')) + ' (자동 입력)</span>'; }
+      else h.textContent = V('user_id') ? '인사 정보에 없는 사번입니다. 사용자명·소속명·직책을 직접 입력하세요' : '';
+    };
+    $('#n_cancel').onclick = function () { location.hash = '#/assets'; };
+    $('#n_save').onclick = async function () {
+      var no = V('asset_no').toUpperCase(), row = { asset_no: no, category: V('category'), manufacturer: V('manufacturer'), model: V('model'), mfg_ym: V('mfg_ym') || null, status: V('status') || '사용중', user_id: V('user_id') || null, user_name: V('user_name') || null, dept: V('dept') || null, title: V('title') || null, location: V('location') || null, serial_no: V('serial_no') || null, purchase_date: V('purchase_date') || null, warranty_end: V('warranty_end') || null, memo: V('memo') || null };
+      if (!row.category || !no || !row.manufacturer || !row.model) { msg('자산분류·관리번호·제조사·모델명은 꼭 입력해야 합니다.', true); return; }
+      if (row.mfg_ym && !/^\d{4}-(0[1-9]|1[0-2])$/.test(row.mfg_ym)) { msg('제조년월은 2025-01 처럼 입력하세요.', true); return; }
+      if (S.assets.some(function (a) { return a.asset_no === no; })) { msg(no + ' 는 이미 있는 관리번호입니다. 번호를 바꿔 주세요.', true); return; }
+      var dup = row.serial_no ? S.assets.filter(function (a) { return a.serial_no && a.serial_no.toUpperCase() === row.serial_no.toUpperCase(); })[0] : null;
+      if (dup && !confirm('같은 시리얼 번호(' + row.serial_no + ')가 이미 ' + dup.asset_no + ' 에 등록되어 있습니다.\n그래도 등록할까요?')) return;
+      var btn = this; btn.disabled = true; btn.textContent = '등록 중…';
+      try {
+        needWrite();
+        var ch = Object.keys(row).filter(function (k) { return k !== 'asset_no' && row[k] != null && row[k] !== ''; }).map(function (k) { return { k: FLBL[k] || k, from: '없음', to: String(row[k]) }; });
+        audCtx({ table: 'assets', action: 'create', target: '자산 ' + no, summary: '자산 직접 등록 · ' + no + ' (' + row.category + ' ' + row.manufacturer + ' ' + row.model + ')', detail: { via: '자산 관리 · 직접 등록', changes: ch } });
+        if (!DEMO) { var r = await sb.from('assets').insert(row); if (r.error) throw r.error; }
+        S.assets.push(Object.assign({ created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, row));
+        rebuildAssets(); toast(no + ' 을(를) 등록했습니다.'); location.hash = '#/asset/' + encodeURIComponent(no);
+      } catch (er) { fail(er); btn.disabled = false; btn.textContent = '등록'; }
+    };
+    setTimeout(function () { $('#n_category').focus(); }, 30);
+  }
+
+  // =====================================================================
+  // v1.9.4: 보고서 (월별 · 기간별 · 부서별 · 보증 · 현황 점검 · 원격 지원 · 실사 · 이력 요약)
+  // =====================================================================
+  var CGRP = ['PC', '노트북', '모니터', '기타'];
+  function catGroup(c) { return c === 'PC' || c === 'PC 본체' ? 'PC' : c === '노트북' ? '노트북' : c === '모니터' ? '모니터' : '기타'; }
+  function liveAssets() { return S.assets.filter(function (a) { return a.status !== '폐기'; }); }
+  function catCounts(list) { var o = { PC: 0, 노트북: 0, 모니터: 0, 기타: 0 }; list.forEach(function (a) { o[catGroup(a.category)]++; }); return o; }
+  function pcStats() {
+    var pcs = S.assets.filter(function (a) { return isPc(a) && a.status !== '폐기'; }), td = ymd(new Date()), o = { total: pcs.length, today: 0, stale: 0, none: 0, mismatch: 0 };
+    pcs.forEach(function (a) { if (!a.last_seen) o.none++; else { if (ymd(a.last_seen) === td) o.today++; if ((Date.now() - new Date(a.last_seen).getTime()) / 86400000 > 7) o.stale++; } if (a.user_mismatch) o.mismatch++; });
+    return o;
+  }
+  async function snapDaily() {   // 관리자가 접속한 날 하루 1번, 그날의 수량을 저장 (월별 자산 현황의 재료)
+    try {
+      if (DEMO || isViewer()) return; var td = ymd(new Date());
+      var r = await sb.from('asset_snapshots').select('snap_date').eq('snap_date', td).maybeSingle(); if (r.error || r.data) return;
+      var c = catCounts(liveAssets());
+      await sb.from('asset_snapshots').insert({ snap_date: td, total: liveAssets().length, counts: c, pc: pcStats() });
+    } catch (e) { }
+  }
+  async function repSnaps() {
+    if (DEMO) {   // 데모용 예시 추이
+      var cur = catCounts(liveAssets()), now = new Date(), out = [], pcs = pcStats();
+      for (var j = now.getMonth(); j >= 0; j--) {
+        var d = new Date(now.getFullYear(), now.getMonth() - j + 1, 0); if (j === 0) d = now; var c = {}, tot = 0;
+        CGRP.forEach(function (g) { c[g] = Math.max(0, cur[g] - j * Math.max(1, Math.round(cur[g] / 140))); tot += c[g]; });
+        out.push({ snap_date: ymd(d), total: tot, counts: c, pc: { total: pcs.total - j, today: Math.max(0, pcs.today - j), stale: pcs.stale + (j % 3), none: pcs.none + j, mismatch: pcs.mismatch + (j % 2) } });
+      }
+      return out;
+    }
+    var r = await sb.from('asset_snapshots').select('*').order('snap_date', { ascending: true }).limit(2000);
+    if (r.error) throw new Error('보고서용 표를 읽지 못했습니다. db/update_v1.9.4.sql 을 SQL Editor에서 실행했는지 확인하세요.');
+    return r.data;
+  }
+  function monthEnd(y, m) { return ymd(new Date(y, m, 0)); }
+  function monthRows(snaps, year) {   // 달별 월말 수량 (스냅샷이 없는 달은 대장 등록일 기준 추정)
+    var now = new Date(), last = year === now.getFullYear() ? now.getMonth() + 1 : 12, rows = [];
+    for (var m = 1; m <= last; m++) {
+      var end = monthEnd(year, m), ms = snaps.filter(function (s0) { return s0.snap_date.slice(0, 7) === year + '-' + ('0' + m).slice(-2); }), hit = ms.length ? ms[ms.length - 1] : null, est = false, c, pc = null;
+      if (hit) { c = hit.counts; pc = hit.pc; }
+      else { est = true; c = catCounts(S.assets.filter(function (a) { return a.status !== '폐기' && (!a.created_at || ymd(a.created_at) <= end); })); }
+      var tot = 0; CGRP.forEach(function (g) { c[g] = c[g] || 0; tot += c[g]; });
+      rows.push({ m: m, label: year + '-' + ('0' + m).slice(-2), c: c, total: tot, est: est, pc: pc, day: hit ? hit.snap_date : end });
+    }
+    return rows;
+  }
+  function repXlsx(fname, sheets, title) {
+    var wb = XLSX.utils.book_new(), n = 0;
+    sheets.forEach(function (s0) { var ws = XLSX.utils.json_to_sheet(s0.rows.length ? s0.rows : [{ '안내': '해당 내용이 없습니다' }]); XLSX.utils.book_append_sheet(wb, ws, s0.name.slice(0, 30)); n += s0.rows.length; });
+    XLSX.writeFile(wb, fname + '_' + ymd(new Date()) + '.xlsx'); logExport('보고서 · ' + title, n, '보고서 내보내기');
+  }
+  function repHead(title, extra, sub) { return '<div class="row wrap"><a href="#/reports">‹ 보고서</a><h1>' + esc(title) + '</h1>' + (sub ? '<span class="note">' + sub + '</span>' : '') + '<div class="grow"></div>' + (extra || '') + '<button class="btn noprint" id="r_xl" type="button">엑셀 내려받기</button><button class="btn noprint" id="r_pdf" type="button">PDF</button></div>'; }
+  function repBind(title, xlFn) {
+    $('#r_xl').onclick = function () { try { xlFn(); } catch (e) { fail(e); } };
+    $('#r_pdf').onclick = function () { logExport('보고서 · ' + title, 0, '보고서 PDF 인쇄'); window.print(); };
+  }
+  function kp(l, v, sub, c) { return '<div class="card kpi"><div class="note">' + l + '</div><div class="kv2" style="color:' + (c || '#1a1a1a') + '">' + v + '</div><div class="note">' + (sub || '') + '</div></div>'; }
+  function dlt(n) { return '<span style="color:' + (n > 0 ? '#1e8e3e' : n < 0 ? '#c42b1c' : '#8a8a8a') + '">' + (n > 0 ? '+' : '') + n.toLocaleString() + '</span>'; }
+  var REPS = [
+    ['자산 현황', [['monthly', '📅', '월별 자산 현황', '월말 기준 PC·노트북·모니터 등 분류별 수량과 전월 대비 증감, 월별 추이 그래프', '월별'], ['period', '🔄', '기간별 자산 변동', '기간을 정해 신규 등록·폐기·상태 변경·사용자 이동·위치 변경 건수와 내역', '기간별'], ['dept', '🏢', '부서별 자산 보유', '소속별 PC·노트북·모니터 보유 수량과 1인당 장비 수', '현재']]],
+    ['점검·지원', [['warranty', '🛡️', '보증 만료 예정', '만료됨 / 1·3·6·12개월 안에 보증이 끝나는 장비 목록과 교체 예산용 수량', '기간별'], ['check', '🩺', '현황 점검 보고', 'PC 점검 수집률, 7일 이상 미확인, 사용자 불일치 현황과 월별 추이', '월별'], ['support', '🎧', '원격 지원 처리 현황', '월별 접수·완료 건수, 평균 처리 시간, 증상별·담당자별 통계', '월별']]],
+    ['실사·감사', [['inv', '📋', '실사 결과 보고서', '회차별 확인율, 부서·분류별 진행, 미확인·이상 목록', '회차별'], ['audit', '🔎', '이력 관리 요약 (메인 관리자)', '기간별 로그인·변경·삭제·내보내기 건수와 작업자별 요약. 감사 제출용', '기간별', 'main']]]
+  ];
+  function pageReports(arg) {
+    var k = (arg || '').split('/')[0];
+    if (k === 'monthly') return repMonthly(); if (k === 'period') return repPeriod(); if (k === 'dept') return repDept(); if (k === 'warranty') return repWarranty();
+    if (k === 'check') return repCheck(); if (k === 'support') return repSupport(); if (k === 'inv') return repInv(); if (k === 'audit') return repAudit();
+    var html = '<div class="row wrap"><h1>보고서</h1><span class="note">조건을 고르면 바로 보고서가 만들어지고, 엑셀·PDF로 내려받습니다</span></div>' + REPS.map(function (g) {
+      return '<h3 style="margin:14px 0 6px">' + g[0] + '</h3><div class="rgrid">' + g[1].filter(function (r) { return !r[5] || isMain(); }).map(function (r) {
+        return '<a class="rcard" href="#/reports/' + r[0] + '"><div class="rt"><span class="ri">' + r[1] + '</span><b>' + r[2] + '</b></div><div class="rd">' + r[3] + '</div><div class="rf"><span class="badge b-blue">' + r[4] + '</span><span class="grow"></span><span class="ro">열기 ›</span></div></a>';
+      }).join('') + '</div>';
+    }).join('') + '<div class="note" style="margin-top:14px;line-height:1.8">· 엑셀·PDF로 내려받으면 이력 관리에 "보고서 내보내기"가 남습니다 · 조회 전용 계정도 열람할 수 있습니다<br>· 월별 자산 현황은 관리자가 접속하는 날 하루 1번 자동 저장되는 수량을 기준으로 합니다 (저장이 없던 달은 대장 등록일 기준 추정으로 표시)</div>';
+    shell('reports', html);
+  }
+  // ---- 월별 자산 현황
+  var RV = { year: new Date().getFullYear() };
+  async function repMonthly() {
+    var snaps; try { snaps = await repSnaps(); } catch (e) { shell('reports', repHead('월별 자산 현황') + '<div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message) + '</div>'); return; }
+    var yrs = [new Date().getFullYear(), new Date().getFullYear() - 1], rows = monthRows(snaps, RV.year), lastR = rows[rows.length - 1], prev = rows.length > 1 ? rows[rows.length - 2] : null, first = rows[0];
+    var series = [['PC', '#0f6cbd'], ['노트북', '#1e8e3e'], ['모니터', '#e08a00']], W = 560, H = 230, all = [];
+    series.forEach(function (s0) { rows.forEach(function (r) { all.push(r.c[s0[0]]); }); });
+    var lo = Math.max(0, Math.min.apply(null, all) - 40), hi = Math.max.apply(null, all) + 40; if (hi === lo) hi = lo + 1;
+    var X = function (i) { return 50 + i * (W - 70) / Math.max(1, rows.length - 1); }, Y = function (v) { return H - 30 - (v - lo) / (hi - lo) * (H - 60); };
+    var svg = '<svg width="' + W + '" height="' + H + '" style="max-width:100%">' + [0, 1, 2, 3, 4].map(function (q) { var yy = H - 30 - q * (H - 60) / 4; return '<line x1="50" x2="' + (W - 20) + '" y1="' + yy + '" y2="' + yy + '" stroke="#eef0f3"/><text x="44" y="' + (yy + 4) + '" font-size="9" fill="#8a8a8a" text-anchor="end">' + Math.round(lo + (hi - lo) * q / 4) + '</text>'; }).join('') +
+      rows.map(function (r, i) { return '<text x="' + X(i) + '" y="' + (H - 10) + '" font-size="9.5" fill="#6a6a6a" text-anchor="middle">' + r.m + '월</text>'; }).join('') +
+      series.map(function (s0) { return '<polyline fill="none" stroke="' + s0[1] + '" stroke-width="2.2" points="' + rows.map(function (r, i) { return X(i).toFixed(0) + ',' + Y(r.c[s0[0]]).toFixed(0); }).join(' ') + '"/>' + rows.map(function (r, i) { return '<circle cx="' + X(i).toFixed(0) + '" cy="' + Y(r.c[s0[0]]).toFixed(0) + '" r="2.8" fill="' + s0[1] + '"/>'; }).join(''); }).join('') + '</svg>';
+    var legend = series.map(function (s0) { return '<span style="margin-right:14px"><i style="display:inline-block;width:10px;height:3px;background:' + s0[1] + ';vertical-align:middle;margin-right:4px"></i>' + s0[0] + '</span>'; }).join('');
+    var trs = rows.slice().reverse().map(function (r) {
+      var i = rows.indexOf(r), p = i > 0 ? rows[i - 1] : null;
+      return '<tr><td>' + r.label + (r.est ? ' <span class="note">추정</span>' : '') + '</td>' + CGRP.map(function (g) { return '<td>' + r.c[g].toLocaleString() + '</td><td>' + (p ? dlt(r.c[g] - p.c[g]) : '—') + '</td>'; }).join('') + '<td><b>' + r.total.toLocaleString() + '</b></td><td>' + (p ? dlt(r.total - p.total) : '—') + '</td></tr>';
+    }).join('');
+    shell('reports', repHead('월별 자산 현황', '<select id="r_y" class="noprint">' + yrs.map(function (y) { return '<option' + (y === RV.year ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>', '월말 기준 · 자산 대장 수량(폐기 제외)') +
+      '<div class="kpis">' + series.map(function (s0) { var v = lastR ? lastR.c[s0[0]] : 0; return kp(s0[0], v.toLocaleString(), prev ? '전월 ' + (v - prev.c[s0[0]] >= 0 ? '+' : '') + (v - prev.c[s0[0]]) : '', s0[1]); }).join('') + kp('합계', (lastR ? lastR.total : 0).toLocaleString(), (prev ? '전월 ' + (lastR.total - prev.total >= 0 ? '+' : '') + (lastR.total - prev.total) : '') + (first && lastR ? ' · ' + RV.year + '년 초 대비 ' + (lastR.total - first.total >= 0 ? '+' : '') + (lastR.total - first.total) : '')) + '</div>' +
+      '<div class="rcols"><div class="card"><div style="font-size:11.5px;margin-bottom:2px">' + legend + '</div>' + svg + '</div><div class="rtb"><table class="tbl ctr"><thead><tr><th>월말 기준</th>' + CGRP.map(function (g) { return '<th>' + g + '</th><th>증감</th>'; }).join('') + '<th>합계</th><th>증감</th></tr></thead><tbody>' + trs + '</tbody></table></div></div>' +
+      '<div class="note" style="margin-top:8px;line-height:1.8">· 월말(마지막 날) 기준 수량입니다. 그 달에 저장된 마지막 수량을 쓰고, 저장이 없던 달은 대장 등록일 기준 <b>추정</b>입니다.</div>');
+    $('#r_y').onchange = function () { RV.year = Number(this.value); repMonthly(); };
+    repBind('월별 자산 현황', function () { repXlsx('월별자산현황_' + RV.year, [{ name: RV.year + '년 월별', rows: rows.map(function (r) { var o = { '월말 기준': r.label, '구분': r.est ? '추정' : '저장값' }; CGRP.forEach(function (g) { o[g] = r.c[g]; }); o['합계'] = r.total; return o; }) }], '월별 자산 현황'); });
+  }
+  // ---- 기간별 자산 변동
+  var RP = { from: '', to: '', cat: '', dept: '', q: 'month' };
+  function periodSet(q) {
+    var n = new Date(), y = n.getFullYear(), m = n.getMonth(), d = n.getDate(), f, t = ymd(n);
+    if (q === 'today') f = t; else if (q === 'week') f = ymd(new Date(y, m, d - ((n.getDay() + 6) % 7))); else if (q === 'month') f = ymd(new Date(y, m, 1));
+    else if (q === 'last') { f = ymd(new Date(y, m - 1, 1)); t = ymd(new Date(y, m, 0)); } else if (q === 'quarter') f = ymd(new Date(y, Math.floor(m / 3) * 3, 1)); else if (q === 'year') f = ymd(new Date(y, 0, 1));
+    if (f) { RP.from = f; RP.to = t; } RP.q = q;
+  }
+  function changeTypes(r) {
+    var out = [], ch = (r.detail && r.detail.changes) || [], ks = ch.map(function (c) { return c.k; });
+    if (r.action === 'create') out.push('신규 등록');
+    if (r.action === 'delete') out.push('삭제');
+    if (r.action === 'update' || r.action === 'change') {
+      ch.forEach(function (c) { if (c.k === '자산상태') out.push(/폐기/.test(c.to) ? '폐기' : '상태 변경'); });
+      if (ks.indexOf('사용자명') >= 0 || ks.indexOf('사용자 ID') >= 0) out.push('사용자 이동'); if (ks.indexOf('위치') >= 0) out.push('위치 변경');
+      if (!out.length && /폐기/.test(r.summary || '')) out.push('폐기');
+    }
+    return out;
+  }
+  async function repPeriod() {
+    if (!RP.from) periodSet('month');
+    var rows = [], err = '';
+    try {
+      if (DEMO) { rows = (S.audit = S.audit || demoAudit()).filter(function (r) { return /^자산/.test(r.target || '') && ymd(r.at) >= RP.from && ymd(r.at) <= RP.to; }); }
+      else { var r = await sb.rpc('report_asset_changes', { p_from: RP.from, p_to: RP.to }); if (r.error) throw new Error('기간별 변동 조회에 실패했습니다. db/update_v1.9.4.sql 을 실행했는지 확인하세요. (' + r.error.message + ')'); rows = r.data; }
+    } catch (e) { err = e.message; }
+    var lines = [];
+    rows.forEach(function (r) {
+      var m = /^자산 (\S+)/.exec(r.target || ''), no = m ? m[1] : '', a = no ? S.assets.filter(function (x) { return x.asset_no === no; })[0] : null;
+      if (RP.cat && (!a || a.category !== RP.cat)) return; if (RP.dept && (!a || a.dept !== RP.dept)) return;
+      changeTypes(r).forEach(function (t) { lines.push({ at: r.at, no: no, type: t, text: r.summary || '', who: r.actor_name || '' }); });
+    });
+    var TYPES = [['신규 등록', '#0f6cbd'], ['폐기', '#c42b1c'], ['상태 변경', '#e08a00'], ['사용자 이동', '#6b3fb0'], ['위치 변경', '#1e8e3e'], ['삭제', '#8a8a8a']], cnt = {}; lines.forEach(function (l) { cnt[l.type] = (cnt[l.type] || 0) + 1; });
+    var mx = Math.max.apply(null, [1].concat(TYPES.map(function (t) { return cnt[t[0]] || 0; })));
+    var bars = TYPES.map(function (t) { var n = cnt[t[0]] || 0; return '<div class="prow"><span class="pn">' + t[0] + '</span><span class="pb"><i style="width:' + Math.round(n / mx * 100) + '%;background:' + t[1] + '"></i></span><span class="pv">' + n + '</span></div>'; }).join('');
+    var cats = groupCount(S.assets, function (a) { return a.category; }).map(function (x) { return x[0]; }), depts = groupCount(S.assets, function (a) { return a.dept; }).map(function (x) { return x[0]; });
+    var QL = [['today', '오늘'], ['week', '이번 주'], ['month', '이번 달'], ['last', '지난 달'], ['quarter', '분기'], ['year', '올해']];
+    shell('reports', repHead('기간별 자산 변동', '', '이력 관리의 자산 변경 기록을 집계합니다') +
+      '<div class="card noprint" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="note">기간</span>' + QL.map(function (q) { return '<button type="button" class="achip' + (RP.q === q[0] ? ' on' : '') + '" data-q="' + q[0] + '">' + q[1] + '</button>'; }).join('') + '<input type="date" id="r_f" value="' + RP.from + '"> ~ <input type="date" id="r_t" value="' + RP.to + '">' +
+      '<select id="r_c"><option value="">분류: 전체</option>' + cats.map(function (c) { return '<option' + (RP.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select><select id="r_d"><option value="">부서: 전체</option>' + depts.map(function (c) { return '<option' + (RP.dept === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select><button class="btn pri" id="r_go" type="button">조회</button></div>' +
+      (err ? '<div class="note" style="color:#c42b1c;margin:8px 0">' + esc(err) + '</div>' : '') +
+      '<div class="rcols"><div class="card" style="min-width:300px"><b>변동 유형별 건수</b> <span class="note">' + RP.from + ' ~ ' + RP.to + ' · 총 ' + lines.length + '건</span>' + bars + '</div><div class="rtb"><div style="font-weight:600;margin-bottom:4px">변동 내역 (최근순 · 최대 200건 표시)</div><table class="tbl"><thead><tr><th>일시</th><th>관리번호</th><th>구분</th><th>내용</th><th>처리자</th></tr></thead><tbody>' +
+      (lines.slice(0, 200).map(function (l) { return '<tr><td>' + esc(ymd(l.at).slice(5)) + ' ' + esc(hm(l.at)) + '</td><td class="mono">' + (l.no ? '<a href="#/asset/' + encodeURIComponent(l.no) + '">' + esc(l.no) + '</a>' : '') + '</td><td>' + esc(l.type) + '</td><td>' + esc(l.text) + '</td><td>' + esc(l.who) + '</td></tr>'; }).join('') || '<tr><td colspan="5" class="note" style="text-align:center;padding:16px">해당 기간에 변동이 없습니다.</td></tr>') + '</tbody></table></div></div>');
+    $$('[data-q]').forEach(function (b) { b.onclick = function () { periodSet(b.dataset.q); repPeriod(); }; });
+    $('#r_go').onclick = function () { RP.from = $('#r_f').value || RP.from; RP.to = $('#r_t').value || RP.to; RP.q = 'custom'; RP.cat = $('#r_c').value; RP.dept = $('#r_d').value; repPeriod(); };
+    $('#r_c').onchange = $('#r_go').onclick; $('#r_d').onchange = $('#r_go').onclick;
+    repBind('기간별 자산 변동', function () { repXlsx('기간별자산변동_' + RP.from + '_' + RP.to, [{ name: '요약', rows: TYPES.map(function (t) { return { '구분': t[0], '건수': cnt[t[0]] || 0 }; }) }, { name: '변동 내역', rows: lines.map(function (l) { return { '일시': ymd(l.at) + ' ' + hm(l.at), '관리번호': l.no, '구분': l.type, '내용': l.text, '처리자': l.who }; }) }], '기간별 자산 변동'); });
+  }
+  // ---- 부서별 자산 보유
+  function repDept() {
+    var g = {}; liveAssets().forEach(function (a) { var d = a.dept || '(소속 없음)', o = g[d] = g[d] || { dept: d, PC: 0, 노트북: 0, 모니터: 0, 기타: 0, users: {} }; o[catGroup(a.category)]++; if (a.user_name) o.users[a.user_name] = 1; });
+    var list = Object.keys(g).map(function (k) { var o = g[k]; o.total = o.PC + o.노트북 + o.모니터 + o.기타; o.n = Object.keys(o.users).length; o.per = o.n ? o.total / o.n : 0; return o; }).sort(function (a, b) { return b.total - a.total; });
+    var tot = { PC: 0, 노트북: 0, 모니터: 0, 기타: 0, total: 0 }; list.forEach(function (o) { CGRP.forEach(function (c) { tot[c] += o[c]; }); tot.total += o.total; });
+    shell('reports', repHead('부서별 자산 보유', '', '현재 자산 대장 기준(폐기 제외)') + '<div class="kpis">' + [kp('부서 수', list.length, ''), kp('전체 장비', tot.total.toLocaleString(), 'PC ' + tot.PC.toLocaleString() + ' · 노트북 ' + tot['노트북'].toLocaleString() + ' · 모니터 ' + tot['모니터'].toLocaleString())].join('') + '</div>' +
+      '<table class="tbl ctr" style="margin-top:8px"><thead><tr><th>소속</th><th>PC</th><th>노트북</th><th>모니터</th><th>기타</th><th>합계</th><th>사용 인원</th><th>1인당 장비</th></tr></thead><tbody>' +
+      list.map(function (o) { return '<tr><td style="text-align:left">' + esc(o.dept) + '</td><td>' + o.PC + '</td><td>' + o['노트북'] + '</td><td>' + o['모니터'] + '</td><td>' + o['기타'] + '</td><td><b>' + o.total + '</b></td><td>' + o.n + '</td><td' + (o.per >= 3.5 ? ' style="color:#c42b1c;font-weight:600"' : o.per > 0 && o.per < 1 ? ' style="color:#a15c00;font-weight:600"' : '') + '>' + (o.n ? o.per.toFixed(1) : '—') + '</td></tr>'; }).join('') + '</tbody></table>' +
+      '<div class="note" style="margin-top:8px">· 1인당 장비가 3.5대 이상이면 빨강(과다 의심), 1대 미만이면 주황(부족 의심)으로 표시합니다. 사용 인원은 사용자명이 있는 서로 다른 사람 수입니다.</div>');
+    repBind('부서별 자산 보유', function () { repXlsx('부서별자산보유', [{ name: '부서별', rows: list.map(function (o) { return { '소속': o.dept, 'PC': o.PC, '노트북': o['노트북'], '모니터': o['모니터'], '기타': o['기타'], '합계': o.total, '사용 인원': o.n, '1인당 장비': o.n ? Number(o.per.toFixed(1)) : '' }; }) }], '부서별 자산 보유'); });
+  }
+  // ---- 보증 만료 예정
+  var RW = { b: 'all', cat: '' };
+  function repWarranty() {
+    var now = new Date(), td = ymd(now), add = function (mo) { var d = new Date(now.getFullYear(), now.getMonth() + mo, now.getDate()); return ymd(d); };
+    var lim = { m1: add(1), m3: add(3), m6: add(6), m12: add(12) }, items = liveAssets().filter(function (a) { return a.warr_end; });
+    function bucket(a) { var d = a.warr_end; return d < td ? 'exp' : d <= lim.m1 ? 'm1' : d <= lim.m3 ? 'm3' : d <= lim.m6 ? 'm6' : d <= lim.m12 ? 'm12' : 'ok'; }
+    var cnt = { exp: 0, m1: 0, m3: 0, m6: 0, m12: 0 }; items.forEach(function (a) { var b = bucket(a); if (cnt[b] != null) cnt[b]++; });
+    var BL = { exp: ['이미 만료', 'b-bad'], m1: ['1개월 이내', 'b-warn'], m3: ['3개월 이내', 'b-warn'], m6: ['6개월 이내', 'b-blue'], m12: ['12개월 이내', 'b-gray'] };
+    var list = items.filter(function (a) { var b = bucket(a); return b !== 'ok' && (RW.b === 'all' || b === RW.b) && (!RW.cat || a.category === RW.cat); }).sort(function (a, b) { return a.warr_end < b.warr_end ? -1 : 1; });
+    var cats = groupCount(S.assets, function (a) { return a.category; }).map(function (x) { return x[0]; });
+    shell('reports', repHead('보증 만료 예정', '', '보증 만료일(없으면 제조년월+5년) 기준') + '<div class="kpis">' + [kp('이미 만료', cnt.exp.toLocaleString(), '교체·연장 검토', '#c42b1c'), kp('1개월 이내', cnt.m1, ''), kp('3개월 이내', cnt.m3, ''), kp('6개월 이내', cnt.m6, ''), kp('12개월 이내', cnt.m12, '교체 예산 산정')].join('') + '</div>' +
+      '<div class="row wrap noprint" style="margin:8px 0"><select id="r_b">' + [['all', '전체 (만료 포함 12개월 이내)'], ['exp', '이미 만료'], ['m1', '1개월 이내'], ['m3', '3개월 이내'], ['m6', '6개월 이내'], ['m12', '12개월 이내']].map(function (o) { return '<option value="' + o[0] + '"' + (RW.b === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select><select id="r_c"><option value="">분류: 전체</option>' + cats.map(function (c) { return '<option' + (RW.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select><span class="note">' + list.length.toLocaleString() + '건</span></div>' +
+      '<table class="tbl"><thead><tr><th>관리번호</th><th>분류</th><th>모델</th><th>사용자 · 부서</th><th>보증 만료</th><th>남은 기간</th></tr></thead><tbody>' + (list.slice(0, 300).map(function (a) { var b = bucket(a); return '<tr><td class="mono"><a href="#/asset/' + encodeURIComponent(a.asset_no) + '">' + esc(a.asset_no) + '</a></td><td>' + esc(a.category || '') + '</td><td>' + esc((a.manufacturer || '') + ' ' + (a.model || '')) + '</td><td>' + esc((a.user_name || '') + (a.dept ? ' · ' + a.dept : '')) + '</td><td>' + esc(a.warr_end) + (a.warr_calc ? ' <span class="note">계산</span>' : '') + '</td><td>' + badge(BL[b][0], BL[b][1].replace('b-', '')) + '</td></tr>'; }).join('') || '<tr><td colspan="6" class="note" style="text-align:center;padding:16px">해당하는 장비가 없습니다.</td></tr>') + '</tbody></table>' + (list.length > 300 ? '<div class="note">화면에는 300건까지 보이고, 엑셀에는 모두 들어갑니다.</div>' : ''));
+    $('#r_b').onchange = function () { RW.b = this.value; repWarranty(); }; $('#r_c').onchange = function () { RW.cat = this.value; repWarranty(); };
+    repBind('보증 만료 예정', function () { repXlsx('보증만료예정', [{ name: '요약', rows: Object.keys(BL).map(function (k) { return { '구분': BL[k][0], '건수': cnt[k] }; }) }, { name: '목록', rows: list.map(function (a) { return { '관리번호': a.asset_no, '분류': a.category, '제조사': a.manufacturer, '모델명': a.model, '사용자': a.user_name, '소속': a.dept, '보증 만료': a.warr_end, '구분': BL[bucket(a)][0] }; }) }], '보증 만료 예정'); });
+  }
+  // ---- 현황 점검 보고
+  async function repCheck() {
+    var snaps; try { snaps = await repSnaps(); } catch (e) { snaps = []; }
+    var cur = pcStats(), rows = monthRows(snaps, new Date().getFullYear()).filter(function (r) { return r.pc; });
+    shell('reports', repHead('현황 점검 보고', '', 'PC·노트북 프로그램 점검 현황') + '<div class="kpis">' + [kp('점검 대상 PC', cur.total.toLocaleString(), '폐기 제외'), kp('오늘 확인', cur.today.toLocaleString(), '수집률 ' + (cur.total ? Math.round(cur.today / cur.total * 100) : 0) + '%', '#1e8e3e'), kp('7일 이상 미확인', cur.stale.toLocaleString(), '휴가·퇴사·고장 확인', '#c42b1c'), kp('미수집 PC', cur.none.toLocaleString(), '프로그램 실행 이력 없음', '#a15c00'), kp('사용자 불일치', cur.mismatch.toLocaleString(), '대장 정리 필요')].join('') + '</div>' +
+      '<h3 style="margin:12px 0 6px">월별 추이 <span class="note">월말 저장값 기준</span></h3><table class="tbl ctr"><thead><tr><th>월말 기준</th><th>대상 PC</th><th>오늘 확인</th><th>수집률</th><th>7일 이상 미확인</th><th>미수집</th><th>사용자 불일치</th></tr></thead><tbody>' +
+      (rows.slice().reverse().map(function (r) { var p = r.pc; return '<tr><td>' + r.label + '</td><td>' + p.total + '</td><td>' + p.today + '</td><td>' + (p.total ? Math.round(p.today / p.total * 100) : 0) + '%</td><td>' + p.stale + '</td><td>' + p.none + '</td><td>' + p.mismatch + '</td></tr>'; }).join('') || '<tr><td colspan="7" class="note" style="text-align:center;padding:16px">아직 저장된 월별 값이 없습니다. 관리자가 접속하면 하루 1번 자동으로 저장됩니다.</td></tr>') + '</tbody></table>');
+    repBind('현황 점검 보고', function () { repXlsx('현황점검보고', [{ name: '현재', rows: [{ '점검 대상 PC': cur.total, '오늘 확인': cur.today, '7일 이상 미확인': cur.stale, '미수집': cur.none, '사용자 불일치': cur.mismatch }] }, { name: '월별 추이', rows: rows.map(function (r) { return { '월말 기준': r.label, '대상 PC': r.pc.total, '오늘 확인': r.pc.today, '7일 이상 미확인': r.pc.stale, '미수집': r.pc.none, '사용자 불일치': r.pc.mismatch }; }) }], '현황 점검 보고'); });
+  }
+  // ---- 원격 지원 처리 현황
+  function repSupport() {
+    var L = S.support || [], now = new Date(), months = [];
+    for (var i = 11; i >= 0; i--) { var d = new Date(now.getFullYear(), now.getMonth() - i, 1); months.push(d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2)); }
+    var rows = months.map(function (mo) {
+      var ms = L.filter(function (x) { return ymd(x.created_at).slice(0, 7) === mo; }), dn = ms.filter(function (x) { return x.status === 'done'; }), mins = dn.map(function (x) { return (new Date(x.updated_at) - new Date(x.created_at)) / 60000; }).filter(function (v) { return v >= 0; });
+      return { mo: mo, rec: ms.length, done: dn.length, wk: ms.length - dn.length, avg: mins.length ? Math.round(mins.reduce(function (a, b) { return a + b; }, 0) / mins.length) : null };
+    }).reverse();
+    var cur = rows[0], sym = {}; L.filter(function (x) { return ymd(x.created_at).slice(0, 7) === months[11]; }).forEach(function (x) { var k = (x.symptom || '(증상 없음)').trim().slice(0, 20); sym[k] = (sym[k] || 0) + 1; });
+    var top = Object.keys(sym).sort(function (a, b) { return sym[b] - sym[a]; }).slice(0, 5), hd = {}; L.forEach(function (x) { var k = x.handler || '(담당 미지정)'; hd[k] = hd[k] || { n: 0, d: 0 }; hd[k].n++; if (x.status === 'done') hd[k].d++; });
+    var avgTxt = function (v) { return v == null ? '—' : v >= 60 ? Math.floor(v / 60) + '시간 ' + (v % 60) + '분' : v + '분'; };
+    shell('reports', repHead('원격 지원 처리 현황', '', '최근 12개월 · 최근 300건 기준') + '<div class="kpis">' + [kp(cur.mo.slice(5) + '월 접수', cur.rec, ''), kp('완료', cur.done, '', '#1e8e3e'), kp('진행·대기', cur.wk, '', '#a15c00'), kp('평균 처리 시간', avgTxt(cur.avg), '접수 → 완료')].join('') + '</div>' +
+      '<div class="rcols"><div class="rtb"><table class="tbl ctr"><thead><tr><th>월</th><th>접수</th><th>완료</th><th>진행·대기</th><th>평균 처리</th></tr></thead><tbody>' + rows.map(function (r) { return '<tr><td>' + r.mo + '</td><td>' + r.rec + '</td><td>' + r.done + '</td><td>' + r.wk + '</td><td>' + avgTxt(r.avg) + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+      '<div class="card" style="min-width:300px"><b>이번 달 상위 증상</b>' + (top.map(function (k) { return '<div class="prow"><span class="pn" style="width:150px">' + esc(k) + '</span><span class="pb"><i style="width:' + Math.round(sym[k] / sym[top[0]] * 100) + '%;background:#0f6cbd"></i></span><span class="pv">' + sym[k] + '</span></div>'; }).join('') || '<div class="note">접수가 없습니다.</div>') + '<b style="display:block;margin-top:12px">담당자별</b>' + Object.keys(hd).map(function (k) { return '<div class="note" style="line-height:1.8">' + esc(k) + ' · 접수 ' + hd[k].n + ' · 완료 ' + hd[k].d + '</div>'; }).join('') + '</div></div>');
+    repBind('원격 지원 처리 현황', function () { repXlsx('원격지원처리현황', [{ name: '월별', rows: rows.map(function (r) { return { '월': r.mo, '접수': r.rec, '완료': r.done, '진행·대기': r.wk, '평균 처리(분)': r.avg == null ? '' : r.avg }; }) }, { name: '접수 내역', rows: L.map(function (x) { return { '접수번호': x.req_no, '접수 시각': ymd(x.created_at) + ' ' + hm(x.created_at), '컴퓨터 이름': x.computer_name, '자산': x.asset_no, '증상': x.symptom, '상태': { received: '접수', working: '진행중', done: '완료' }[x.status] || x.status, '담당': x.handler, '처리 메모': x.note }; }) }], '원격 지원 처리 현황'); });
+  }
+  // ---- 실사 결과 보고서
+  var RI = { id: '' };
+  async function repInv() {
+    var invs; try { invs = await invList(); } catch (e) { shell('reports', repHead('실사 결과 보고서') + '<div class="note" style="color:#c42b1c">' + esc(e.message || e) + '</div>'); return; }
+    if (!invs.length) { shell('reports', repHead('실사 결과 보고서') + '<div class="note" style="margin-top:10px">아직 만든 실사가 없습니다.</div>'); repBind('실사 결과 보고서', function () { }); return; }
+    var inv = invs.filter(function (x) { return String(x.id) === String(RI.id); })[0] || invs[0]; RI.id = inv.id;
+    var items = await invItems(inv.id), st = invStats(items);
+    function grp(key) { var g = {}; items.forEach(function (i) { var k = i[key] || '(없음)', o = g[k] = g[k] || { k: k, n: 0, d: 0, p: 0, a: 0 }; o.n++; if (invDone(i)) o.d++; else if (i.result === 'abnormal') o.a++; else o.p++; }); return Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return b.n - a.n; }); }
+    var gd = grp('dept'), gc = grp('category'), gt = function (L) { return '<table class="tbl ctr"><thead><tr><th>구분</th><th>대상</th><th>확인</th><th>미확인</th><th>이상</th><th>진행률</th></tr></thead><tbody>' + L.slice(0, 15).map(function (o) { return '<tr><td style="text-align:left">' + esc(o.k) + '</td><td>' + o.n + '</td><td>' + o.d + '</td><td>' + o.p + '</td><td>' + o.a + '</td><td>' + Math.round(o.d / o.n * 100) + '%</td></tr>'; }).join('') + '</tbody></table>'; };
+    var bad = items.filter(function (i) { return !invDone(i); });
+    shell('reports', repHead('실사 결과 보고서', '<select id="r_i" class="noprint">' + invs.map(function (x) { return '<option value="' + x.id + '"' + (x.id === inv.id ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') + '</select>', esc((inv.start_date || '') + ' ~ ' + (inv.end_date || '')) + ' · ' + (inv.status === 'open' ? '진행 중' : '마감')) +
+      '<div class="kpis">' + [kp('대상', st.total.toLocaleString(), ''), kp('확인 완료', (st.auto + st.scan).toLocaleString(), st.pct + '% (자동 ' + st.auto + ' · 현장 ' + st.scan + ')', '#1e8e3e'), kp('미확인', st.pending.toLocaleString(), '', '#a15c00'), kp('이상', st.abnormal.toLocaleString(), '', '#c42b1c')].join('') + '</div>' +
+      '<div class="rcols"><div class="rtb"><h3>부서별</h3>' + gt(gd) + '</div><div class="rtb"><h3>분류별</h3>' + gt(gc) + '</div></div>' +
+      '<h3 style="margin:12px 0 6px">미확인·이상 목록 <span class="note">' + bad.length.toLocaleString() + '건 (화면에는 50건까지)</span></h3><table class="tbl"><thead><tr><th>관리번호</th><th>분류</th><th>사용자 · 부서</th><th>상태</th><th>처리</th></tr></thead><tbody>' + (bad.slice(0, 50).map(function (i) { return '<tr><td class="mono">' + esc(i.asset_no) + '</td><td>' + esc(i.category || '') + '</td><td>' + esc((i.user_name || '') + (i.dept ? ' · ' + i.dept : '')) + '</td><td>' + (i.result === 'abnormal' ? esc(i.abn_type || '이상') : '미확인') + '</td><td>' + esc(i.resolution ? (RES_L[i.resolution] || i.resolution) + (i.resolved_note ? ' · ' + i.resolved_note : '') : '') + '</td></tr>'; }).join('') || '<tr><td colspan="5" class="note" style="text-align:center;padding:14px">없습니다.</td></tr>') + '</tbody></table>');
+    $('#r_i').onchange = function () { RI.id = this.value; repInv(); };
+    repBind('실사 결과 보고서', function () { var RL = { auto: '자동 확인', ok: '현장 확인', pending: '미확인', abnormal: '이상' }; repXlsx('실사결과보고_' + inv.name.replace(/[\\/:*?"<>|\s]/g, ''), [{ name: '요약', rows: [{ '실사': inv.name, '대상': st.total, '확인': st.auto + st.scan, '미확인': st.pending, '이상': st.abnormal, '진행률(%)': st.pct }] }, { name: '부서별', rows: gd.map(function (o) { return { '부서': o.k, '대상': o.n, '확인': o.d, '미확인': o.p, '이상': o.a }; }) }, { name: '분류별', rows: gc.map(function (o) { return { '분류': o.k, '대상': o.n, '확인': o.d, '미확인': o.p, '이상': o.a }; }) }, { name: '미확인·이상', rows: bad.map(function (i) { return { '관리번호': i.asset_no, '분류': i.category, '부서': i.dept, '사용자': i.user_name, '결과': RL[i.result] || i.result, '이상 유형': i.abn_type || '', '처리': i.resolution ? RES_L[i.resolution] || i.resolution : '', '처리 사유': i.resolved_note || '' }; }) }], '실사 결과 보고서'); });
+  }
+  // ---- 이력 관리 요약 (메인 관리자)
+  var RA = { from: '', to: '' };
+  async function repAudit() {
+    if (!isMain()) { shell('reports', '<h1>이력 관리 요약</h1><div class="note" style="margin-top:8px">메인 관리자만 볼 수 있습니다.</div>'); return; }
+    if (!RA.from) { RA.from = ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); RA.to = ymd(new Date()); }
+    var rows = [], err = '';
+    try {
+      if (DEMO) rows = (S.audit = S.audit || demoAudit()).filter(function (r) { return ymd(r.at) >= RA.from && ymd(r.at) <= RA.to; });
+      else for (var from = 0; from < 20000; from += 1000) { var r = await sb.from('audit_log').select('action,actor_name,actor_sabun,at').gte('at', RA.from + 'T00:00:00+09:00').lte('at', RA.to + 'T23:59:59+09:00').order('at', { ascending: false }).range(from, from + 999); if (r.error) throw r.error; rows = rows.concat(r.data); if (r.data.length < 1000) break; }
+    } catch (e) { err = e.message || String(e); }
+    var byA = {}, byU = {}; rows.forEach(function (r) { byA[r.action] = (byA[r.action] || 0) + 1; var k = (r.actor_name || '알 수 없음') + ' ' + (r.actor_sabun || ''); var o = byU[k] = byU[k] || { k: k, n: 0 }; o.n++; o[r.action] = (o[r.action] || 0) + 1; });
+    var acts = Object.keys(byA).sort(function (a, b) { return byA[b] - byA[a]; }), us = Object.keys(byU).map(function (k) { return byU[k]; }).sort(function (a, b) { return b.n - a.n; });
+    shell('reports', repHead('이력 관리 요약', '<input type="date" id="r_f" value="' + RA.from + '" class="noprint"> ~ <input type="date" id="r_t" value="' + RA.to + '" class="noprint"><button class="btn noprint" id="r_go" type="button">조회</button>', '메인 관리자 전용 · 감사 제출용') + (err ? '<div class="note" style="color:#c42b1c">' + esc(err) + '</div>' : '') +
+      '<div class="kpis">' + [kp('전체 기록', rows.length.toLocaleString(), RA.from + ' ~ ' + RA.to)].concat(['login', 'create', 'update', 'delete', 'export'].map(function (a) { return kp(ACT_L[a], (byA[a] || 0).toLocaleString(), '', a === 'delete' ? '#c42b1c' : ''); })).join('') + '</div>' +
+      '<div class="rcols"><div class="rtb"><h3>작업 유형별</h3><table class="tbl ctr"><thead><tr><th>유형</th><th>건수</th></tr></thead><tbody>' + acts.map(function (a) { return '<tr><td>' + actBadge(a) + '</td><td>' + byA[a].toLocaleString() + '</td></tr>'; }).join('') + '</tbody></table></div><div class="rtb"><h3>작업자별 (상위 20명)</h3><table class="tbl ctr"><thead><tr><th>작업자</th><th>전체</th><th>로그인</th><th>변경·수정·생성</th><th>삭제</th><th>내보내기</th></tr></thead><tbody>' + us.slice(0, 20).map(function (o) { return '<tr><td style="text-align:left">' + esc(o.k) + '</td><td>' + o.n + '</td><td>' + (o.login || 0) + '</td><td>' + ((o.change || 0) + (o.update || 0) + (o.create || 0)) + '</td><td>' + (o['delete'] || 0) + '</td><td>' + (o['export'] || 0) + '</td></tr>'; }).join('') + '</tbody></table></div></div>');
+    $('#r_go').onclick = function () { RA.from = $('#r_f').value || RA.from; RA.to = $('#r_t').value || RA.to; repAudit(); };
+    repBind('이력 관리 요약', function () { repXlsx('이력관리요약_' + RA.from + '_' + RA.to, [{ name: '작업 유형별', rows: acts.map(function (a) { return { '유형': ACT_L[a] || a, '건수': byA[a] }; }) }, { name: '작업자별', rows: us.map(function (o) { return { '작업자': o.k, '전체': o.n, '로그인': o.login || 0, '변경·수정·생성': (o.change || 0) + (o.update || 0) + (o.create || 0), '삭제': o['delete'] || 0, '내보내기': o['export'] || 0 }; }) }], '이력 관리 요약'); });
+  }
+
   function route() {
+
     scanStop(); $$('.scanov').forEach(function (m) { m.remove(); });
     $$('.mdl').forEach(function (m) { m.remove(); });   // 화면을 옮기면 열려 있던 창(QR 출력 등)을 닫음
     var h = (location.hash || '#/dashboard').replace(/^#\//, '').split('/'), p = h[0], arg = h.slice(1).join('/');
     try {
       if (p === 'assets') pageAssets();
+      else if (p === 'asset-new') pageAssetNew();
       else if (p === 'asset') pageDetail(decodeURIComponent(arg));
       else if (p === 'check') pageCheck(arg);
       else if (p === 'support') pageSupport(arg);
       else if (p === 'employees') pageEmployees(arg);
       else if (p === 'admins') pageAdmins();
+      else if (p === 'reports') pageReports(arg);
       else if (p === 'audit') pageAudit();
       else if (p === 'inventory') { var iv = arg.split('/')[0]; if (iv) pageInvDetail(iv); else pageInventory(); }
       else if (p === 'inv-scan') pageInvScan(arg);
@@ -2047,7 +2446,7 @@
         if (!s.data.session) { pageLogin(); return; }
         S.user = s.data.session.user;
         var adm = await sb.from('admin_users').select('user_id,sabun,role,active,name,dept').eq('user_id', S.user.id).maybeSingle();
-        if (adm.error) { adm = await sb.from('admin_users').select('user_id').eq('user_id', S.user.id).maybeSingle(); if (adm.data) { adm.data.role = 'main'; adm.data.active = true; } }   // v1.9.3 SQL 실행 전에도 기존 관리자는 동작
+        if (adm.error) { adm = await sb.from('admin_users').select('user_id').eq('user_id', S.user.id).maybeSingle(); if (adm.data) { adm.data.role = 'main'; adm.data.active = true; } }   // v1.9.4 SQL 실행 전에도 기존 관리자는 동작
         S.me = adm.data || null;
         if (!adm.data) { await sb.auth.signOut(); pageLogin('관리자 권한이 없는 계정입니다. 메인 관리자에게 등록을 요청하세요.'); return; }
         if (adm.data.active === false) { await sb.auth.signOut(); pageLogin('사용이 중지된 계정입니다. 전산지원파트로 문의하세요.'); return; }

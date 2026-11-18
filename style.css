@@ -239,3 +239,26 @@ body.viewer .wonly{display:none!important}
 .lkb.ok{background:#e6f4ea;color:#1e8e3e}.lkb.no{background:#fde7f1;color:#b4226b}.lkb.gray{background:#eef1f5;color:#5c5c5c}
 .b-pink{background:#fde7f1;color:#b4226b}
 .hit mark,.hit span{font-weight:500}
+
+/* v1.9.4: 자산 목록 가운데 정렬 */
+.tbl.ctr th,.tbl.ctr td{text-align:center}
+.tbl.ctr td.hit{text-align:center}
+
+/* v1.9.4: 자산 직접 등록 */
+.frow{display:flex;gap:12px;padding:7px 0;border-bottom:1px solid #f0f0f0}
+.frow .fl{width:100px;flex:none;font-size:12px;color:#6a6a6a;padding-top:8px}
+.frow .fv{flex:1;min-width:0}
+.frow .fv input,.frow .fv select,.frow .fv textarea{max-width:100%}
+.frow .fv input[type=text],.frow .fv select{width:100%;box-sizing:border-box}
+.btn.dng{color:#c42b1c;border-color:#e0a39b}.btn.dng.sel{background:#c42b1c;color:#fff;border-color:#c42b1c}.btn.dng.sel:disabled{opacity:.45}
+.tbl tr.rsel td{background:#f3f8fd}.tbl .cbx{width:30px}
+
+/* v1.9.4: 보고서 */
+.rgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rcard{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #e5e8ee;border-radius:10px;padding:14px 16px;color:inherit;text-decoration:none}
+.rcard:hover{border-color:#0f6cbd;box-shadow:0 2px 8px #0f6cbd22}
+.rcard .rt{display:flex;align-items:center;gap:8px}.rcard .ri{width:30px;height:30px;border-radius:8px;background:#e7f1fb;display:inline-flex;align-items:center;justify-content:center;font-size:15px}
+.rcard .rd{font-size:11.5px;color:#5c5c5c;line-height:1.6;min-height:46px}.rcard .rf{display:flex;align-items:center}.rcard .ro{color:#0f6cbd;font-size:11.5px;font-weight:600}
+.rcols{display:flex;gap:12px;align-items:flex-start;margin-top:10px;flex-wrap:wrap}.rcols .rtb{flex:1;min-width:320px}
+.tbl.ctr td[style*="text-align:left"]{text-align:left}
+@media print{.layout{display:block}.main{padding:0}.rgrid{grid-template-columns:1fr}}
