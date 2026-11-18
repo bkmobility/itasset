@@ -387,6 +387,10 @@
     if (isPc(a)) { var n = a._dev ? (S.monitors || []).filter(function (m) { return m.device_id === a._dev.id; }).length : 0; return { mon: false, n: n }; }
     return null;
   }
+  function monSpec(a) {
+    var rec = (S.monitors || []).filter(function (m) { return m.asset_no === a.asset_no; })[0]; if (!rec) return '—';
+    return [rec.size_inch ? rec.size_inch + '인치' : '', rec.resolution || ''].filter(Boolean).join(' · ') || '—';
+  }
   function monBadge(a) {
     var L = monLink(a); if (!L) return '';
     if (L.mon) return L.pcNo ? '<span class="lkb ok">' + esc(L.pcNo) + ' · ' + L.how + '</span>' : '<span class="lkb no">PC 미연결</span>';
@@ -446,14 +450,14 @@
     var pageRows = list.slice((F.page - 1) * PS, F.page * PS), qLow = F.q.trim().toLowerCase();
     var rows = pageRows.map(function (a) {
       var hitCell = '';
-      if (qLow) { var hs = searchHits(a, qLow).filter(function (f) { return HID[f[0]]; }).slice(0, 2); hitCell = '<td class="hit">' + (hs.map(function (f) { return '<span>' + hl(f[1], qLow) + '</span>'; }).join('<br>') || '<span class="note">—</span>') + (monBadge(a) ? '<div>' + monBadge(a) + '</div>' : '') + '</td>'; }
+      if (qLow) { var hs = searchHits(a, qLow).filter(function (f) { return HID[f[0]]; }).slice(0, 2); hitCell = '<td class="hit">' + hs.map(function (f) { return '<span>' + hl(f[1], qLow) + '</span>'; }).join('<br>') + (monBadge(a) ? '<div>' + monBadge(a) + '</div>' : '') + '</td>'; }
       var L = monLink(a), dPc = L && L.mon && L.pc ? L.pc : null;   // 연결된 모니터는 PC 값으로 표시
       var cName = a.pc_name || (dPc && dPc.pc_name) || '—', cIp = a.ip || (dPc && dPc.ip) || '—', cSeen = a.last_seen || (dPc && dPc.last_seen);
       var nameExtra = (!qLow && monBadge(a) ? '<div>' + monBadge(a) + '</div>' : '');
       return '<tr class="clk" data-no="' + esc(a.asset_no) + '"><td><input type="checkbox" class="sel" data-no="' + esc(a.asset_no) + '"' + (F.sel[a.asset_no] ? ' checked' : '') + '></td>' +
         '<td class="mono">' + esc(a.asset_no) + '</td>' + hitCell + '<td>' + esc(a.category) + '</td><td>' + esc(a.manufacturer) + '</td><td>' + esc(a.model) + '</td><td>' + esc(a.mfg_ym) + '</td><td>' + esc(a.status) + '</td>' +
         '<td>' + esc(a.user_name) + (a.user_mismatch ? ' ' + badge('불일치', 'warn') : '') + '</td><td>' + esc(a.dept) + '</td><td>' + esc(a.title) + '</td><td>' + warrantyBadge(a.warr_end, a.warr_calc) + '</td>' +
-        '<td class="auto">' + esc(cName) + nameExtra + '</td><td class="auto mono">' + esc(cIp) + '</td><td class="auto">' + esc(specStr(a)) + '</td><td class="auto">' + (cSeen ? seenHtml(cSeen) + (!a.last_seen && dPc ? '<div class="note" style="font-size:10.5px">연결 PC 기준</div>' : '') : seenHtml(a.last_seen)) + '</td></tr>';
+        '<td class="auto">' + esc(cName) + nameExtra + '</td><td class="auto mono">' + esc(cIp) + '</td><td class="auto">' + esc(a.category === '모니터' ? monSpec(a) : specStr(a)) + '</td><td class="auto">' + (cSeen ? seenHtml(cSeen) + (!a.last_seen && dPc ? '<div class="note" style="font-size:10.5px">연결 PC 기준</div>' : '') : seenHtml(a.last_seen)) + '</td></tr>';
     }).join('') || '<tr><td colspan="16" class="note" style="padding:24px;text-align:center">조건에 맞는 자산이 없습니다.</td></tr>';
     var nsel = Object.keys(F.sel).length;
     var hasFilter = !!(qLow || F.dept || F.cat || F.status || F.collect);
@@ -475,7 +479,7 @@
     }
     var innerHtml = (
       chipHtml + bulk +
-      sortBar('assets', AC, list.length) + '<div style="overflow:auto"><table class="tbl"><thead><tr><th><input type="checkbox" id="all"></th>' + thS('assets', 'asset_no', '관리번호') + (qLow ? '<th>일치한 항목</th>' : '') + thS('assets', 'category', '자산분류') + thS('assets', 'manufacturer', '제조사') + thS('assets', 'model', '모델명') + thS('assets', 'mfg_ym', '제조년월') + thS('assets', 'status', '자산상태') + thS('assets', 'user_name', '사용자명') + thS('assets', 'dept', '소속명') + thS('assets', 'title', '직책') + thS('assets', 'warr', '보증 (제조년월+5년)') + thS('assets', 'pc_name', '컴퓨터 이름', 'auto') + thS('assets', 'ip', 'IP', 'auto') + thS('assets', 'spec', '사양 (CPU / RAM / 저장)', 'auto') + thS('assets', 'last_seen', '최종 확인', 'auto') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      sortBar('assets', AC, list.length) + '<div style="overflow:auto"><table class="tbl"><thead><tr><th><input type="checkbox" id="all"></th>' + thS('assets', 'asset_no', '관리번호') + (qLow ? '<th>일치한 항목</th>' : '') + thS('assets', 'category', '자산분류') + thS('assets', 'manufacturer', '제조사') + thS('assets', 'model', '모델명') + thS('assets', 'mfg_ym', '제조년월') + thS('assets', 'status', '자산상태') + thS('assets', 'user_name', '사용자명') + thS('assets', 'dept', '소속명') + thS('assets', 'title', '직책') + thS('assets', 'warr', '보증 (제조년월+5년)') + thS('assets', 'pc_name', '컴퓨터 이름', 'auto') + thS('assets', 'ip', 'IP', 'auto') + thS('assets', 'spec', '사양', 'auto') + thS('assets', 'last_seen', '최종 확인', 'auto') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="pager"><span>' + (list.length ? ((F.page - 1) * PS + 1) + '–' + Math.min(list.length, F.page * PS) : 0) + ' / ' + list.length.toLocaleString() + '건</span><span><button class="btn sm" id="prev"' + (F.page <= 1 ? ' disabled' : '') + '>‹ 이전</button> ' + F.page + ' / ' + pages + ' <button class="btn sm" id="next"' + (F.page >= pages ? ' disabled' : '') + '>다음 ›</button></span></div>'
     );
     // v1.9.2: 위쪽 [QR코드 출력] — 선택한 항목이 있으면 선택한 것만, 없으면 검색·조건으로 걸러진 목록 전체
