@@ -270,3 +270,13 @@ body.viewer .wonly{display:none!important}
 .tbl.audtb td:nth-child(5){word-break:keep-all;overflow-wrap:anywhere}
 .tbl.audtb th.ipth{background:#fff7d6}
 .ipb{display:inline-block;background:#eef1f5;color:#6a6a6a;border-radius:3px;padding:0 4px;font-size:9.5px;vertical-align:1px}
+
+/* v1.9.5 대시보드: 윗줄 자산 유형 | 자산 상태, 아랫줄 부서별 자산 수 | PC 수집 현황 (반/반) */
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch}
+.dgrid .card{min-width:0;margin:0}
+@media (max-width:760px){.dgrid{grid-template-columns:1fr}}
+/* v1.9.5 이력 선택 */
+.audmenu{position:fixed;z-index:60;width:320px;background:#fff;border:1px solid #cfd6df;border-radius:8px;box-shadow:0 6px 18px #0003;padding:4px 0}
+.audmenu button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 14px;font-size:12.5px;cursor:pointer}
+.audmenu button:hover{background:#eef5fc}
+.tbl.audtb th.cbx,.tbl.audtb td.cbx{text-align:center;padding-left:6px;padding-right:2px}

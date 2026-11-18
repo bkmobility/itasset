@@ -289,7 +289,8 @@
     return '<span class="rchip ' + (isViewer() ? 'v' : 'a') + '">' + role + '</span><span>' + esc(adminLabel()) + '</span>';
   }
   var ROUTES = [['dashboard', '대시보드'], ['assets', '자산 관리'], ['check', '현황 점검'], ['support', '원격 지원'], ['employees', '인사 정보'], ['data', '데이터 관리'], ['inventory', '실사 (재물조사)']];
-  function navRoutes() { return (isMain() ? ROUTES.concat([['audit', '이력 관리'], ['admins', '관리자']]) : ROUTES).concat([['reports', '보고서']]); }
+  function navRoutes() { return isMain() ? ROUTES.concat([['audit', '이력 관리'], ['admins', '관리자'], ['reports', '보고서']]) : ROUTES; }   // v1.9.5: 이력 관리·관리자·보고서는 메인 관리자 전용
+  function denyPage() { shell('dashboard', '<div class="card" style="text-align:center;padding:30px 20px;max-width:560px;margin:30px auto"><div style="font-size:30px">🔒</div><h2 style="margin:6px 0">접근 권한이 없습니다</h2><div class="note" style="line-height:1.8">이 메뉴(이력 관리 · 관리자 · 보고서)는 <b>메인 관리자</b>만 열 수 있습니다.<br>주소를 직접 입력해 들어와도 이 화면이 표시됩니다.</div><div style="margin-top:14px"><a class="btn pri" href="#/dashboard">대시보드로 이동</a></div></div>'); }
   function shell(active, html) {
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
@@ -362,10 +363,11 @@
     shell('dashboard', '<div class="row"><h1>대시보드</h1><span class="note">' + esc(ymd(new Date()) + ' ' + hm(new Date())) + ' 기준</span></div>' +
       '<div class="dks">' + k('전체 자산', A.length.toLocaleString(), '엑셀 가져오기 기준', '#2f7df6', '#/assets') + k('오늘 확인된 PC', today.toLocaleString(), '수집률 ' + (pcs.length ? Math.round(today / pcs.length * 100) : 0) + '%', '#1e8e3e', '#/assets') + k('점검 필요', stale.toLocaleString(), '7일 이상 미확인', '#c42b1c', '#/check/stale') + k('보증 만료 예정', warrSoon.toLocaleString(), '30일 이내', '#e9a100', '#/assets') + k('지원 요청', recv.toLocaleString(), '미처리 · 오늘 접수 ' + recvToday, '#7a4bd6', '#/support') + '</div>' +
       '<div class="card dwide" style="border-left:4px solid #e9a100"><h3>오늘 처리할 일 <span class="note" style="font-weight:400">— 누르면 해당 목록으로 이동</span></h3>' + todo + '</div>' +
-      '<div class="dcols"><div class="dleft"><div class="card"><h3>PC 수집 현황</h3>' + cbar + legend(coll) + '<div class="note" style="margin-top:6px">프로그램을 한 번도 실행하지 않은 PC는 미수집으로 집계됩니다.</div></div>' +
-      '<div class="card"><h3>부서별 자산 수 <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + bars(groupCount(A, function (a) { return a.dept; }).slice(0, 5), null, 'dept') + '</div></div>' +
-      '<div class="dright"><div class="card"><h3>자산 유형</h3><div class="dn">' + donut(typ, A.length.toLocaleString(), 'cat') + '<div class="lgs">' + legend(typ, 'cat') + '</div></div></div>' +
-      '<div class="card"><h3>자산 상태</h3><div class="dn">' + donut(sts, A.length.toLocaleString(), 'status') + '<div class="lgs">' + legend(sts, 'status') + '</div></div></div></div></div>' +
+      '<div class="dgrid">' +
+      '<div class="card"><h3>자산 유형</h3><div class="dn">' + donut(typ, A.length.toLocaleString(), 'cat') + '<div class="lgs">' + legend(typ, 'cat') + '</div></div></div>' +
+      '<div class="card"><h3>자산 상태</h3><div class="dn">' + donut(sts, A.length.toLocaleString(), 'status') + '<div class="lgs">' + legend(sts, 'status') + '</div></div></div>' +
+      '<div class="card"><h3>부서별 자산 수 <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + bars(groupCount(A, function (a) { return a.dept; }).slice(0, 5), null, 'dept') + '</div>' +
+      '<div class="card"><h3>PC 수집 현황</h3>' + cbar + legend(coll) + '<div class="note" style="margin-top:6px">프로그램을 한 번도 실행하지 않은 PC는 미수집으로 집계됩니다.</div></div></div>' +
       '<div class="card dwide"><div class="row"><h3 style="flex:1;margin:0">보증 만료·교체 알림</h3>' + (wr.length > 6 ? '<span class="note">외 ' + (wr.length - 6) + '건</span>' : '') + '<a href="#/assets" style="font-size:11.5px">자산 목록 ›</a></div><table class="tbl dtbl"><thead><tr><th>자산번호</th><th>유형</th><th>사용자</th><th>만료일/기준</th><th>상태</th></tr></thead><tbody>' + wrows + '</tbody></table><div class="note" style="margin-top:6px">보증 만료 30일 전~만료 후 90일, 그리고 구매일(없으면 제조년월) 기준 5년 이상 사용한 PC·노트북을 표시합니다.</div></div>' +
       '<div class="card dwide"><h3>최근 활동</h3>' + arows + '</div>');
     if (isMain()) $$('.ar.clk').forEach(function (el) { el.onclick = function () { AUDV = { from: el.dataset.at, to: el.dataset.at, actor: '', target: el.dataset.tg, q: '', chip: 'all', page: 0 }; location.hash = '#/audit'; }; });
@@ -1289,7 +1291,7 @@
     $('#pwc', d).onclick = function () { try { navigator.clipboard.writeText(pw); toast('복사했습니다.'); } catch (e) { toast('직접 선택해서 복사하세요.'); } };
   }
   async function pageAdmins() {
-    if (!isMain()) { location.hash = '#/dashboard'; return; }
+    if (!isMain()) { denyPage(); return; }
     var rows;
     try { rows = (await admCall('list')).admins; } catch (e) { shell('admins', '<h1>관리자</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message) + '</div>'); return; }
     ADM.list = rows;
@@ -1452,8 +1454,8 @@
   // v1.9.4: 이력 관리 (메인 관리자 전용)
   // =====================================================================
   var AUDV = { from: '', to: '', actor: '', target: '', q: '', chip: 'all', page: 0 };
-  var CHIPS = [['all', '전체', null], ['login', '로그인', ['login', 'logout']], ['fail', '로그인 실패', ['login_fail']], ['create', '생성', ['create']], ['update', '수정', ['update', 'import']], ['delete', '삭제', ['delete']], ['change', '변경', ['change', 'scan']], ['export', '내보내기', ['export']]];
-  var ACT_L = { login: '로그인', logout: '로그아웃', login_fail: '로그인 실패', create: '생성', update: '수정', delete: '삭제', change: '변경', export: '내보내기', import: '업로드', scan: '스캔' };
+  var CHIPS = [['all', '전체', null], ['login', '로그인', ['login', 'logout']], ['fail', '로그인 실패', ['login_fail']], ['create', '생성', ['create']], ['update', '수정', ['update', 'import']], ['delete', '삭제', ['delete', 'purge']], ['change', '변경', ['change', 'scan']], ['export', '내보내기', ['export']]];
+  var ACT_L = { login: '로그인', logout: '로그아웃', login_fail: '로그인 실패', create: '생성', update: '수정', delete: '삭제', purge: '이력 삭제', change: '변경', export: '내보내기', import: '업로드', scan: '스캔' };
   function actBadge(a) { return '<span class="abx a-' + esc(a) + '">' + esc(ACT_L[a] || a) + '</span>'; }
   function actorRole(r) { return r === 'main' ? '메인 관리자' : r === 'viewer' ? '조회 전용' : r === 'program' ? 'PC 프로그램' : r ? '관리자' : ''; }
   function actorHtml(r) { return r.actor_name ? '<b>' + esc(r.actor_name) + '</b> <span class="note">' + esc(r.actor_sabun || '') + '</span>' : r.actor_sabun ? '<b>알 수 없음</b> <span class="note">' + esc(r.actor_sabun) + '</span>' : '<span class="note">—</span>'; }
@@ -1483,7 +1485,7 @@
   }
   var AUD_PS = 50;
   async function pageAudit() {
-    if (!isMain()) { location.hash = '#/dashboard'; return; }
+    if (!isMain()) { denyPage(); return; }
     if (!AUDV.from) { AUDV.from = dstr(new Date(Date.now() - 6 * 86400000)); AUDV.to = dstr(new Date()); }
     var v = AUDV;
     shell('audit', '<div class="row wrap"><h1>이력 관리</h1><span class="note">로그인 기록과 모든 작업(생성·수정·삭제·변경)을 누가·언제·무엇을·어떻게·왜 했는지 남깁니다</span></div>' +
@@ -1495,10 +1497,10 @@
       '<button class="btn pri" id="au_go" type="button">조회</button><button class="btn" id="au_rs" type="button">초기화</button><div class="grow"></div><button class="btn pri" id="au_ex" type="button">내보내기</button></div>' +
       '<div class="fchips" id="au_chips" style="margin-top:8px">' + CHIPS.map(function (c) { return '<button type="button" class="achip' + (v.chip === c[0] ? ' on' : '') + '" data-c="' + c[0] + '">' + c[1] + '</button>'; }).join('') + '</div></div>' +
       '<div id="audres"><div class="note" style="padding:16px">불러오는 중…</div></div>');
-    function read() { v.from = $('#au_f').value; v.to = $('#au_t').value; v.actor = $('#au_a').value.trim(); v.target = $('#au_g').value.trim(); v.q = $('#au_q').value.trim(); v.page = 0; }
+    function read() { AUDSEL = {}; v.from = $('#au_f').value; v.to = $('#au_t').value; v.actor = $('#au_a').value.trim(); v.target = $('#au_g').value.trim(); v.q = $('#au_q').value.trim(); v.page = 0; }
     $('#au_go').onclick = function () { read(); loadAuditList(); };
     ['au_a', 'au_g', 'au_q'].forEach(function (id) { $('#' + id).onkeydown = function (e) { if (e.key === 'Enter' && !e.isComposing) { read(); loadAuditList(); } }; });
-    $('#au_rs').onclick = function () { AUDV = { from: '', to: '', actor: '', target: '', q: '', chip: 'all', page: 0 }; pageAudit(); };
+    $('#au_rs').onclick = function () { AUDSEL = {}; AUDV = { from: '', to: '', actor: '', target: '', q: '', chip: 'all', page: 0 }; pageAudit(); };
     $$('#au_chips .achip').forEach(function (b) { b.onclick = function () { read(); v.chip = b.dataset.c; $$('#au_chips .achip').forEach(function (x) { x.classList.toggle('on', x === b); }); loadAuditList(); }; });
     $('#au_ex').onclick = function () { read(); auditExportDialog(); };
     loadAuditList();
@@ -1509,13 +1511,21 @@
     try { res = await auditFetch(AUDV.page, AUD_PS); } catch (e) { box.innerHTML = '<div class="note" style="color:#c42b1c;padding:14px">' + esc(e.message || e) + '<br>v1.9.5 SQL(update_v1.9.5.sql)을 실행했는지 확인하세요.</div>'; return; }
     var rows = res.rows, pages = Math.max(1, Math.ceil(res.count / AUD_PS));
     var trs = rows.map(function (r, i) {
-      return '<tr class="clk" data-i="' + i + '"><td style="white-space:nowrap">' + esc(ymd(r.at).slice(5) + ' ' + hm(r.at)) + '</td><td>' + actorHtml(r) + '</td><td>' + actBadge(r.action) + '</td><td>' + esc(r.target || '') + '</td><td>' + esc(r.summary || '') + (r.reason ? ' <span class="note">· 사유: ' + esc(r.reason) + '</span>' : '') + '</td><td>' + ipLocalHtml(r) + '</td><td class="mono">' + esc(r.ip || '') + '</td></tr>';
-    }).join('') || '<tr><td colspan="7" class="note" style="padding:22px;text-align:center">조건에 맞는 이력이 없습니다.' + (AUDV.target ? '<br>(PC 프로그램이 자동으로 올리는 점검·사양 변경은 이력 관리에 기록하지 않으며, 자산 상세의 "변경 이력"에서 확인합니다.)' : '') + '</td></tr>';
+      return '<tr class="clk' + (AUDSEL[r.id] ? ' rsel' : '') + '" data-i="' + i + '"><td class="cbx wonly"><input type="checkbox" class="au_c" value="' + esc(r.id) + '"' + (AUDSEL[r.id] ? ' checked' : '') + '></td><td style="white-space:nowrap">' + esc(ymd(r.at).slice(5) + ' ' + hm(r.at)) + '</td><td>' + actorHtml(r) + '</td><td>' + actBadge(r.action) + '</td><td>' + esc(r.target || '') + '</td><td>' + esc(r.summary || '') + (r.reason ? ' <span class="note">· 사유: ' + esc(r.reason) + '</span>' : '') + '</td><td>' + ipLocalHtml(r) + '</td><td class="mono">' + esc(r.ip || '') + '</td></tr>';
+    }).join('') || '<tr><td colspan="8" class="note" style="padding:22px;text-align:center">조건에 맞는 이력이 없습니다.' + (AUDV.target ? '<br>(PC 프로그램이 자동으로 올리는 점검·사양 변경은 이력 관리에 기록하지 않으며, 자산 상세의 "변경 이력"에서 확인합니다.)' : '') + '</td></tr>';
     box.innerHTML = '<div class="note" style="margin:8px 0">검색 결과 ' + res.count.toLocaleString() + '건 · 최근순 · 한 번에 ' + AUD_PS + '건' + (AUDV.target ? ' · <span class="fchip">대상: ' + esc(AUDV.target) + '</span>' : '') + '</div>' +
-      '<table class="tbl audtb"><colgroup><col style="width:7%"><col style="width:12%"><col style="width:8%"><col style="width:12%"><col style="width:35%"><col style="width:14%"><col style="width:12%"></colgroup><thead><tr><th>일시</th><th>작업자</th><th>구분</th><th>대상</th><th>내용</th><th class="ipth">접속 IP (내부)</th><th class="ipth">접속 IP (공인)</th></tr></thead><tbody>' + trs + '</tbody></table>' +
+      '<div class="bulk noprint" id="au_bar" style="display:none"><b id="au_n"></b><span>|</span><button class="btn sm dng" id="au_del" type="button">선택 삭제</button><button class="btn sm" id="au_menu" type="button">전체 선택 ▾</button><button class="btn sm" id="au_clr" type="button">선택 해제</button></div>' +
+      '<table class="tbl audtb"><colgroup><col style="width:3%"><col style="width:7%"><col style="width:12%"><col style="width:8%"><col style="width:12%"><col style="width:32%"><col style="width:14%"><col style="width:12%"></colgroup><thead><tr><th class="cbx"><input type="checkbox" id="au_all" title="이 페이지 전체 선택"></th><th>일시</th><th>작업자</th><th>구분</th><th>대상</th><th>내용</th><th class="ipth">접속 IP (내부)</th><th class="ipth">접속 IP (공인)</th></tr></thead><tbody>' + trs + '</tbody></table>' +
       '<div class="row" style="justify-content:center;gap:10px;margin:10px 0"><button class="btn sm" id="au_pv"' + (AUDV.page <= 0 ? ' disabled' : '') + '>‹ 이전</button><span class="note">' + (AUDV.page + 1) + ' / ' + pages + '쪽</span><button class="btn sm" id="au_nx"' + (AUDV.page + 1 >= pages ? ' disabled' : '') + '>다음 ›</button></div>' +
-      '<div class="card"><div class="note" style="line-height:1.8">· 행을 누르면 상세(누가·언제·무엇을·어떻게·왜·어디서)가 열립니다<br>· 이력은 <b>수정·삭제할 수 없고</b> 추가만 됩니다 (메인 관리자도 불가) · 이 메뉴는 메인 관리자에게만 보입니다<br>· PC 프로그램이 자동으로 올리는 점검 정보는 건수가 많아 기록하지 않고, 모니터 연결·분리만 기록합니다</div></div>';
-    $$('tr.clk', box).forEach(function (tr) { tr.onclick = function () { auditDetail(rows[+tr.dataset.i]); }; });
+      '<div class="card"><div class="note" style="line-height:1.8">· 행을 누르면 상세(누가·언제·무엇을·어떻게·왜·어디서)가 열립니다<br>· 이력은 <b>수정할 수 없고</b>, 삭제는 메인 관리자만 사유를 남기고 할 수 있습니다 (삭제 기록은 삭제 불가) · 이 메뉴는 메인 관리자에게만 보입니다<br>· PC 프로그램이 자동으로 올리는 점검 정보는 건수가 많아 기록하지 않고, 모니터 연결·분리만 기록합니다</div></div>';
+    AUDROWS = rows;
+    $$('tr.clk', box).forEach(function (tr) { tr.onclick = function (e) { if (e.target && e.target.tagName === 'INPUT') return; auditDetail(rows[+tr.dataset.i]); }; });
+    $$('.au_c', box).forEach(function (c) { c.onclick = function (e) { e.stopPropagation(); }; c.onchange = function () { if (c.checked) AUDSEL[c.value] = 1; else delete AUDSEL[c.value]; c.closest('tr').classList.toggle('rsel', c.checked); audSync(); }; });
+    var ha = $('#au_all', box); if (ha) ha.onchange = function () { $$('.au_c', box).forEach(function (c) { c.checked = ha.checked; if (ha.checked) AUDSEL[c.value] = 1; else delete AUDSEL[c.value]; c.closest('tr').classList.toggle('rsel', c.checked); }); audSync(); };
+    $('#au_clr', box).onclick = function () { AUDSEL = {}; $$('.au_c', box).forEach(function (c) { c.checked = false; c.closest('tr').classList.remove('rsel'); }); audSync(); };
+    $('#au_del', box).onclick = function () { auditDeleteDlg(); };
+    $('#au_menu', box).onclick = function (e) { e.stopPropagation(); audMenu(this, res.count); };
+    audSync();
     $('#au_pv', box).onclick = function () { AUDV.page--; loadAuditList(); }; $('#au_nx', box).onclick = function () { AUDV.page++; loadAuditList(); };
   }
   // v1.9.5: 접속 IP (내부) — PC 프로그램 기록은 프로그램이 보낸 값, 그 외(웹 접속)는 같은 사번 PC의 최근 내부 IP를 'PC 기준'으로 표시
@@ -1528,6 +1538,65 @@
   function ipLocalHtml(r) {
     var x = ipLocal(r);
     return x ? (x.est ? '<span class="mono note">' + esc(x.ip) + '</span> <span class="ipb">PC 기준</span>' : '<span class="mono">' + esc(x.ip) + '</span>') : '<span class="note">확인 불가</span>';
+  }
+  // v1.9.5: 이력 선택·삭제 (메인 관리자 전용)
+  var AUDSEL = {}, AUDROWS = [], AUD_MAX = 500;
+  function audSync() {
+    var box = $('#audres'); if (!box) return;
+    var ids = Object.keys(AUDSEL), cs = $$('.au_c', box), on = cs.filter(function (c) { return c.checked; }).length, bar = $('#au_bar', box);
+    if (bar) { bar.style.display = ids.length ? '' : 'none'; $('#au_n', box).textContent = ids.length + '개 선택됨'; }
+    var ha = $('#au_all', box); if (ha) { ha.checked = cs.length > 0 && on === cs.length; ha.indeterminate = on > 0 && on < cs.length; }
+  }
+  function audMenu(btn, total) {
+    $$('.audmenu').forEach(function (m) { m.remove(); });
+    var m = document.createElement('div'); m.className = 'audmenu';
+    m.innerHTML = '<button type="button" data-k="page">이 페이지 ' + AUDROWS.length + '건 모두 선택</button><button type="button" data-k="all">조회된 ' + total.toLocaleString() + '건 모두 선택 (다른 페이지 포함, 최대 ' + AUD_MAX + '건)</button><button type="button" data-k="none">선택 해제</button>';
+    var r = btn.getBoundingClientRect(); m.style.left = Math.max(8, r.left) + 'px'; m.style.top = (r.bottom + 4) + 'px'; document.body.appendChild(m);
+    function close() { m.remove(); document.removeEventListener('click', close); }
+    setTimeout(function () { document.addEventListener('click', close); }, 0);
+    $$('button', m).forEach(function (b) {
+      b.onclick = async function () {
+        var k = b.dataset.k; close();
+        try {
+          if (k === 'none') AUDSEL = {};
+          else if (k === 'page') AUDROWS.forEach(function (x) { AUDSEL[x.id] = 1; });
+          else { var res = await auditFetch(0, AUD_MAX); res.rows.forEach(function (x) { AUDSEL[x.id] = 1; }); if (res.count > AUD_MAX) toast('한 번에 최대 ' + AUD_MAX + '건까지 선택됩니다. (' + res.count.toLocaleString() + '건 중 최근 ' + AUD_MAX + '건)'); }
+          $$('.au_c', $('#audres')).forEach(function (c) { c.checked = !!AUDSEL[c.value]; c.closest('tr').classList.toggle('rsel', c.checked); }); audSync();
+        } catch (e) { fail(e); }
+      };
+    });
+  }
+  async function auditDeleteDlg() {
+    if (!isMain()) { toast('이력 삭제는 메인 관리자만 할 수 있습니다.'); return; }
+    var ids = Object.keys(AUDSEL); if (!ids.length) return;
+    if (ids.length > AUD_MAX) { toast('한 번에 최대 ' + AUD_MAX + '건까지 삭제할 수 있습니다.'); return; }
+    var m = openModal('<div class="mh"><b>이력 ' + ids.length + '건 삭제</b><button class="mx" type="button">✕</button></div>' +
+      '<div class="warnbox">선택한 이력 <b>' + ids.length + '건</b>을 삭제합니다.<br><b>삭제한 이력은 되돌릴 수 없습니다.</b> 삭제한 사실은 새 이력으로 남습니다.</div>' +
+      '<div class="ms">삭제 사유 (필수)</div><textarea id="ad_r" rows="2" style="width:100%;box-sizing:border-box" placeholder="예: 테스트 중 생긴 로그인 실패 기록 정리"></textarea>' +
+      '<label style="display:block;margin:8px 0"><input type="checkbox" id="ad_ex" checked> 삭제 전에 선택한 이력을 엑셀로 내보내기 <span style="color:#1e8e3e">(권장)</span></label>' +
+      '<div class="ms">확인을 위해 <b>이력 삭제</b> 를 그대로 입력하세요</div><input type="text" id="ad_n" autocomplete="off" style="width:100%;box-sizing:border-box">' +
+      '<div class="mf"><button class="btn" id="ad_x" type="button">취소</button><button class="btn dng sel" id="ad_ok" type="button" disabled>' + ids.length + '건 삭제</button></div>', 480);
+    function chk() { $('#ad_ok', m.d).disabled = !($('#ad_r', m.d).value.trim() && $('#ad_n', m.d).value.trim() === '이력 삭제'); }
+    $('#ad_r', m.d).oninput = chk; $('#ad_n', m.d).oninput = chk; $('#ad_r', m.d).focus();
+    $('#ad_x', m.d).onclick = m.close;
+    $('#ad_ok', m.d).onclick = async function () {
+      var rs = $('#ad_r', m.d).value.trim(), doEx = $('#ad_ex', m.d).checked, btn = this; btn.disabled = true; btn.textContent = '삭제 중…';
+      try {
+        var rows;
+        if (DEMO) rows = (S.audit || []).filter(function (x) { return AUDSEL[x.id]; });
+        else { var r = await sb.from('audit_log').select('*').in('id', ids).order('at', { ascending: false }); if (r.error) throw r.error; rows = r.data; }
+        if (!rows.length) throw new Error('선택한 이력을 찾지 못했습니다.');
+        if (doEx) {
+          var ex = rows.map(function (x) { return { '일시': ymd(x.at) + ' ' + hm(x.at), '작업자 사번': x.actor_sabun || '', '성명': x.actor_name || '', '구분': ACT_L[x.action] || x.action, '대상': x.target || '', '내용': x.summary || '', '사유': x.reason || '', '접속 IP (내부)': x.ip_local || '', '접속 IP (공인)': x.ip || '' }; });
+          var ws = XLSX.utils.json_to_sheet(ex), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '삭제한 이력'); XLSX.writeFile(wb, '삭제한이력_' + ymd(new Date()).replace(/-/g, '') + '.xlsx');
+        }
+        var from = rows[rows.length - 1].at, to = rows[0].at, cnt = rows.length;
+        if (DEMO) S.audit = S.audit.filter(function (x) { return !AUDSEL[x.id]; });
+        else { var d = await sb.from('audit_log').delete().in('id', ids); if (d.error) throw d.error; }
+        await auditPost({ action: 'purge', target: '이력 관리', summary: '이력 ' + cnt + '건 삭제 (' + ymd(from).slice(5) + ' ~ ' + ymd(to).slice(5) + ' 기록)' + (doEx ? ' · 삭제 전 엑셀 내보내기 완료' : ''), reason: rs, detail: { via: '이력 관리 · 선택 삭제', note: '삭제 ' + cnt + '건 · 기간 ' + ymd(from) + ' ~ ' + ymd(to) } });
+        AUDSEL = {}; m.close(); toast('이력 ' + cnt + '건을 삭제했습니다.'); loadAuditList();
+      } catch (e) { btn.disabled = false; btn.textContent = ids.length + '건 삭제'; fail(e); }
+    };
   }
   function auditHow(r) {
     var ch = r.detail && r.detail.changes, via = (r.detail && r.detail.via) || '';
@@ -2232,6 +2301,7 @@
     ['실사·감사', [['inv', '📋', '실사 결과 보고서', '회차별 확인율, 부서·분류별 진행, 미확인·이상 목록', '회차별'], ['audit', '🔎', '이력 관리 요약 (메인 관리자)', '기간별 로그인·변경·삭제·내보내기 건수와 작업자별 요약. 감사 제출용', '기간별', 'main']]]
   ];
   function pageReports(arg) {
+    if (!isMain()) { denyPage(); return; }
     var k = (arg || '').split('/')[0];
     if (k === 'monthly') return repMonthly(); if (k === 'period') return repPeriod(); if (k === 'dept') return repDept(); if (k === 'warranty') return repWarranty();
     if (k === 'check') return repCheck(); if (k === 'support') return repSupport(); if (k === 'inv') return repInv(); if (k === 'audit') return repAudit();
