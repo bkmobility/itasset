@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.8 - 관리자 웹 (정적 페이지, Supabase 연동) */
+/* IT 자산관리시스템 v1.9.11 - 관리자 웹 (정적 페이지, Supabase 연동) */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -350,13 +350,13 @@
   var CATG = ['모니터', 'PC', '노트북', '스캐너', '기타'], CATG_COL = { '모니터': '#2f7df6', 'PC': '#1e8e3e', '노트북': '#c42b1c', '스캐너': '#e9a100', '기타': '#b0b7c3' };
   function catGrp(c) { c = String(c || ''); return c === '모니터' ? '모니터' : (c === 'PC' || c === 'PC 본체') ? 'PC' : c === '노트북' ? '노트북' : /스캐너/.test(c) ? '스캐너' : '기타'; }
   var ROUTES = [['dashboard', '대시보드'], ['assets', '자산 관리'], ['check', '현황 점검'], ['support', '원격 지원'], ['employees', '인사 정보'], ['data', '데이터 관리'], ['inventory', '실사 (재물조사)']];
-  function navRoutes() { return isMain() ? ROUTES.concat([['audit', '이력 관리'], ['admins', '관리자'], ['reports', '보고서']]) : ROUTES; }   // v1.9.5: 이력 관리·관리자·보고서는 메인 관리자 전용
+  function navRoutes() { return isMain() ? ROUTES.concat([['audit', '이력 관리'], ['admins', '관리자'], ['reports', '보고서'], ['security', '보안 설정']]) : ROUTES; }   // v1.9.5: 이력 관리·관리자·보고서는 메인 관리자 전용 / v1.9.11: 보안 설정도 메인 관리자 전용
   function denyPage() { shell('dashboard', '<div class="card" style="text-align:center;padding:30px 20px;max-width:560px;margin:30px auto"><div style="font-size:30px">🔒</div><h2 style="margin:6px 0">접근 권한이 없습니다</h2><div class="note" style="line-height:1.8">이 메뉴(이력 관리 · 관리자 · 보고서)는 <b>메인 관리자</b>만 열 수 있습니다.<br>주소를 직접 입력해 들어와도 이 화면이 표시됩니다.</div><div style="margin-top:14px"><a class="btn pri" href="#/dashboard">대시보드로 이동</a></div></div>'); }
   function shell(active, html) {
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.8</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.11</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -408,7 +408,7 @@
     var act = S.history.map(function (h) { return { t: h.created_at, a: h.asset_no || '(미등록 PC)', d: h.detail }; })
       .concat(S.imports.map(function (x) { return { t: x.applied_at, a: '인사 명단' + (x.reverted_at ? ' (되돌림)' : ''), d: (x.file_name || '') + ' · 신규 ' + x.added + ' · 변경 ' + x.changed + ' · 퇴사 ' + x.deactivated }; }))
       .sort(function (x, y) { return new Date(y.t) - new Date(x.t); }).slice(0, 6);
-    function k(t, n, s, c, href) { return '<a class="dk" href="' + href + '"><span class="ic" style="background:' + c + '22"><i style="background:' + c + '"></i></span><span><span class="t">' + t + '</span><span class="n">' + n + '</span><span class="s">' + s + '</span></span></a>'; }
+    function k(t, n, s, c, href, go) { return '<a class="dk" href="' + href + '"' + (go ? ' data-go="' + go + '"' : '') + '><span class="ic" style="background:' + c + '22"><i style="background:' + c + '"></i></span><span><span class="t">' + t + '</span><span class="n">' + n + '</span><span class="s">' + s + '</span></span></a>'; }
     function todoCard(t, cnt, sub, link, href) { var c = cnt ? (t === '미등록 PC' || t === '사용자 불일치' ? '#e9a100' : '#c42b1c') : '#1e8e3e'; return '<a class="todo" href="' + href + '"><div class="th"><span class="dot" style="background:' + c + '"></span>' + t + ' <b>' + cnt + '</b></div><div class="ts">' + sub + '</div><div class="tl">' + link + ' ›</div></a>'; }
     var allClear = !unreg && !stale && !mism && !leaver.length;
     var todo = allClear ? '<div class="note" style="padding:8px 0">오늘 처리할 일이 없습니다. ✓</div>' : '<div class="todos">' +
@@ -432,7 +432,7 @@
       return (n === '전체' ? '<div class="cosep"></div>' : '') + '<div class="corow' + (n === co ? ' on' : '') + '" data-co="' + esc(n) + '"><span class="rd"><i></i></span><span class="nm">' + esc(n) + '</span><b>' + cnt.toLocaleString() + '</b><span class="pc">' + (n === '전체' ? '' : (A.length ? Math.round(cnt / A.length * 100) : 0) + '%') + '</span></div>';
     }).join('') + (noCo ? '<div class="note" style="margin-top:6px">회사 미지정 ' + noCo.toLocaleString() + '건 (전체에만 포함) · <a href="#/data">데이터 관리</a>에서 지정</div>' : '');
     shell('dashboard', '<div class="row"><h1>대시보드</h1><span class="note">' + esc(ymd(new Date()) + ' ' + hm(new Date())) + ' 기준</span></div>' +
-      '<div class="dks">' + k('전체 자산', A.length.toLocaleString(), '엑셀 가져오기 기준', '#2f7df6', '#/assets') + k('오늘 확인된 PC', today.toLocaleString(), '수집률 ' + (pcs.length ? Math.round(today / pcs.length * 100) : 0) + '%', '#1e8e3e', '#/assets') + k('점검 필요', stale.toLocaleString(), '7일 이상 미확인', '#c42b1c', '#/check/stale') + k('보증 만료 예정', warrSoon.toLocaleString(), '30일 이내', '#e9a100', '#/assets') + k('지원 요청', recv.toLocaleString(), '미처리 · 오늘 접수 ' + recvToday, '#7a4bd6', '#/support') + '</div>' +
+      '<div class="dks">' + k('전체 자산', A.length.toLocaleString(), '엑셀 가져오기 기준', '#2f7df6', '#/assets') + k('오늘 확인된 PC', today.toLocaleString(), '수집률 ' + (pcs.length ? Math.round(today / pcs.length * 100) : 0) + '%', '#1e8e3e', '#/assets', 'collect:today') + k('점검 필요', stale.toLocaleString(), '7일 이상 미확인', '#c42b1c', '#/check/stale') + k('보증 만료 예정', warrSoon.toLocaleString(), '30일 이내', '#e9a100', '#/assets') + k('지원 요청', recv.toLocaleString(), '미처리 · 오늘 접수 ' + recvToday, '#7a4bd6', '#/support') + '</div>' +
       '<div class="card dwide" style="border-left:4px solid #e9a100"><h3>오늘 처리할 일 <span class="note" style="font-weight:400">— 누르면 해당 목록으로 이동</span></h3>' + todo + '</div>' +
       '<div class="dtop">' +
       '<div class="card"><h3>회사별 자산</h3>' + coRows + '<div class="note codet">회사를 누르면 오른쪽 두 카드가 바뀝니다<a href="#/company/' + encodeURIComponent(co) + '">회사별 상세 보기 ›</a></div></div>' +
@@ -1495,6 +1495,7 @@
       busy = true; $('#go').disabled = true;
       try {
         var j = await fnCall('admin-login', { sabun: n, password: pw });
+        if (j.need_otp) { busy = false; pageLoginOtp(n, pw); return; }   // v1.9.11: 메인 관리자는 비밀번호가 맞아도 OTP 단계로 전환
         var r = await sb.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token });
         if (r.error) throw r.error;
         busy = false; start();
@@ -1502,6 +1503,26 @@
     }
     $('#go').onclick = go; $('#pw').onkeydown = function (e) { if (e.key === 'Enter') go(); }; $('#sbn').onkeydown = function (e) { if (e.key === 'Enter') $('#pw').focus(); };
     $('#sbn').focus();
+  }
+  // v1.9.11: 메인 관리자 2단계 인증(OTP) 입력 화면 — 사번·비밀번호는 이미 확인된 상태로, 화면에는 비밀번호를 다시 보여주지 않음
+  function pageLoginOtp(sabun, password) {
+    $app.innerHTML = '<div class="login"><div class="lgh"><div class="lgt">인증 코드 입력</div><div class="lgs">Google Authenticator 앱의 6자리 숫자</div></div><input type="text" id="otpc" inputmode="numeric" maxlength="6" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:6px;font-size:20px"><div style="margin-top:16px"><button class="btn pri" id="go2" style="width:100%;height:36px">확인하고 로그인</button></div><div class="err" id="er2"></div><div class="note" style="margin-top:10px;font-size:11px"><a href="#" id="back2">‹ 사번으로 돌아가기</a></div></div>';
+    var busy = false;
+    $('#back2').onclick = function (e) { e.preventDefault(); pageLogin(); };
+    async function go2() {
+      if (busy) return;
+      var code = $('#otpc').value.trim(); $('#er2').textContent = '';
+      if (!/^\d{6}$/.test(code)) { $('#er2').textContent = '6자리 숫자를 입력하세요.'; return; }
+      busy = true; $('#go2').disabled = true;
+      try {
+        var j = await fnCall('admin-login', { sabun: sabun, password: password, otp_code: code });
+        var r = await sb.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token });
+        if (r.error) throw r.error;
+        busy = false; start();
+      } catch (e) { busy = false; $('#go2').disabled = false; $('#er2').textContent = e.message || '인증에 실패했습니다.'; $('#otpc').value = ''; }
+    }
+    $('#go2').onclick = go2; $('#otpc').onkeydown = function (e) { if (e.key === 'Enter') go2(); };
+    $('#otpc').focus();
   }
   // ---------- v1.9.4: 관리자 등록 (메인 관리자 전용) ----------
   var ADM = { list: null, demo: null };
@@ -1654,6 +1675,58 @@
       $('#ax', m.d).onclick = function () { m.close(); resolve(null); }; $('.mx', m.d).onclick = $('#ax', m.d).onclick;
       $('#aok', m.d).onclick = function () { var v = t.value.trim(); if (!v) { t.focus(); return; } m.close(); resolve(v); };
     });
+  }
+  // ---------- v1.9.11: 보안 설정 (메인 관리자 전용) ----------
+  async function secCall(action, body) {
+    return fnCall('admin-security', Object.assign({ action: action }, body || {}), await myToken());
+  }
+  function demoSec(action, b) {
+    if (action === 'status') return { otp_enabled: !!S.secOtp, telegram_configured: true, geo_block: true, auto_logout_minutes: 30 };
+    if (action === 'otp_begin') return { secret: 'JBSWY3DPEHPK3PXP', otpauth: 'otpauth://totp/demo' };
+    if (action === 'otp_confirm') { if (String(b.code || '') !== '000000') throw new Error('인증 코드가 올바르지 않습니다. (데모에서는 000000 을 입력하세요)'); S.secOtp = true; return { ok: true }; }
+    if (action === 'otp_disable') { S.secOtp = false; return { ok: true }; }
+    if (action === 'test_telegram') return { ok: true };
+    throw new Error('알 수 없는 요청입니다.');
+  }
+  async function pageSecurity() {
+    if (!isMain()) { denyPage(); return; }
+    var st; try { st = DEMO ? demoSec('status') : await secCall('status'); } catch (e) { shell('security', '<h1>보안 설정</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message) + '</div>'); return; }
+    shell('security', '<h1>보안 설정 <span class="note" style="font-weight:400">· 메인 관리자만 볼 수 있습니다</span></h1>' +
+      '<div class="secg">' +
+      '<div class="card seccard"><div class="row"><b>텔레그램 로그인 알림</b>' + (st.telegram_configured ? badge('연결됨', 'ok') : badge('미설정', 'bad')) + '</div><div class="note" style="margin-top:4px">관리자 계정으로 로그인에 성공할 때마다 설정된 텔레그램 방으로 알림을 보냅니다. (서버 환경변수 TELEGRAM_BOT_TOKEN·TELEGRAM_CHAT_ID 설정 필요 — 설치가이드 참고)</div><div style="margin-top:10px"><button class="btn sm" id="sec_tg_test"' + (st.telegram_configured ? '' : ' disabled') + '>테스트 알림 보내기</button></div></div>' +
+      '<div class="card seccard"><div class="row"><b>2단계 인증 (OTP)</b>' + (st.otp_enabled ? badge('설정됨', 'ok') : badge('미설정', 'gray')) + '</div><div class="note" style="margin-top:4px">메인 관리자(나) 계정에만 적용됩니다. 켜면 로그인 시 Google Authenticator 등 OTP 앱의 6자리 코드를 추가로 입력해야 합니다.</div><div style="margin-top:10px">' + (st.otp_enabled ? '<button class="btn sm" id="sec_otp_redo">다시 등록 (QR 재발급)</button> <button class="btn sm dng" id="sec_otp_off">해제</button>' : '<button class="btn sm pri" id="sec_otp_on">OTP로 등록</button>') + '</div></div>' +
+      '<div class="card seccard"><div class="row"><b>자동 로그아웃</b>' + badge(st.auto_logout_minutes + '분 고정', 'gray') + '</div><div class="note" style="margin-top:4px">모든 관리자 계정은 화면 조작 없이 ' + st.auto_logout_minutes + '분이 지나면 자동으로 로그아웃됩니다(설정 변경 불가). 다른 사이트에 갔다가 뒤로가기로 돌아와도 즉시 다시 로그인해야 합니다.</div></div>' +
+      '<div class="card seccard"><div class="row"><b>해외 접속 차단</b>' + (st.geo_block ? badge('켜짐', 'ok') : badge('꺼짐', 'bad')) + '</div><div class="note" style="margin-top:4px">접속 IP가 대한민국이 아니면 로그인 자체가 차단됩니다. 해외 출장 등 예외가 필요하면 전산지원파트(서버 환경변수 GEO_BLOCK)에서 임시로 꺼야 합니다.</div></div>' +
+      '</div>');
+    var tgBtn = $('#sec_tg_test'); if (tgBtn) tgBtn.onclick = async function () { tgBtn.disabled = true; tgBtn.textContent = '보내는 중…'; try { await (DEMO ? demoSec('test_telegram') : secCall('test_telegram')); toast('테스트 알림을 보냈습니다. 텔레그램 방을 확인하세요.'); } catch (e) { fail(e); } tgBtn.disabled = false; tgBtn.textContent = '테스트 알림 보내기'; };
+    var onBtn = $('#sec_otp_on'); if (onBtn) onBtn.onclick = otpSetupDialog;
+    var redoBtn = $('#sec_otp_redo'); if (redoBtn) redoBtn.onclick = otpSetupDialog;
+    var offBtn = $('#sec_otp_off'); if (offBtn) offBtn.onclick = async function () {
+      var code = await askText('2단계 인증 해제', '해제하려면 지금 OTP 앱에 표시된 6자리 코드를 입력하세요.', '', '해제');
+      if (code === null) return;
+      try { await (DEMO ? demoSec('otp_disable', { code: code }) : secCall('otp_disable', { code: code })); toast('2단계 인증을 해제했습니다.'); pageSecurity(); } catch (e) { fail(e); }
+    };
+  }
+  function otpSetupDialog() {
+    (async function () {
+      var r; try { r = DEMO ? demoSec('otp_begin') : await secCall('otp_begin'); } catch (e) { fail(e); return; }
+      var q = qrcode(0, 'M'); q.addData(r.otpauth); q.make();
+      var key = (r.secret.match(/.{1,4}/g) || [r.secret]).join(' ');
+      var m = openModal('<div class="mh"><b>2단계 인증(OTP) 등록</b><button class="mx" type="button">✕</button></div>' +
+        '<div class="note" style="margin-bottom:10px">Google Authenticator(또는 Microsoft Authenticator) 앱을 켜고 아래 QR코드를 스캔하세요.</div>' +
+        '<div style="display:flex;gap:16px;align-items:flex-start">' + q.createSvgTag({ cellSize: 4, margin: 0 }) +
+        '<div style="flex:1"><div class="note">QR코드를 스캔할 수 없으면 아래 키를 앱에 직접 입력하세요.</div><div class="pwbox" style="margin-top:6px"><code>' + esc(key) + '</code></div></div></div>' +
+        '<div class="ms">앱에 표시된 6자리 코드</div><input type="text" id="otp_c" inputmode="numeric" maxlength="6" style="width:140px;letter-spacing:3px;font-size:16px;text-align:center">' +
+        '<div class="mf"><button class="btn" id="otp_x" type="button">취소</button><button class="btn pri" id="otp_ok" type="button">등록 완료</button></div>', 480);
+      $('#otp_x', m.d).onclick = m.close;
+      $('#otp_c', m.d).focus();
+      $('#otp_ok', m.d).onclick = async function () {
+        var code = $('#otp_c', m.d).value.trim(); if (!/^\d{6}$/.test(code)) { toast('6자리 숫자를 입력하세요.'); return; }
+        var btn = this; btn.disabled = true; btn.textContent = '확인 중…';
+        try { await (DEMO ? demoSec('otp_confirm', { code: code }) : secCall('otp_confirm', { secret: r.secret, code: code })); m.close(); toast('2단계 인증을 등록했습니다.'); pageSecurity(); }
+        catch (e) { btn.disabled = false; btn.textContent = '등록 완료'; toast(e.message || '확인에 실패했습니다.'); }
+      };
+    })();
   }
   function demoAudit() {
     var t = function (h, m) { var d = new Date(); d.setHours(h, m, 12, 0); return d.toISOString(); };
@@ -2203,22 +2276,26 @@
   function invNewDialog() {
     needWrite();
     var d0 = dstr(new Date()), d1 = dstr(new Date(Date.now() + 15 * 86400000)), nowD = new Date(), qn = Math.floor(nowD.getMonth() / 3) + 1;
-    var opts = { cat: groupCount(S.assets, function (a) { return a.category; }), dept: groupCount(S.assets, function (a) { return a.dept; }), loc: groupCount(S.assets, function (a) { return a.location; }) };
+    var coOpts = CO.map(function (c) { return [c, S.assets.filter(function (a) { return a.company === c; }).length]; }).filter(function (o) { return o[1] > 0; });
+    var opts = { cat: groupCount(S.assets, function (a) { return a.category; }), dept: groupCount(S.assets, function (a) { return a.dept; }), loc: groupCount(S.assets, function (a) { return a.location; }), co: coOpts };
+    var dashCo = (typeof DASH_CO !== 'undefined' && DASH_CO && DASH_CO !== '전체') ? DASH_CO : '';
+    var nmPrefix = dashCo ? dashCo + ' ' : '';
     var m = openModal('<div class="mh"><b>새 실사 만들기</b><button class="mx" type="button">✕</button></div>' +
-      '<div class="ms">1. 실사 이름</div><input type="text" id="in_n" value="' + nowD.getFullYear() + '년 ' + qn + '분기 정기 실사" style="width:100%;box-sizing:border-box">' +
+      '<div class="ms">1. 실사 이름</div><input type="text" id="in_n" value="' + nmPrefix + nowD.getFullYear() + '년 ' + qn + '분기 정기 실사" style="width:100%;box-sizing:border-box">' +
       '<div class="ms">2. 기간</div><input type="date" id="in_s" value="' + d0 + '"> ~ <input type="date" id="in_e" value="' + d1 + '">' +
-      '<div class="ms">3. 대상 범위 <span class="note" id="in_cnt"></span></div><div><label><input type="radio" name="isc" value="all" checked> 전체 자산</label> <label><input type="radio" name="isc" value="cat"> 분류 선택</label> <label><input type="radio" name="isc" value="dept"> 부서 선택</label> <label><input type="radio" name="isc" value="loc"> 위치 선택</label></div>' +
-      ['cat', 'dept', 'loc'].map(function (k) { return '<div class="scl" id="sc_' + k + '" style="display:none">' + opts[k].slice(0, 60).map(function (o) { return '<label><input type="checkbox" data-k="' + k + '" value="' + esc(o[0]) + '"> ' + esc(o[0]) + ' <span class="note">' + o[1] + '</span></label>'; }).join('') + '</div>'; }).join('') +
+      '<div class="ms">3. 대상 범위 <span class="note" id="in_cnt"></span></div><div><label><input type="radio" name="isc" value="all"' + (dashCo ? '' : ' checked') + '> 전체 자산</label> <label><input type="radio" name="isc" value="cat"> 분류 선택</label> <label><input type="radio" name="isc" value="dept"> 부서 선택</label> <label><input type="radio" name="isc" value="loc"> 위치 선택</label> <label><input type="radio" name="isc" value="co"' + (dashCo ? ' checked' : '') + '> 회사 선택</label></div>' +
+      ['cat', 'dept', 'loc', 'co'].map(function (k) { return '<div class="scl" id="sc_' + k + '" style="display:none">' + opts[k].slice(0, 60).map(function (o) { return '<label><input type="checkbox" data-k="' + k + '" value="' + esc(o[0]) + '"' + (k === 'co' && dashCo && o[0] === dashCo ? ' checked' : '') + '> ' + esc(o[0]) + ' <span class="note">' + o[1] + '</span></label>'; }).join('') + '</div>'; }).join('') +
+      (dashCo ? '<div class="note" style="margin-top:2px">대시보드에서 고른 "' + esc(dashCo) + '"가 미리 체크되어 있습니다. 필요하면 바꿀 수 있습니다.</div>' : '') +
       '<div class="ms">4. 확인 방법</div><label><input type="checkbox" id="in_auto" checked> PC 프로그램 점검 정보가 최근 <select id="in_ad"><option>3</option><option selected>7</option><option>14</option></select>일 이내이면 자동 확인</label><br><label><input type="checkbox" checked disabled> 나머지는 담당자가 현장에서 QR 스티커를 스캔해 확인</label>' +
       '<div class="ms">5. 담당자</div><div class="note">메인·일반 관리자 계정은 누구나 폰에서 현장 스캔을 할 수 있습니다. 현장 목록은 부서별로 걸러서 볼 수 있습니다. (조회 전용은 진행 현황만 봅니다)</div>' +
       '<div class="note" style="margin-top:8px;background:#eef5fc;border-radius:6px;padding:7px 10px">시작하면 대상 자산이 "내 실사" 목록에 나타나고, 생성·확인·마감 등 모든 처리가 이력 관리에 기록됩니다. (폐기·분실 자산은 제외)</div>' +
       '<div class="mf"><button class="btn" id="in_x" type="button">취소</button><button class="btn pri" id="in_ok" type="button">실사 시작</button></div>', 560);
     function scope() { var mode = $('input[name=isc]:checked', m.d).value, vals = $$('input[type=checkbox][data-k=' + mode + ']:checked', m.d).map(function (x) { return x.value; }); return { mode: mode, values: vals }; }
     function targets() {
-      var sc = scope(), key = { cat: 'category', dept: 'dept', loc: 'location' }[sc.mode];
+      var sc = scope(), key = { cat: 'category', dept: 'dept', loc: 'location', co: 'company' }[sc.mode];
       return S.assets.filter(function (a) { return a.status !== '폐기' && a.status !== '분실' && (sc.mode === 'all' || (sc.values.length && sc.values.indexOf(a[key]) >= 0)); });
     }
-    function upd() { $('#in_cnt', m.d).textContent = '→ 대상 ' + targets().length.toLocaleString() + '대 (폐기·분실 제외)'; ['cat', 'dept', 'loc'].forEach(function (k) { $('#sc_' + k, m.d).style.display = $('input[name=isc]:checked', m.d).value === k ? '' : 'none'; }); }
+    function upd() { $('#in_cnt', m.d).textContent = '→ 대상 ' + targets().length.toLocaleString() + '대 (폐기·분실 제외)'; ['cat', 'dept', 'loc', 'co'].forEach(function (k) { $('#sc_' + k, m.d).style.display = $('input[name=isc]:checked', m.d).value === k ? '' : 'none'; }); }
     $$('input', m.d).forEach(function (x) { if (x.type !== 'text' && x.type !== 'date') x.onchange = upd; }); upd();
     $('#in_x', m.d).onclick = m.close;
     $('#in_ok', m.d).onclick = async function () {
@@ -2228,7 +2305,7 @@
       try {
         var id;
         var nAuto = tg.filter(function (a) { return mkItem(a, 0, auto).result === 'auto'; }).length;
-        audCtx({ table: 'inventories', action: 'create', target: '실사 ' + name, summary: '실사 생성 · 대상 ' + tg.length.toLocaleString() + '대 · 기간 ' + sd + '~' + ed + ' · 자동 확인 ' + nAuto + '대', detail: { via: '새 실사 만들기', note: '범위: ' + ({ all: '전체 자산', cat: '분류', dept: '부서', loc: '위치' }[sc.mode]) + (sc.values.length ? ' (' + sc.values.join(', ') + ')' : '') + ' · 자동 확인 기준 ' + (auto ? '최근 ' + auto + '일' : '사용 안 함') } });
+        audCtx({ table: 'inventories', action: 'create', target: '실사 ' + name, summary: '실사 생성 · 대상 ' + tg.length.toLocaleString() + '대 · 기간 ' + sd + '~' + ed + ' · 자동 확인 ' + nAuto + '대', detail: { via: '새 실사 만들기', note: '범위: ' + ({ all: '전체 자산', cat: '분류', dept: '부서', loc: '위치', co: '회사' }[sc.mode]) + (sc.values.length ? ' (' + sc.values.join(', ') + ')' : '') + ' · 자동 확인 기준 ' + (auto ? '최근 ' + auto + '일' : '사용 안 함') } });
         if (DEMO) {
           var D = demoInvInit(); id = ++D.seq; D.invs.push({ id: id, name: name, start_date: sd, end_date: ed, scope: sc, auto_days: auto, status: 'open', created_by: S.me.sabun, created_at: new Date().toISOString() });
           D.items[id] = tg.map(function (a, i) { var it = mkItem(a, id, auto); it.id = ++D.seq; return it; });
@@ -2533,7 +2610,7 @@
     try {
       if (DEMO || isViewer()) return; var td = ymd(new Date());
       var r = await sb.from('asset_snapshots').select('snap_date').eq('snap_date', td).maybeSingle(); if (r.error || r.data) return;
-      var c = catCounts(liveAssets());
+      var c = catCounts(liveAssets()); var byCo = {}; CO.forEach(function (co) { byCo[co] = catCounts(liveAssets().filter(function (a) { return a.company === co; })); }); c._co = byCo;   // v1.9.9: 회사별 보고서 필터용 (이 저장 시점부터)
       await sb.from('asset_snapshots').insert({ snap_date: td, total: liveAssets().length, counts: c, pc: pcStats() });
     } catch (e) { }
   }
@@ -2552,14 +2629,16 @@
     return r.data;
   }
   function monthEnd(y, m) { return ymd(new Date(y, m, 0)); }
-  function monthRows(snaps, year) {   // 달별 월말 수량 (스냅샷이 없는 달은 대장 등록일 기준 추정)
+  function monthRows(snaps, year, co) {   // 달별 월말 수량 (스냅샷이 없는 달은 대장 등록일 기준 추정); co 지정 시 그 회사만 (v1.9.9)
     var now = new Date(), last = year === now.getFullYear() ? now.getMonth() + 1 : 12, rows = [];
     for (var m = 1; m <= last; m++) {
-      var end = monthEnd(year, m), ms = snaps.filter(function (s0) { return s0.snap_date.slice(0, 7) === year + '-' + ('0' + m).slice(-2); }), hit = ms.length ? ms[ms.length - 1] : null, est = false, c, pc = null;
-      if (hit) { c = hit.counts; pc = hit.pc; }
-      else { est = true; c = catCounts(S.assets.filter(function (a) { return a.status !== '폐기' && (!a.created_at || ymd(a.created_at) <= end); })); }
-      var tot = 0; CGRP.forEach(function (g) { c[g] = c[g] || 0; tot += c[g]; });
-      rows.push({ m: m, label: year + '-' + ('0' + m).slice(-2), c: c, total: tot, est: est, pc: pc, day: hit ? hit.snap_date : end });
+      var end = monthEnd(year, m), ms = snaps.filter(function (s0) { return s0.snap_date.slice(0, 7) === year + '-' + ('0' + m).slice(-2); }), hit = ms.length ? ms[ms.length - 1] : null, est = false, c = null, pc = null, noData = false;
+      if (hit) {
+        if (co) { if (hit.counts && hit.counts._co && hit.counts._co[co]) c = hit.counts._co[co]; else noData = true; }
+        else { c = hit.counts; pc = hit.pc; }
+      } else { est = true; c = catCounts(S.assets.filter(function (a) { return a.status !== '폐기' && (!a.created_at || ymd(a.created_at) <= end) && (!co || a.company === co); })); }
+      var tot = null; if (c) { tot = 0; CGRP.forEach(function (g) { c[g] = c[g] || 0; tot += c[g]; }); }
+      rows.push({ m: m, label: year + '-' + ('0' + m).slice(-2), c: c, total: tot, est: est, pc: pc, day: hit ? hit.snap_date : end, noData: noData });
     }
     return rows;
   }
@@ -2575,6 +2654,8 @@
   }
   function kp(l, v, sub, c) { return '<div class="card kpi"><div class="note">' + l + '</div><div class="kv2" style="color:' + (c || '#1a1a1a') + '">' + v + '</div><div class="note">' + (sub || '') + '</div></div>'; }
   function dlt(n) { return '<span style="color:' + (n > 0 ? '#1e8e3e' : n < 0 ? '#c42b1c' : '#8a8a8a') + '">' + (n > 0 ? '+' : '') + n.toLocaleString() + '</span>'; }
+  var REP_CO = '';   // v1.9.9: 보고서 회사 필터 ('' = 전체)
+  function repCoFilter(list) { return !REP_CO ? list : list.filter(function (a) { return a.company === REP_CO; }); }
   var REPS = [
     ['자산 현황', [['monthly', '📅', '월별 자산 현황', '월말 기준 PC·노트북·모니터 등 분류별 수량과 전월 대비 증감, 월별 추이 그래프', '월별'], ['period', '🔄', '기간별 자산 변동', '기간을 정해 신규 등록·폐기·상태 변경·사용자 이동·위치 변경 건수와 내역', '기간별'], ['dept', '🏢', '부서별 자산 보유', '소속별 PC·노트북·모니터 보유 수량과 1인당 장비 수', '현재']]],
     ['점검·지원', [['warranty', '🛡️', '보증 만료 예정', '만료됨 / 1·3·6·12개월 안에 보증이 끝나는 장비 목록과 교체 예산용 수량', '기간별'], ['check', '🩺', '현황 점검 보고', 'PC 점검 수집률, 7일 이상 미확인, 사용자 불일치 현황과 월별 추이', '월별'], ['support', '🎧', '원격 지원 처리 현황', '월별 접수·완료 건수, 평균 처리 시간, 증상별·담당자별 통계', '월별']]],
@@ -2585,36 +2666,43 @@
     var k = (arg || '').split('/')[0];
     if (k === 'monthly') return repMonthly(); if (k === 'period') return repPeriod(); if (k === 'dept') return repDept(); if (k === 'warranty') return repWarranty();
     if (k === 'check') return repCheck(); if (k === 'support') return repSupport(); if (k === 'inv') return repInv(); if (k === 'audit') return repAudit();
-    var html = '<div class="row wrap"><h1>보고서</h1><span class="note">조건을 고르면 바로 보고서가 만들어지고, 엑셀·PDF로 내려받습니다</span></div>' + REPS.map(function (g) {
+    var CO_FLT = ['monthly', 'period', 'dept'];   // 회사 필터가 적용되는 보고서
+    var html = '<div class="row wrap"><h1>보고서</h1><span class="note">조건을 고르면 바로 보고서가 만들어지고, 엑셀·PDF로 내려받습니다</span><div class="grow"></div><span class="note">회사</span><select id="r_co" class="noprint"><option value="">전체</option>' + CO.map(function (c) { return '<option' + (REP_CO === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></div>' +
+      (REP_CO ? '<div class="note" style="background:#fff3cd;color:#8a6d00;border-radius:6px;padding:6px 10px;margin-bottom:4px">회사를 "' + esc(REP_CO) + '"로 좁혀서 자산 현황 보고서를 다시 계산합니다 (월별 자산 현황은 이번 선택이 반영되는 달부터만 적용, 아래 참고)</div>' : '') +
+      REPS.map(function (g) {
       return '<h3 style="margin:14px 0 6px">' + g[0] + '</h3><div class="rgrid">' + g[1].filter(function (r) { return !r[5] || isMain(); }).map(function (r) {
-        return '<a class="rcard" href="#/reports/' + r[0] + '"><div class="rt"><span class="ri">' + r[1] + '</span><b>' + r[2] + '</b></div><div class="rd">' + r[3] + '</div><div class="rf"><span class="badge b-blue">' + r[4] + '</span><span class="grow"></span><span class="ro">열기 ›</span></div></a>';
+        return '<a class="rcard" href="#/reports/' + r[0] + '"><div class="rt"><span class="ri">' + r[1] + '</span><b>' + r[2] + '</b></div><div class="rd">' + r[3] + '</div><div class="rf"><span class="badge b-blue">' + r[4] + '</span>' + (REP_CO && CO_FLT.indexOf(r[0]) >= 0 ? '<span class="badge" style="background:#fff3cd;color:#8a6d00">' + esc(REP_CO) + '만</span>' : '') + '<span class="grow"></span><span class="ro">열기 ›</span></div></a>';
       }).join('') + '</div>';
-    }).join('') + '<div class="note" style="margin-top:14px;line-height:1.8">· 엑셀·PDF로 내려받으면 이력 관리에 "보고서 내보내기"가 남습니다 · 조회 전용 계정도 열람할 수 있습니다<br>· 월별 자산 현황은 관리자가 접속하는 날 하루 1번 자동 저장되는 수량을 기준으로 합니다 (저장이 없던 달은 대장 등록일 기준 추정으로 표시)</div>';
+    }).join('') + '<div class="note" style="margin-top:14px;line-height:1.8">· 엑셀·PDF로 내려받으면 이력 관리에 "보고서 내보내기"가 남습니다 · 조회 전용 계정도 열람할 수 있습니다<br>· 월별 자산 현황은 관리자가 접속하는 날 하루 1번 자동 저장되는 수량을 기준으로 합니다 (저장이 없던 달은 대장 등록일 기준 추정으로 표시)<br>· 실사 결과·이력 관리 요약 보고서는 이미 회사·기간 단위라 위 회사 선택과 무관합니다</div>';
     shell('reports', html);
+    $('#r_co').onchange = function () { REP_CO = this.value; pageReports(arg); };
   }
   // ---- 월별 자산 현황
   var RV = { year: new Date().getFullYear() };
   async function repMonthly() {
     var snaps; try { snaps = await repSnaps(); } catch (e) { shell('reports', repHead('월별 자산 현황') + '<div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message) + '</div>'); return; }
-    var yrs = [new Date().getFullYear(), new Date().getFullYear() - 1], rows = monthRows(snaps, RV.year), lastR = rows[rows.length - 1], prev = rows.length > 1 ? rows[rows.length - 2] : null, first = rows[0];
+    var yrs = [new Date().getFullYear(), new Date().getFullYear() - 1], rowsAll = monthRows(snaps, RV.year, REP_CO), rows = rowsAll.filter(function (r) { return r.c; });
+    var lastR = rows[rows.length - 1], prev = rows.length > 1 ? rows[rows.length - 2] : null, first = rows[0];
     var series = [['PC', '#0f6cbd'], ['노트북', '#1e8e3e'], ['모니터', '#e08a00']], W = 560, H = 230, all = [];
     series.forEach(function (s0) { rows.forEach(function (r) { all.push(r.c[s0[0]]); }); });
+    if (!all.length) all = [0];
     var lo = Math.max(0, Math.min.apply(null, all) - 40), hi = Math.max.apply(null, all) + 40; if (hi === lo) hi = lo + 1;
     var X = function (i) { return 50 + i * (W - 70) / Math.max(1, rows.length - 1); }, Y = function (v) { return H - 30 - (v - lo) / (hi - lo) * (H - 60); };
-    var svg = '<svg width="' + W + '" height="' + H + '" style="max-width:100%">' + [0, 1, 2, 3, 4].map(function (q) { var yy = H - 30 - q * (H - 60) / 4; return '<line x1="50" x2="' + (W - 20) + '" y1="' + yy + '" y2="' + yy + '" stroke="#eef0f3"/><text x="44" y="' + (yy + 4) + '" font-size="9" fill="#8a8a8a" text-anchor="end">' + Math.round(lo + (hi - lo) * q / 4) + '</text>'; }).join('') +
+    var svg = !rows.length ? '' : '<svg width="' + W + '" height="' + H + '" style="max-width:100%">' + [0, 1, 2, 3, 4].map(function (q) { var yy = H - 30 - q * (H - 60) / 4; return '<line x1="50" x2="' + (W - 20) + '" y1="' + yy + '" y2="' + yy + '" stroke="#eef0f3"/><text x="44" y="' + (yy + 4) + '" font-size="9" fill="#8a8a8a" text-anchor="end">' + Math.round(lo + (hi - lo) * q / 4) + '</text>'; }).join('') +
       rows.map(function (r, i) { return '<text x="' + X(i) + '" y="' + (H - 10) + '" font-size="9.5" fill="#6a6a6a" text-anchor="middle">' + r.m + '월</text>'; }).join('') +
       series.map(function (s0) { return '<polyline fill="none" stroke="' + s0[1] + '" stroke-width="2.2" points="' + rows.map(function (r, i) { return X(i).toFixed(0) + ',' + Y(r.c[s0[0]]).toFixed(0); }).join(' ') + '"/>' + rows.map(function (r, i) { return '<circle cx="' + X(i).toFixed(0) + '" cy="' + Y(r.c[s0[0]]).toFixed(0) + '" r="2.8" fill="' + s0[1] + '"/>'; }).join(''); }).join('') + '</svg>';
     var legend = series.map(function (s0) { return '<span style="margin-right:14px"><i style="display:inline-block;width:10px;height:3px;background:' + s0[1] + ';vertical-align:middle;margin-right:4px"></i>' + s0[0] + '</span>'; }).join('');
-    var trs = rows.slice().reverse().map(function (r) {
-      var i = rows.indexOf(r), p = i > 0 ? rows[i - 1] : null;
-      return '<tr><td>' + r.label + (r.est ? ' <span class="note">추정</span>' : '') + '</td>' + CGRP.map(function (g) { return '<td>' + r.c[g].toLocaleString() + '</td><td>' + (p ? dlt(r.c[g] - p.c[g]) : '—') + '</td>'; }).join('') + '<td><b>' + r.total.toLocaleString() + '</b></td><td>' + (p ? dlt(r.total - p.total) : '—') + '</td></tr>';
+    var trs = rowsAll.slice().reverse().map(function (r) {
+      var i = rowsAll.indexOf(r), p = i > 0 ? rowsAll[i - 1] : null;
+      if (!r.c) return '<tr><td>' + r.label + '</td><td colspan="9" class="note">회사별 자산 현황이 저장되지 않은 달입니다 (이 회사 필터는 ' + ymd(new Date()) + ' 이후 저장분부터 적용됩니다)</td></tr>';
+      return '<tr><td>' + r.label + (r.est ? ' <span class="note">추정</span>' : '') + '</td>' + CGRP.map(function (g) { return '<td>' + r.c[g].toLocaleString() + '</td><td>' + (p && p.c ? dlt(r.c[g] - p.c[g]) : '—') + '</td>'; }).join('') + '<td><b>' + r.total.toLocaleString() + '</b></td><td>' + (p && p.c ? dlt(r.total - p.total) : '—') + '</td></tr>';
     }).join('');
-    shell('reports', repHead('월별 자산 현황', '<select id="r_y" class="noprint">' + yrs.map(function (y) { return '<option' + (y === RV.year ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>', '월말 기준 · 자산 대장 수량(폐기 제외)') +
+    shell('reports', repHead('월별 자산 현황', '<select id="r_y" class="noprint">' + yrs.map(function (y) { return '<option' + (y === RV.year ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>', '월말 기준 · 자산 대장 수량(폐기 제외)' + (REP_CO ? ' · 회사: ' + esc(REP_CO) : '')) +
       '<div class="kpis">' + series.map(function (s0) { var v = lastR ? lastR.c[s0[0]] : 0; return kp(s0[0], v.toLocaleString(), prev ? '전월 ' + (v - prev.c[s0[0]] >= 0 ? '+' : '') + (v - prev.c[s0[0]]) : '', s0[1]); }).join('') + kp('합계', (lastR ? lastR.total : 0).toLocaleString(), (prev ? '전월 ' + (lastR.total - prev.total >= 0 ? '+' : '') + (lastR.total - prev.total) : '') + (first && lastR ? ' · ' + RV.year + '년 초 대비 ' + (lastR.total - first.total >= 0 ? '+' : '') + (lastR.total - first.total) : '')) + '</div>' +
-      '<div class="rcols"><div class="card"><div style="font-size:11.5px;margin-bottom:2px">' + legend + '</div>' + svg + '</div><div class="rtb"><table class="tbl ctr"><thead><tr><th>월말 기준</th>' + CGRP.map(function (g) { return '<th>' + g + '</th><th>증감</th>'; }).join('') + '<th>합계</th><th>증감</th></tr></thead><tbody>' + trs + '</tbody></table></div></div>' +
-      '<div class="note" style="margin-top:8px;line-height:1.8">· 월말(마지막 날) 기준 수량입니다. 그 달에 저장된 마지막 수량을 쓰고, 저장이 없던 달은 대장 등록일 기준 <b>추정</b>입니다.</div>');
+      '<div class="rcols"><div class="card"><div style="font-size:11.5px;margin-bottom:2px">' + legend + '</div>' + (svg || '<div class="note">표시할 달이 없습니다.</div>') + '</div><div class="rtb"><table class="tbl ctr"><thead><tr><th>월말 기준</th>' + CGRP.map(function (g) { return '<th>' + g + '</th><th>증감</th>'; }).join('') + '<th>합계</th><th>증감</th></tr></thead><tbody>' + trs + '</tbody></table></div></div>' +
+      '<div class="note" style="margin-top:8px;line-height:1.8">· 월말(마지막 날) 기준 수량입니다. 그 달에 저장된 마지막 수량을 쓰고, 저장이 없던 달은 대장 등록일 기준 <b>추정</b>입니다.' + (REP_CO ? '<br>· 회사별 분해는 이번 업데이트부터 매일 저장에 함께 기록되므로, 이전 달은 회사별 수치가 없을 수 있습니다.' : '') + '</div>');
     $('#r_y').onchange = function () { RV.year = Number(this.value); repMonthly(); };
-    repBind('월별 자산 현황', function () { repXlsx('월별자산현황_' + RV.year, [{ name: RV.year + '년 월별', rows: rows.map(function (r) { var o = { '월말 기준': r.label, '구분': r.est ? '추정' : '저장값' }; CGRP.forEach(function (g) { o[g] = r.c[g]; }); o['합계'] = r.total; return o; }) }], '월별 자산 현황'); });
+    repBind('월별 자산 현황', function () { repXlsx('월별자산현황_' + RV.year + (REP_CO ? '_' + REP_CO : ''), [{ name: RV.year + '년 월별', rows: rowsAll.map(function (r) { if (!r.c) return { '월말 기준': r.label, '구분': '회사별 미저장' }; var o = { '월말 기준': r.label, '구분': r.est ? '추정' : '저장값' }; CGRP.forEach(function (g) { o[g] = r.c[g]; }); o['합계'] = r.total; return o; }) }], '월별 자산 현황'); });
   }
   // ---- 기간별 자산 변동
   var RP = { from: '', to: '', cat: '', dept: '', q: 'month' };
@@ -2645,7 +2733,7 @@
     var lines = [];
     rows.forEach(function (r) {
       var m = /^자산 (\S+)/.exec(r.target || ''), no = m ? m[1] : '', a = no ? S.assets.filter(function (x) { return x.asset_no === no; })[0] : null;
-      if (RP.cat && (!a || a.category !== RP.cat)) return; if (RP.dept && (!a || a.dept !== RP.dept)) return;
+      if (RP.cat && (!a || a.category !== RP.cat)) return; if (RP.dept && (!a || a.dept !== RP.dept)) return; if (REP_CO && (!a || a.company !== REP_CO)) return;
       changeTypes(r).forEach(function (t) { lines.push({ at: r.at, no: no, type: t, text: r.summary || '', who: r.actor_name || '' }); });
     });
     var TYPES = [['신규 등록', '#0f6cbd'], ['폐기', '#c42b1c'], ['상태 변경', '#e08a00'], ['사용자 이동', '#6b3fb0'], ['위치 변경', '#1e8e3e'], ['삭제', '#8a8a8a']], cnt = {}; lines.forEach(function (l) { cnt[l.type] = (cnt[l.type] || 0) + 1; });
@@ -2653,7 +2741,7 @@
     var bars = TYPES.map(function (t) { var n = cnt[t[0]] || 0; return '<div class="prow"><span class="pn">' + t[0] + '</span><span class="pb"><i style="width:' + Math.round(n / mx * 100) + '%;background:' + t[1] + '"></i></span><span class="pv">' + n + '</span></div>'; }).join('');
     var cats = groupCount(S.assets, function (a) { return a.category; }).map(function (x) { return x[0]; }), depts = groupCount(S.assets, function (a) { return a.dept; }).map(function (x) { return x[0]; });
     var QL = [['today', '오늘'], ['week', '이번 주'], ['month', '이번 달'], ['last', '지난 달'], ['quarter', '분기'], ['year', '올해']];
-    shell('reports', repHead('기간별 자산 변동', '', '이력 관리의 자산 변경 기록을 집계합니다') +
+    shell('reports', repHead('기간별 자산 변동', '', '이력 관리의 자산 변경 기록을 집계합니다' + (REP_CO ? ' · 회사: ' + esc(REP_CO) : '')) +
       '<div class="card noprint" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="note">기간</span>' + QL.map(function (q) { return '<button type="button" class="achip' + (RP.q === q[0] ? ' on' : '') + '" data-q="' + q[0] + '">' + q[1] + '</button>'; }).join('') + '<input type="date" id="r_f" value="' + RP.from + '"> ~ <input type="date" id="r_t" value="' + RP.to + '">' +
       '<select id="r_c"><option value="">분류: 전체</option>' + cats.map(function (c) { return '<option' + (RP.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select><select id="r_d"><option value="">부서: 전체</option>' + depts.map(function (c) { return '<option' + (RP.dept === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select><button class="btn pri" id="r_go" type="button">조회</button></div>' +
       (err ? '<div class="note" style="color:#c42b1c;margin:8px 0">' + esc(err) + '</div>' : '') +
@@ -2666,10 +2754,10 @@
   }
   // ---- 부서별 자산 보유
   function repDept() {
-    var g = {}; liveAssets().forEach(function (a) { var d = a.dept || '(소속 없음)', o = g[d] = g[d] || { dept: d, PC: 0, 노트북: 0, 모니터: 0, 기타: 0, users: {} }; o[catGroup(a.category)]++; if (a.user_name) o.users[a.user_name] = 1; });
+    var g = {}; repCoFilter(liveAssets()).forEach(function (a) { var d = a.dept || '(소속 없음)', o = g[d] = g[d] || { dept: d, PC: 0, 노트북: 0, 모니터: 0, 기타: 0, users: {} }; o[catGroup(a.category)]++; if (a.user_name) o.users[a.user_name] = 1; });
     var list = Object.keys(g).map(function (k) { var o = g[k]; o.total = o.PC + o.노트북 + o.모니터 + o.기타; o.n = Object.keys(o.users).length; o.per = o.n ? o.total / o.n : 0; return o; }).sort(function (a, b) { return b.total - a.total; });
     var tot = { PC: 0, 노트북: 0, 모니터: 0, 기타: 0, total: 0 }; list.forEach(function (o) { CGRP.forEach(function (c) { tot[c] += o[c]; }); tot.total += o.total; });
-    shell('reports', repHead('부서별 자산 보유', '', '현재 자산 대장 기준(폐기 제외)') + '<div class="kpis">' + [kp('부서 수', list.length, ''), kp('전체 장비', tot.total.toLocaleString(), 'PC ' + tot.PC.toLocaleString() + ' · 노트북 ' + tot['노트북'].toLocaleString() + ' · 모니터 ' + tot['모니터'].toLocaleString())].join('') + '</div>' +
+    shell('reports', repHead('부서별 자산 보유', '', '현재 자산 대장 기준(폐기 제외)' + (REP_CO ? ' · 회사: ' + esc(REP_CO) : '')) + '<div class="kpis">' + [kp('부서 수', list.length, ''), kp('전체 장비', tot.total.toLocaleString(), 'PC ' + tot.PC.toLocaleString() + ' · 노트북 ' + tot['노트북'].toLocaleString() + ' · 모니터 ' + tot['모니터'].toLocaleString())].join('') + '</div>' +
       '<table class="tbl ctr" style="margin-top:8px"><thead><tr><th>소속</th><th>PC</th><th>노트북</th><th>모니터</th><th>기타</th><th>합계</th><th>사용 인원</th><th>1인당 장비</th></tr></thead><tbody>' +
       list.map(function (o) { return '<tr><td style="text-align:left">' + esc(o.dept) + '</td><td>' + o.PC + '</td><td>' + o['노트북'] + '</td><td>' + o['모니터'] + '</td><td>' + o['기타'] + '</td><td><b>' + o.total + '</b></td><td>' + o.n + '</td><td' + (o.per >= 3.5 ? ' style="color:#c42b1c;font-weight:600"' : o.per > 0 && o.per < 1 ? ' style="color:#a15c00;font-weight:600"' : '') + '>' + (o.n ? o.per.toFixed(1) : '—') + '</td></tr>'; }).join('') + '</tbody></table>' +
       '<div class="note" style="margin-top:8px">· 1인당 장비가 3.5대 이상이면 빨강(과다 의심), 1대 미만이면 주황(부족 의심)으로 표시합니다. 사용 인원은 사용자명이 있는 서로 다른 사람 수입니다.</div>');
@@ -2767,6 +2855,7 @@
       else if (p === 'employees') pageEmployees(arg);
       else if (p === 'admins') pageAdmins();
       else if (p === 'reports') pageReports(arg);
+      else if (p === 'security') pageSecurity();
       else if (p === 'audit') pageAudit();
       else if (p === 'inventory') { var iv = arg.split('/')[0]; if (iv) pageInvDetail(iv); else pageInventory(); }
       else if (p === 'inv-scan') pageInvScan(arg);
@@ -2820,8 +2909,41 @@
       $app.innerHTML = '<div style="padding:40px;text-align:center;color:#5c5c5c">불러오는 중…</div>';
       await loadAll();
       window.addEventListener('hashchange', route); route();
-      if (!DEMO) startSupportPoll();
+      if (!DEMO) { startSupportPoll(); startIdleTimer(); }
     } catch (e) { $app.innerHTML = '<div style="padding:40px"><h1>오류</h1><p class="err">' + esc(e.message || e) + '</p><p class="note">config.js 의 주소와 키, DB 구조(schema.sql) 실행 여부를 확인하세요.</p></div>'; console.error(e); }
   }
+  // ---------- v1.9.11: 자동 로그아웃 (30분 미조작) ----------
+  var IDLE_WARN_MS = 25 * 60 * 1000, IDLE_OUT_MS = 30 * 60 * 1000;
+  var idleWarnT = null, idleOutT = null, idleToastEl = null, idleLast = 0;
+  function idleClearToast() { if (idleToastEl) { idleToastEl.remove(); idleToastEl = null; } }
+  function idleShowWarn() {
+    idleToastEl = document.createElement('div'); idleToastEl.className = 'notice'; idleToastEl.style.background = '#2a2f38'; idleToastEl.style.color = '#fff';
+    idleToastEl.innerHTML = '<b>5분 후 자동 로그아웃됩니다</b><div class="nsub" style="color:#d8dde3">화면을 움직이거나 아무 키나 누르면 계속 사용할 수 있습니다.</div>';
+    idleToastEl.onclick = function () { idleResetTimer(); };
+    document.body.appendChild(idleToastEl);
+  }
+  async function idleDoLogout() {
+    idleClearToast(); clearTimeout(idleWarnT); clearTimeout(idleOutT);
+    try { await sb.auth.signOut(); } catch (e) { /* 무시 */ }
+    pageLogin('장시간 조작이 없어 자동 로그아웃되었습니다. 다시 로그인해 주세요.');
+  }
+  function idleResetTimer() {
+    if (!S.me) return;
+    idleClearToast(); clearTimeout(idleWarnT); clearTimeout(idleOutT);
+    idleWarnT = setTimeout(idleShowWarn, IDLE_WARN_MS);
+    idleOutT = setTimeout(idleDoLogout, IDLE_OUT_MS);
+  }
+  function idleOnActivity() {
+    var now = Date.now(); if (now - idleLast < 5000) return; idleLast = now;   // 너무 자주 재설정하지 않도록 5초 간격으로만 처리
+    idleResetTimer();
+  }
+  function startIdleTimer() {
+    ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, idleOnActivity, { passive: true }); });
+    idleResetTimer();
+  }
   start();
+  // v1.9.11: 다른 사이트에 갔다가 뒤로가기로 돌아오면(브라우저 캐시 복원) 세션이 남아 있어도 무조건 다시 로그인하도록 함
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted && !DEMO) { sb.auth.signOut().catch(function () { }).then(function () { location.reload(); }); }
+  });
 })();
