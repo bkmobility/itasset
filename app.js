@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.11 - 관리자 웹 (정적 페이지, Supabase 연동) */
+/* IT 자산관리시스템 v1.9.12 - 관리자 웹 (정적 페이지, Supabase 연동) */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -315,6 +315,11 @@
 
   // ---------- v1.9.4: 로그인 계정(사번)·권한 ----------
   function isViewer() { return !!(S.me && S.me.role === 'viewer'); }
+  // v1.9.12: 조회 전용 계정 화면 마스킹 (자산 관리 · 인사 정보)
+  function mkName(s) { s = String(s == null ? '' : s); if (!s) return s; return s.charAt(0) + '*'.repeat(Math.max(1, s.length - 1)); }
+  function mkSabun(s) { s = String(s == null ? '' : s); if (s.length <= 4) return '*'.repeat(s.length); return s.slice(0, 2) + '*'.repeat(s.length - 4) + s.slice(-2); }
+  function mkPc(s) { s = String(s == null ? '' : s); if (!s || s === '—') return s; return s.length <= 2 ? '*'.repeat(s.length) : s.slice(0, 2) + '*'.repeat(Math.max(2, s.length - 2)); }
+  function mkIp(s) { s = String(s == null ? '' : s); if (!s || s === '—') return s; var p = s.split('.'); return p.length === 4 ? p[0] + '.' + p[1] + '.***.***' : s; }
   function isMain() { return !!(S.me && S.me.role === 'main'); }
   function needWrite() { if (isViewer()) throw new Error('조회 전용 계정은 수정·업로드·처리를 할 수 없습니다.'); }
   async function fnCall(name, body, token) {
@@ -350,13 +355,13 @@
   var CATG = ['모니터', 'PC', '노트북', '스캐너', '기타'], CATG_COL = { '모니터': '#2f7df6', 'PC': '#1e8e3e', '노트북': '#c42b1c', '스캐너': '#e9a100', '기타': '#b0b7c3' };
   function catGrp(c) { c = String(c || ''); return c === '모니터' ? '모니터' : (c === 'PC' || c === 'PC 본체') ? 'PC' : c === '노트북' ? '노트북' : /스캐너/.test(c) ? '스캐너' : '기타'; }
   var ROUTES = [['dashboard', '대시보드'], ['assets', '자산 관리'], ['check', '현황 점검'], ['support', '원격 지원'], ['employees', '인사 정보'], ['data', '데이터 관리'], ['inventory', '실사 (재물조사)']];
-  function navRoutes() { return isMain() ? ROUTES.concat([['audit', '이력 관리'], ['admins', '관리자'], ['reports', '보고서'], ['security', '보안 설정']]) : ROUTES; }   // v1.9.5: 이력 관리·관리자·보고서는 메인 관리자 전용 / v1.9.11: 보안 설정도 메인 관리자 전용
+  function navRoutes() { if (isMain()) return ROUTES.concat([['audit', '이력 관리'], ['admins', '관리자'], ['reports', '보고서'], ['security', '보안 설정']]); if (!isViewer()) return ROUTES.concat([['myaccount', '내 계정']]); return ROUTES; }   // v1.9.5: 이력 관리·관리자·보고서는 메인 관리자 전용 / v1.9.11: 보안 설정도 메인 관리자 전용 / v1.9.12: 일반 관리자는 "내 계정"에서 본인 OTP 관리
   function denyPage() { shell('dashboard', '<div class="card" style="text-align:center;padding:30px 20px;max-width:560px;margin:30px auto"><div style="font-size:30px">🔒</div><h2 style="margin:6px 0">접근 권한이 없습니다</h2><div class="note" style="line-height:1.8">이 메뉴(이력 관리 · 관리자 · 보고서)는 <b>메인 관리자</b>만 열 수 있습니다.<br>주소를 직접 입력해 들어와도 이 화면이 표시됩니다.</div><div style="margin-top:14px"><a class="btn pri" href="#/dashboard">대시보드로 이동</a></div></div>'); }
   function shell(active, html) {
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.11</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.12</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -560,10 +565,11 @@
       var L = monLink(a), dPc = L && L.mon && L.pc ? L.pc : null;   // 연결된 모니터는 PC 값으로 표시
       var cName = a.pc_name || (dPc && dPc.pc_name) || '—', cIp = a.ip || (dPc && dPc.ip) || '—', cSeen = a.last_seen || (dPc && dPc.last_seen);
       var nameExtra = (!qLow && monBadge(a) ? '<div>' + monBadge(a) + '</div>' : '');
+      var vw = isViewer();
       return '<tr class="clk" data-no="' + esc(a.asset_no) + '"><td><input type="checkbox" class="sel" data-no="' + esc(a.asset_no) + '"' + (F.sel[a.asset_no] ? ' checked' : '') + '></td>' +
         '<td class="mono">' + esc(a.asset_no) + '</td>' + hitCell + '<td>' + esc(a.category) + '</td><td>' + esc(a.manufacturer) + '</td><td>' + esc(a.model) + '</td><td>' + esc(a.mfg_ym) + '</td><td>' + esc(a.status) + '</td><td>' + warrantyBadge(a.warr_end, a.warr_calc) + '</td>' +
-        '<td>' + esc(a.user_name) + (a.user_mismatch ? ' ' + badge('불일치', 'warn') : '') + '</td><td>' + esc(a.dept) + '</td><td>' + esc(a.company || '') + '</td><td>' + esc(a.title) + '</td>' +
-        '<td class="auto">' + esc(cName) + nameExtra + '</td><td class="auto mono">' + esc(cIp) + '</td><td class="auto">' + esc(a.category === '모니터' ? monSpec(a) : specStr(a)) + '</td><td class="auto">' + (cSeen ? seenHtml(cSeen) + (!a.last_seen && dPc ? '<div class="note" style="font-size:10.5px">연결 PC 기준</div>' : '') : seenHtml(a.last_seen)) + '</td></tr>';
+        '<td>' + esc(vw ? mkName(a.user_name) : a.user_name) + (a.user_mismatch ? ' ' + badge('불일치', 'warn') : '') + '</td><td>' + esc(a.dept) + '</td><td>' + esc(a.company || '') + '</td><td>' + esc(a.title) + '</td>' +
+        '<td class="auto">' + esc(vw ? mkPc(cName) : cName) + nameExtra + '</td><td class="auto mono">' + esc(vw ? mkIp(cIp) : cIp) + '</td><td class="auto">' + esc(a.category === '모니터' ? monSpec(a) : specStr(a)) + '</td><td class="auto">' + (cSeen ? seenHtml(cSeen) + (!a.last_seen && dPc ? '<div class="note" style="font-size:10.5px">연결 PC 기준</div>' : '') : seenHtml(a.last_seen)) + '</td></tr>';
     }).join('') || '<tr><td colspan="17" class="note" style="padding:24px;text-align:center">조건에 맞는 자산이 없습니다.</td></tr>';
     var nsel = Object.keys(F.sel).length;
     var hasFilter = !!(qLow || F.dept || F.cat || F.catg || F.status || F.company || F.collect);
@@ -751,16 +757,17 @@
     var hist = S.history.filter(function (h) { return h.asset_no === no; });
     if (!DEMO) { var r = await sb.from('asset_history').select('*').eq('asset_no', no).order('created_at', { ascending: false }).limit(30); if (!r.error) hist = r.data; }
     var d = a._dev, e = a._emp, q = qrcode(0, 'M'); q.addData(no); q.make();
+    var vw = isViewer();
     function kv(k, v) { return '<div class="kv"><div class="k">' + k + '</div><div class="v">' + (v == null || v === '' ? '—' : v) + '</div></div>'; }
-    function inp(id, label, val, type) { return '<div class="kv"><div class="k">' + label + '</div><div class="v"><input type="' + (type || 'text') + '" id="f_' + id + '" value="' + esc(val || '') + '" style="width:100%"></div></div>'; }
-    shell('assets', '<div class="row wrap"><a href="#/assets">‹ 자산</a><h1 class="mono">' + esc(no) + '</h1>' + badge(a.status || '—', a.status === '사용중' ? 'ok' : 'gray') + (a.user_mismatch ? badge('사용자 불일치', 'warn') : '') + '<div class="grow"></div><button class="btn" id="qr">QR코드 출력</button><button class="btn pri" id="save">저장</button></div>' +
+    function inp(id, label, val, type) { return '<div class="kv"><div class="k">' + label + '</div><div class="v"><input type="' + (type || 'text') + '" id="f_' + id + '" value="' + esc(val || '') + '"' + (vw ? ' disabled' : '') + ' style="width:100%"></div></div>'; }
+    shell('assets', '<div class="row wrap"><a href="#/assets">‹ 자산</a><h1 class="mono">' + esc(no) + '</h1>' + badge(a.status || '—', a.status === '사용중' ? 'ok' : 'gray') + (a.user_mismatch ? badge('사용자 불일치', 'warn') : '') + '<div class="grow"></div><button class="btn" id="qr">QR코드 출력</button><button class="btn pri wonly" id="save">저장</button></div>' +
       '<div class="cards" style="margin-top:12px"><div class="card" style="flex:1.2"><h3>기본 정보 (대장)</h3><div class="row" style="align-items:flex-start"><div class="grow">' +
       kv('자산분류', esc(a.category)) + kv('제조사', esc(a.manufacturer)) + kv('모델명', esc(a.model)) + kv('제조년월', esc(a.mfg_ym)) +
-      inp('status', '자산상태', a.status) + inp('user_name', '사용자명', a.user_name) + inp('user_id', '사용자 ID', a.user_id) + inp('dept', '소속명', a.dept) + coSel('f_company', a.company) + inp('title', '직책', a.title) + inp('location', '위치', a.location) + inp('serial_no', '시리얼 번호', a.serial_no) + inp('purchase_date', '구매일', a.purchase_date, 'date') + inp('warranty_end', '보증 만료', a.warranty_end, 'date') +
-      '</div><div style="text-align:center;font-size:10px;color:#8a8a8a">' + q.createSvgTag({ cellSize: 3, margin: 0 }) + '<div>QR = 관리번호</div></div></div><div class="kv"><div class="k">메모</div><div class="v"><textarea id="f_memo">' + esc(a.memo || '') + '</textarea></div></div></div>' +
+      inp('status', '자산상태', a.status) + inp('user_name', '사용자명', vw ? mkName(a.user_name) : a.user_name) + inp('user_id', '사용자 ID', vw ? mkSabun(a.user_id) : a.user_id) + inp('dept', '소속명', a.dept) + coSel('f_company', a.company) + inp('title', '직책', a.title) + inp('location', '위치', a.location) + inp('serial_no', '시리얼 번호', a.serial_no) + inp('purchase_date', '구매일', a.purchase_date, 'date') + inp('warranty_end', '보증 만료', a.warranty_end, 'date') +
+      '</div><div style="text-align:center;font-size:10px;color:#8a8a8a">' + q.createSvgTag({ cellSize: 3, margin: 0 }) + '<div>QR = 관리번호</div></div></div><div class="kv"><div class="k">메모</div><div class="v"><textarea id="f_memo"' + (vw ? ' disabled' : '') + '>' + esc(a.memo || '') + '</textarea></div></div></div>' +
       '<div class="card" style="background:#f2f8fe"><h3>자동 수집 정보' + (d ? '' : ' <span class="badge b-gray">미수집</span>') + '</h3>' +
-      (d ? kv('컴퓨터 이름', esc(d.computer_name)) + kv('OS', esc(d.os)) + kv('IP / MAC', esc(d.ip) + ' / ' + esc(d.mac)) + kv('CPU', esc(d.cpu)) + kv('RAM / 저장장치', esc((d.ram_gb || '—') + ' GB / ' + (d.storage || '—'))) + kv('그래픽카드', esc(d.gpu)) + kv('최종 확인', seenHtml(d.last_seen)) +
-        kv('실행 사번', e ? esc(d.emp_no + ' (' + e.name + ', ' + (e.dept || '') + ')') : esc(d.emp_no)) +
+      (d ? kv('컴퓨터 이름', esc(vw ? mkPc(d.computer_name) : d.computer_name)) + kv('OS', esc(d.os)) + kv('IP / MAC', esc(vw ? mkIp(d.ip) : d.ip) + ' / ' + (vw ? '**:**:**:**:**:**' : esc(d.mac))) + kv('CPU', esc(d.cpu)) + kv('RAM / 저장장치', esc((d.ram_gb || '—') + ' GB / ' + (d.storage || '—'))) + kv('그래픽카드', esc(d.gpu)) + kv('최종 확인', seenHtml(d.last_seen)) +
+        kv('실행 사번', e ? esc((vw ? mkSabun(d.emp_no) : d.emp_no) + ' (' + (vw ? mkName(e.name) : e.name) + ', ' + (e.dept || '') + ')') : esc(vw ? mkSabun(d.emp_no) : d.emp_no)) +
         '<div style="margin-top:8px">' + (a.user_mismatch ? badge('대장 사용자와 다름', 'warn') : badge('대장 사용자와 일치', 'ok')) + ' ' + badge(d.link_source === 'auto' ? '자동 연결' : '수동 연결', 'gray') + ' <button class="btn sm" id="unlink">연결 해제</button></div>'
         : '<div class="note">이 자산에 연결된 PC가 없습니다. 사용자가 프로그램을 실행하면 자동으로 연결되거나, <a href="#/check/unreg">현황 점검 &gt; 미등록 PC</a>에서 연결할 수 있습니다.' + (isPc(a) ? '' : '<br>(모니터·서버 등은 자동 수집 대상이 아닙니다)') + '</div>') + '</div></div>' +
       monCardHtml(a, d) +
@@ -1403,11 +1410,12 @@
       var cnt = months.map(function (m) { return S.employees.filter(function (e) { return isNew ? String(e.joined_at || '').slice(0, 7) === m[0] : (e.active === false && String(e.left_at || '').slice(0, 7) === m[0]); }).length; });
       var mx = Math.max.apply(null, cnt.concat([1]));
       var mbar = '<div class="card mbar"><div class="ml"><b>' + (isNew ? '신규 입사자' : '퇴사자') + '</b><div class="note">월별 추이 (참고)</div></div>' + months.map(function (m, i) { return '<div class="mc"><span>' + cnt[i] + '</span><i style="height:' + (4 + Math.round(46 * cnt[i] / mx)) + 'px;background:' + (isNew ? '#1e8e3e' : '#c42b1c') + '"></i><span class="note">' + m[1] + '</span></div>'; }).join('') + '</div>';
+      var vwEmp2 = isViewer();
       var rows = list.sort(function (a, b) { return String(isNew ? b.joined_at : b.left_at).localeCompare(String(isNew ? a.joined_at : a.left_at)); }).slice(0, 300).map(function (e) {
         var pc = devCount(e.emp_no);
         return isNew ?
-          '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(ymd(e.joined_at)) + estH(e, 'joined') + '</td><td>' + tagH(srcOf(e.emp_no, 'add'), 'gray') + '</td><td>' + (pc ? tagH('연동됨', 'ok') : tagH('미연동', 'warn')) + '</td></tr>' :
-          '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(ymd(e.left_at)) + estH(e, 'left') + '</td><td>' + tagH(srcOf(e.emp_no, 'out'), 'gray') + '</td><td>' + (pc ? '<b style="color:#c42b1c">PC ' + pc + '대 회수 필요</b>' : '<span style="color:#1e8e3e">PC 없음</span>') + '</td><td><button class="btn sm" data-rs="' + esc(e.emp_no) + '">복직</button></td></tr>';
+          '<tr><td class="mono">' + esc(vwEmp2 ? mkSabun(e.emp_no) : e.emp_no) + '</td><td>' + esc(vwEmp2 ? mkName(e.name) : e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(ymd(e.joined_at)) + estH(e, 'joined') + '</td><td>' + tagH(srcOf(e.emp_no, 'add'), 'gray') + '</td><td>' + (pc ? tagH('연동됨', 'ok') : tagH('미연동', 'warn')) + '</td></tr>' :
+          '<tr><td class="mono">' + esc(vwEmp2 ? mkSabun(e.emp_no) : e.emp_no) + '</td><td>' + esc(vwEmp2 ? mkName(e.name) : e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(ymd(e.left_at)) + estH(e, 'left') + '</td><td>' + tagH(srcOf(e.emp_no, 'out'), 'gray') + '</td><td>' + (pc ? '<b style="color:#c42b1c">PC ' + pc + '대 회수 필요</b>' : '<span style="color:#1e8e3e">PC 없음</span>') + '</td><td>' + (vwEmp2 ? '' : '<button class="btn sm" data-rs="' + esc(e.emp_no) + '">복직</button>') + '</td></tr>';
       }).join('') || '<tr><td colspan="9" class="note" style="padding:16px;text-align:center">' + (S.dates ? '이 기간에 해당하는 사람이 없습니다.' : '입사일·퇴사일 열 추가(db/update_v1.8.sql, update_v1.9.sql) 후 조회할 수 있습니다.') + '</td></tr>';
       body = '<div class="card pbox"><b>기간</b><input type="date" id="p_from" value="' + P[0] + '"><span>~</span><input type="date" id="p_to" value="' + P[1] + '"><span class="chips">' + chips + '</span><span class="grow"></span><span class="note">' + (isNew ? '신규 입사자' : '퇴사자') + ' <b style="font-size:14px;color:#1a1a1a">' + list.length + '명</b></span><button class="btn" id="p_xl">엑셀 내려받기</button></div>' + mbar +
         '<div style="overflow:auto"><table class="tbl">' + th(isNew ? ['사번(인사ID)', '이름', '조직명', '본부/팀', '호칭', '입사일', '등록 방법', 'PC 연동'] : ['사번(인사ID)', '이름', '조직명', '본부/팀', '호칭', '퇴사일', '처리 방법', '사용 PC', '관리']) + '<tbody>' + rows + '</tbody></table></div>' +
@@ -1440,9 +1448,10 @@
           return !q || [e.emp_no, e.name, e.dept, e.team, e.title, e.sales_title, e.duty, e.ext_no].join(' ').toLowerCase().indexOf(q) >= 0;
         });
         list = sortRows(list, 'emp', EC);   // 전체 명단을 정렬한 뒤 상위 300명만 표시
+        var vwEmp = isViewer();
         var rows = list.slice(0, 300).map(function (e) {
-          var btn = tab === 'all' && e.active === false ? '<button class="btn sm" data-ed="' + esc(e.emp_no) + '">수정</button> <button class="btn sm" data-rs="' + esc(e.emp_no) + '">복직</button>' : '<button class="btn sm" data-ed="' + esc(e.emp_no) + '">수정</button> <button class="btn sm" data-out="' + esc(e.emp_no) + '">퇴사 처리</button>';
-          return '<tr><td class="mono">' + esc(e.emp_no) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(e.sales_title || '') + '</td><td>' + esc(e.duty || '') + '</td><td>' + esc(e.ext_no || '') + '</td>' +
+          var btn = vwEmp ? '' : tab === 'all' && e.active === false ? '<button class="btn sm" data-ed="' + esc(e.emp_no) + '">수정</button> <button class="btn sm" data-rs="' + esc(e.emp_no) + '">복직</button>' : '<button class="btn sm" data-ed="' + esc(e.emp_no) + '">수정</button> <button class="btn sm" data-out="' + esc(e.emp_no) + '">퇴사 처리</button>';
+          return '<tr><td class="mono">' + esc(vwEmp ? mkSabun(e.emp_no) : e.emp_no) + '</td><td>' + esc(vwEmp ? mkName(e.name) : e.name) + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(e.team || '') + '</td><td>' + esc(e.title || '') + '</td><td>' + esc(e.sales_title || '') + '</td><td>' + esc(e.duty || '') + '</td><td>' + esc(e.ext_no || '') + '</td>' +
             (tab === 'all' ? '<td>' + (e.active === false ? tagH('퇴사', 'bad') : tagH('재직', 'ok')) + '</td>' : '') + '<td>' + (e.joined_at ? esc(ymd(e.joined_at)) + estH(e, 'joined') : '<span class="note">미등록</span>') + '</td>' + (tab === 'all' ? '<td>' + (e.left_at ? esc(ymd(e.left_at)) + estH(e, 'left') : '—') + '</td>' : '') + '<td>' + btn + '</td></tr>';
         }).join('') || '<tr><td colspan="12" class="note" style="padding:16px;text-align:center">표시할 명단이 없습니다.</td></tr>';
         $('#emp_tbl').innerHTML = '<div class="note" style="margin-bottom:6px">' + list.length.toLocaleString() + '명' + (list.length > 300 ? ' (상위 300명만 표시, 검색으로 좁혀 보세요)' : '') + '</div>' + sortBar('emp', EC, list.length) + '<div style="overflow:auto"><table class="tbl"><thead><tr>' + [['emp_no', '사번(인사ID)'], ['name', '이름'], ['dept', '조직명'], ['team', '본부/팀'], ['title', '호칭'], ['sales', '영업직책'], ['duty', '업무'], ['ext', '내선']].concat(tab === 'all' ? [['st', '상태']] : []).concat([['joined', '입사일']]).concat(tab === 'all' ? [['left', '퇴사일']] : []).map(function (c) { return thS('emp', c[0], c[1]); }).join('') + '<th>관리</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
@@ -1681,7 +1690,10 @@
     return fnCall('admin-security', Object.assign({ action: action }, body || {}), await myToken());
   }
   function demoSec(action, b) {
-    if (action === 'status') return { otp_enabled: !!S.secOtp, telegram_configured: true, geo_block: true, auto_logout_minutes: 30 };
+    if (action === 'status') return { otp_enabled: !!S.secOtp, otp_count: (S.secOtp ? 1 : 0), telegram_configured: true, geo_block: true, auto_logout_minutes: S.idleMinutes || 30 };
+    if (action === 'my_status') return { otp_enabled: !!S.secOtp };
+    if (action === 'get_logout') return { auto_logout_minutes: S.idleMinutes || 30 };
+    if (action === 'set_logout') { S.idleMinutes = Number(b.minutes) || 30; return { ok: true, auto_logout_minutes: S.idleMinutes }; }
     if (action === 'otp_begin') return { secret: 'JBSWY3DPEHPK3PXP', otpauth: 'otpauth://totp/demo' };
     if (action === 'otp_confirm') { if (String(b.code || '') !== '000000') throw new Error('인증 코드가 올바르지 않습니다. (데모에서는 000000 을 입력하세요)'); S.secOtp = true; return { ok: true }; }
     if (action === 'otp_disable') { S.secOtp = false; return { ok: true }; }
@@ -1691,23 +1703,45 @@
   async function pageSecurity() {
     if (!isMain()) { denyPage(); return; }
     var st; try { st = DEMO ? demoSec('status') : await secCall('status'); } catch (e) { shell('security', '<h1>보안 설정</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message) + '</div>'); return; }
+    var logoutOpts = [10, 30, 60].map(function (m) { return '<option value="' + m + '"' + (m === st.auto_logout_minutes ? ' selected' : '') + '>' + m + (m === 60 ? '분 (1시간)' : '분') + '</option>'; }).join('');
     shell('security', '<h1>보안 설정 <span class="note" style="font-weight:400">· 메인 관리자만 볼 수 있습니다</span></h1>' +
       '<div class="secg">' +
       '<div class="card seccard"><div class="row"><b>텔레그램 로그인 알림</b>' + (st.telegram_configured ? badge('연결됨', 'ok') : badge('미설정', 'bad')) + '</div><div class="note" style="margin-top:4px">관리자 계정으로 로그인에 성공할 때마다 설정된 텔레그램 방으로 알림을 보냅니다. (서버 환경변수 TELEGRAM_BOT_TOKEN·TELEGRAM_CHAT_ID 설정 필요 — 설치가이드 참고)</div><div style="margin-top:10px"><button class="btn sm" id="sec_tg_test"' + (st.telegram_configured ? '' : ' disabled') + '>테스트 알림 보내기</button></div></div>' +
-      '<div class="card seccard"><div class="row"><b>2단계 인증 (OTP)</b>' + (st.otp_enabled ? badge('설정됨', 'ok') : badge('미설정', 'gray')) + '</div><div class="note" style="margin-top:4px">메인 관리자(나) 계정에만 적용됩니다. 켜면 로그인 시 Google Authenticator 등 OTP 앱의 6자리 코드를 추가로 입력해야 합니다.</div><div style="margin-top:10px">' + (st.otp_enabled ? '<button class="btn sm" id="sec_otp_redo">다시 등록 (QR 재발급)</button> <button class="btn sm dng" id="sec_otp_off">해제</button>' : '<button class="btn sm pri" id="sec_otp_on">OTP로 등록</button>') + '</div></div>' +
-      '<div class="card seccard"><div class="row"><b>자동 로그아웃</b>' + badge(st.auto_logout_minutes + '분 고정', 'gray') + '</div><div class="note" style="margin-top:4px">모든 관리자 계정은 화면 조작 없이 ' + st.auto_logout_minutes + '분이 지나면 자동으로 로그아웃됩니다(설정 변경 불가). 다른 사이트에 갔다가 뒤로가기로 돌아와도 즉시 다시 로그인해야 합니다.</div></div>' +
+      '<div class="card seccard"><div class="row"><b>2단계 인증 (OTP)</b>' + (st.otp_enabled ? badge('내 계정 설정됨', 'ok') : badge('내 계정 미설정', 'gray')) + '</div><div class="note" style="margin-top:4px">v1.9.12부터 <b>메인·일반 관리자 누구나</b> 본인 계정에서 켜고 끌 수 있습니다. 일반 관리자는 "관리자" 메뉴에서, 메인 관리자(나)는 여기서 설정합니다. 켜면 로그인 시 OTP 앱의 6자리 코드를 추가로 입력해야 합니다.</div><div style="margin-top:10px;font-size:11.5px;color:#5c5c5c">현재 OTP 적용 계정 <b>' + (st.otp_count != null ? st.otp_count : '-') + '명</b></div><div style="margin-top:10px">' + (st.otp_enabled ? '<button class="btn sm" id="sec_otp_redo">다시 등록 (QR 재발급)</button> <button class="btn sm dng" id="sec_otp_off">해제</button>' : '<button class="btn sm pri" id="sec_otp_on">OTP로 등록</button>') + ' <a href="#/admins" class="btn sm">관리자 목록 보기</a></div></div>' +
+      '<div class="card seccard"><div class="row"><b>자동 로그아웃</b>' + badge(st.auto_logout_minutes + '분', 'ok') + '</div><div class="note" style="margin-top:4px">모든 관리자 계정 공통으로 적용됩니다. 화면 조작 없이 선택한 시간이 지나면 자동으로 로그아웃됩니다. 다른 사이트에 갔다가 뒤로가기로 돌아와도 즉시 다시 로그인해야 합니다.</div><div style="margin-top:10px;display:flex;align-items:center;gap:8px"><label class="note">로그아웃까지</label><select id="sec_logout_sel" style="height:30px">' + logoutOpts + '</select><span class="note" id="sec_logout_saved" style="display:none;color:#1e8e3e">저장됨 ✓</span></div></div>' +
       '<div class="card seccard"><div class="row"><b>해외 접속 차단</b>' + (st.geo_block ? badge('켜짐', 'ok') : badge('꺼짐', 'bad')) + '</div><div class="note" style="margin-top:4px">접속 IP가 대한민국이 아니면 로그인 자체가 차단됩니다. 해외 출장 등 예외가 필요하면 전산지원파트(서버 환경변수 GEO_BLOCK)에서 임시로 꺼야 합니다.</div></div>' +
       '</div>');
     var tgBtn = $('#sec_tg_test'); if (tgBtn) tgBtn.onclick = async function () { tgBtn.disabled = true; tgBtn.textContent = '보내는 중…'; try { await (DEMO ? demoSec('test_telegram') : secCall('test_telegram')); toast('테스트 알림을 보냈습니다. 텔레그램 방을 확인하세요.'); } catch (e) { fail(e); } tgBtn.disabled = false; tgBtn.textContent = '테스트 알림 보내기'; };
-    var onBtn = $('#sec_otp_on'); if (onBtn) onBtn.onclick = otpSetupDialog;
-    var redoBtn = $('#sec_otp_redo'); if (redoBtn) redoBtn.onclick = otpSetupDialog;
+    var onBtn = $('#sec_otp_on'); if (onBtn) onBtn.onclick = function () { otpSetupDialog(pageSecurity); };
+    var redoBtn = $('#sec_otp_redo'); if (redoBtn) redoBtn.onclick = function () { otpSetupDialog(pageSecurity); };
     var offBtn = $('#sec_otp_off'); if (offBtn) offBtn.onclick = async function () {
       var code = await askText('2단계 인증 해제', '해제하려면 지금 OTP 앱에 표시된 6자리 코드를 입력하세요.', '', '해제');
       if (code === null) return;
       try { await (DEMO ? demoSec('otp_disable', { code: code }) : secCall('otp_disable', { code: code })); toast('2단계 인증을 해제했습니다.'); pageSecurity(); } catch (e) { fail(e); }
     };
+    var selEl = $('#sec_logout_sel'); if (selEl) selEl.onchange = async function () {
+      var minutes = Number(selEl.value), savedEl = $('#sec_logout_saved'); selEl.disabled = true;
+      try { await (DEMO ? demoSec('set_logout', { minutes: minutes }) : secCall('set_logout', { minutes: minutes })); S.idleMinutes = minutes; idleResetTimer(); if (savedEl) { savedEl.style.display = ''; setTimeout(function () { savedEl.style.display = 'none'; }, 2000); } toast('자동 로그아웃 시간을 ' + minutes + '분으로 저장했습니다.'); }
+      catch (e) { fail(e); pageSecurity(); }
+      selEl.disabled = false;
+    };
   }
-  function otpSetupDialog() {
+  // v1.9.12: 일반 관리자가 본인 계정 OTP를 켜고 끄는 화면 ("내 계정" 메뉴, 메인·조회 전용은 제외)
+  async function pageMyAccount() {
+    if (isMain() || isViewer()) { denyPage(); return; }
+    var st; try { st = DEMO ? demoSec('my_status') : await secCall('my_status'); } catch (e) { shell('myaccount', '<h1>내 계정</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message) + '</div>'); return; }
+    shell('myaccount', '<h1>내 계정 보안</h1><div class="note" style="margin:4px 0 14px">' + esc(adminLabel()) + ' · 본인 계정에만 적용됩니다</div>' +
+      '<div class="card seccard" style="max-width:520px"><div class="row"><b>2단계 인증 (OTP)</b>' + (st.otp_enabled ? badge('설정됨', 'ok') : badge('미설정', 'gray')) + '</div><div class="note" style="margin-top:4px">켜면 로그인 시 비밀번호 다음에 Google Authenticator 등 OTP 앱의 6자리 코드를 추가로 입력해야 합니다.</div><div style="margin-top:10px">' + (st.otp_enabled ? '<button class="btn sm" id="my_otp_redo">다시 등록 (QR 재발급)</button> <button class="btn sm dng" id="my_otp_off">OTP 해제</button>' : '<button class="btn sm pri" id="my_otp_on">OTP로 등록</button>') + '</div></div>');
+    var onBtn = $('#my_otp_on'); if (onBtn) onBtn.onclick = function () { otpSetupDialog(pageMyAccount); };
+    var redoBtn = $('#my_otp_redo'); if (redoBtn) redoBtn.onclick = function () { otpSetupDialog(pageMyAccount); };
+    var offBtn = $('#my_otp_off'); if (offBtn) offBtn.onclick = async function () {
+      var code = await askText('2단계 인증 해제', '해제하려면 지금 OTP 앱에 표시된 6자리 코드를 입력하세요.', '', '해제');
+      if (code === null) return;
+      try { await (DEMO ? demoSec('otp_disable', { code: code }) : secCall('otp_disable', { code: code })); toast('2단계 인증을 해제했습니다.'); pageMyAccount(); } catch (e) { fail(e); }
+    };
+  }
+  function otpSetupDialog(onDone) {
+    onDone = onDone || pageSecurity;
     (async function () {
       var r; try { r = DEMO ? demoSec('otp_begin') : await secCall('otp_begin'); } catch (e) { fail(e); return; }
       var q = qrcode(0, 'M'); q.addData(r.otpauth); q.make();
@@ -1723,7 +1757,7 @@
       $('#otp_ok', m.d).onclick = async function () {
         var code = $('#otp_c', m.d).value.trim(); if (!/^\d{6}$/.test(code)) { toast('6자리 숫자를 입력하세요.'); return; }
         var btn = this; btn.disabled = true; btn.textContent = '확인 중…';
-        try { await (DEMO ? demoSec('otp_confirm', { code: code }) : secCall('otp_confirm', { secret: r.secret, code: code })); m.close(); toast('2단계 인증을 등록했습니다.'); pageSecurity(); }
+        try { await (DEMO ? demoSec('otp_confirm', { code: code }) : secCall('otp_confirm', { secret: r.secret, code: code })); m.close(); toast('2단계 인증을 등록했습니다.'); onDone(); }
         catch (e) { btn.disabled = false; btn.textContent = '등록 완료'; toast(e.message || '확인에 실패했습니다.'); }
       };
     })();
@@ -2856,6 +2890,7 @@
       else if (p === 'admins') pageAdmins();
       else if (p === 'reports') pageReports(arg);
       else if (p === 'security') pageSecurity();
+      else if (p === 'myaccount') pageMyAccount();
       else if (p === 'audit') pageAudit();
       else if (p === 'inventory') { var iv = arg.split('/')[0]; if (iv) pageInvDetail(iv); else pageInventory(); }
       else if (p === 'inv-scan') pageInvScan(arg);
@@ -2908,17 +2943,17 @@
       if (DEMO) S.me = { sabun: '99999012', role: params.get('role') || 'main', name: '배병욱', dept: '전산지원파트', title: '파트장' };
       $app.innerHTML = '<div style="padding:40px;text-align:center;color:#5c5c5c">불러오는 중…</div>';
       await loadAll();
+      try { var gl = DEMO ? demoSec('get_logout') : await secCall('get_logout'); S.idleMinutes = gl.auto_logout_minutes || 30; } catch (e) { S.idleMinutes = 30; }   // v1.9.12: 로그아웃 시간을 서버 설정값으로
       window.addEventListener('hashchange', route); route();
       if (!DEMO) { startSupportPoll(); startIdleTimer(); }
     } catch (e) { $app.innerHTML = '<div style="padding:40px"><h1>오류</h1><p class="err">' + esc(e.message || e) + '</p><p class="note">config.js 의 주소와 키, DB 구조(schema.sql) 실행 여부를 확인하세요.</p></div>'; console.error(e); }
   }
-  // ---------- v1.9.11: 자동 로그아웃 (30분 미조작) ----------
-  var IDLE_WARN_MS = 25 * 60 * 1000, IDLE_OUT_MS = 30 * 60 * 1000;
+  // ---------- v1.9.11: 자동 로그아웃 (v1.9.12: 10/30/60분 중 선택, S.idleMinutes) ----------
   var idleWarnT = null, idleOutT = null, idleToastEl = null, idleLast = 0;
   function idleClearToast() { if (idleToastEl) { idleToastEl.remove(); idleToastEl = null; } }
   function idleShowWarn() {
     idleToastEl = document.createElement('div'); idleToastEl.className = 'notice'; idleToastEl.style.background = '#2a2f38'; idleToastEl.style.color = '#fff';
-    idleToastEl.innerHTML = '<b>5분 후 자동 로그아웃됩니다</b><div class="nsub" style="color:#d8dde3">화면을 움직이거나 아무 키나 누르면 계속 사용할 수 있습니다.</div>';
+    idleToastEl.innerHTML = '<b>곧 자동 로그아웃됩니다</b><div class="nsub" style="color:#d8dde3">화면을 움직이거나 아무 키나 누르면 계속 사용할 수 있습니다.</div>';
     idleToastEl.onclick = function () { idleResetTimer(); };
     document.body.appendChild(idleToastEl);
   }
@@ -2930,8 +2965,9 @@
   function idleResetTimer() {
     if (!S.me) return;
     idleClearToast(); clearTimeout(idleWarnT); clearTimeout(idleOutT);
-    idleWarnT = setTimeout(idleShowWarn, IDLE_WARN_MS);
-    idleOutT = setTimeout(idleDoLogout, IDLE_OUT_MS);
+    var mins = S.idleMinutes || 30, outMs = mins * 60 * 1000, warnMs = Math.max(outMs - 5 * 60 * 1000, Math.floor(outMs * 0.5));   // 만료 5분 전 경고(10분처럼 짧으면 절반 지점)
+    idleWarnT = setTimeout(idleShowWarn, warnMs);
+    idleOutT = setTimeout(idleDoLogout, outMs);
   }
   function idleOnActivity() {
     var now = Date.now(); if (now - idleLast < 5000) return; idleLast = now;   // 너무 자주 재설정하지 않도록 5초 간격으로만 처리
