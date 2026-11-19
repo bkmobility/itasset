@@ -304,3 +304,14 @@ body.viewer .wonly{display:none!important}
 .ctbl tr.on td{background:#e7f1fb}.ctbl tr.tot td{background:#fafbfc}
 
 .allmenu a.dngm{color:#c42b1c;border-top:1px solid #eee;margin-top:3px;padding-top:9px}.allmenu a.dngm:hover{background:#fbe9e7;color:#c42b1c}
+
+/* ===== v1.9.7: 엑셀식 열 필터 ===== */
+.fltpop{position:absolute;z-index:9999;width:268px;background:#fff;border:1px solid #9aa3ad;box-shadow:0 8px 22px rgba(0,0,0,.2);font-size:12px;border-radius:2px}
+.fltpop .fi{display:block;padding:7px 12px;border-bottom:1px solid #eef0f3;color:#1f1f1f;cursor:pointer;text-decoration:none}
+.fltpop .fi:hover{background:#eef4fb}.fltpop .fi.fon{color:#0f6cbd}.fltpop .fi.dis{color:#b0b6bf;cursor:default}.fltpop .fi.dis:hover{background:none}
+.fltpop .fq{padding:8px 10px}.fltpop .fq input{width:100%;box-sizing:border-box;height:28px}
+.fltpop .fl{margin:0 10px;border:1px solid #cfd6df;max-height:230px;overflow:auto;padding:4px}
+.fltpop .fl label{display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer}.fltpop .fl label:hover{background:#f3f7fc}
+.fltpop .fl label span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fltpop .fl em{font-style:normal;color:#8a8a8a;font-size:11px}
+.fltpop .fb{padding:10px;display:flex;justify-content:flex-end;gap:8px}
+.sortbar .fchip button{border:0;background:none;cursor:pointer;color:#0f6cbd;margin-left:4px}

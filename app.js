@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.6 - 관리자 웹 (정적 페이지, Supabase 연동) */
+/* IT 자산관리시스템 v1.9.7 - 관리자 웹 (정적 페이지, Supabase 연동) */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -228,8 +228,21 @@
     if (t === 'd') { var x = String(a), y = String(b); return x < y ? -1 : x > y ? 1 : 0; }
     return String(a).localeCompare(String(b), 'ko', { numeric: true, sensitivity: 'base' });
   }
-  // cols: { 키: { f: 값 꺼내는 함수, t: 's'|'d'|'ip'|'n', l: 이름 } }. 비어 있는 값은 오름·내림 모두 맨 아래, 같은 값은 처음 순서 유지
+  // v1.9.7: 엑셀식 열 필터 (머리글 ▾ → 오름·내림 정렬 + 값 체크 목록). cols: { 키: { f: 값 꺼내는 함수, t: 's'|'d'|'ip'|'n', l: 이름 } }
+  // 비어 있는 값은 오름·내림 모두 맨 아래, 같은 값은 처음 순서 유지
+  var FLT = {}, FALL = {}, FREDO = {}, EMPTYV = '(빈 값)';
+  function fval(c, row) {
+    var v = c.f(row); if (v == null || v === '') return EMPTYV;
+    v = String(v); return c.t === 'd' ? v.slice(0, 10) : v;
+  }
+  function fltPass(row, cols, fl, skipK) {
+    for (var k in fl) { if (k === skipK || !cols[k]) continue; if (fl[k].indexOf(fval(cols[k], row)) < 0) return false; }
+    return true;
+  }
   function sortRows(arr, key, cols) {
+    FALL[key] = { arr: arr, cols: cols };
+    var fl = FLT[key];
+    if (fl && Object.keys(fl).length) arr = arr.filter(function (r) { return fltPass(r, cols, fl); });
     var s0 = SORT[key]; if (!s0 || !cols[s0.k]) return arr;
     var c = cols[s0.k], dir = s0.d === 'desc' ? -1 : 1;
     return arr.map(function (x, i) { return [x, i]; }).sort(function (p, q) {
@@ -239,22 +252,65 @@
     }).map(function (x) { return x[0]; });
   }
   function thS(key, k, label, cls) {
-    var s0 = SORT[key], on = s0 && s0.k === k, ar = on ? (s0.d === 'desc' ? '▼' : '▲') : '⇅';
-    return '<th class="srt' + (on ? ' on' : '') + (cls ? ' ' + cls : '') + '" data-srt="' + key + '|' + k + '" title="누르면 정렬 (▲ 오름 → ▼ 내림 → 해제)">' + label + ' <i>' + ar + '</i></th>';
+    var s0 = SORT[key], on = s0 && s0.k === k, fo = FLT[key] && FLT[key][k], ar = fo ? '⛉' : on ? (s0.d === 'desc' ? '▼' : '▲') : '▾';
+    return '<th class="srt' + (on || fo ? ' on' : '') + (cls ? ' ' + cls : '') + '" data-srt="' + key + '|' + k + '" title="누르면 정렬·필터">' + label + ' <i>' + ar + '</i></th>';
   }
   function sortBar(key, cols, total) {
-    var s0 = SORT[key]; if (!s0 || !cols[s0.k]) return '';
-    return '<div class="sortbar"><span class="fchip on">정렬: ' + esc(cols[s0.k].l) + ' ' + (s0.d === 'desc' ? '▼ 내림차순' : '▲ 오름차순') + '</span>' + (total != null ? '<span class="note">' + total.toLocaleString() + '건을 정렬해서 보여줍니다</span>' : '') + '<a href="#" data-sclr="' + key + '">정렬 해제</a></div>';
+    var s0 = SORT[key], fl = FLT[key] || {}, fk = Object.keys(fl).filter(function (k) { return cols[k]; }), h = '';
+    if (!(s0 && cols[s0.k]) && !fk.length) return '';
+    if (s0 && cols[s0.k]) h += '<span class="fchip on">정렬: ' + esc(cols[s0.k].l) + ' ' + (s0.d === 'desc' ? '▼ 내림차순' : '▲ 오름차순') + '</span><a href="#" data-sclr="' + key + '">정렬 해제</a>';
+    fk.forEach(function (k) { var v = fl[k]; h += '<span class="fchip on">' + esc(cols[k].l) + ': ' + esc(v.length ? v[0] + (v.length > 1 ? ' 외 ' + (v.length - 1) : '') : '(없음)') + '<button type="button" data-fx="' + key + '|' + k + '" title="해제">✕</button></span>'; });
+    if (fk.length) h += '<a href="#" data-fclr="' + key + '">필터 모두 해제</a>';
+    return '<div class="sortbar"><span class="note">적용된 조건</span>' + h + '</div>';
   }
-  function bindSort(key, redo) {
-    $$('th[data-srt^="' + key + '|"]').forEach(function (t) {
-      t.onclick = function () {
-        var k = t.dataset.srt.split('|')[1], s0 = SORT[key];
-        if (!s0 || s0.k !== k) SORT[key] = { k: k, d: 'asc' }; else if (s0.d === 'asc') s0.d = 'desc'; else delete SORT[key];
-        redo();
+  function closeFlt() { var p = document.getElementById('fltpop'); if (p) p.parentNode.removeChild(p); document.removeEventListener('mousedown', fltOut, true); }
+  function fltOut(e) { var p = document.getElementById('fltpop'); if (p && !p.contains(e.target)) closeFlt(); }
+  function openFlt(th, key, k) {
+    closeFlt();
+    var A = FALL[key]; if (!A || !A.cols[k]) return;
+    var c = A.cols[k], fl = FLT[key] || {}, rows = A.arr.filter(function (r) { return fltPass(r, A.cols, fl, k); }), cnt = {}, order = [];
+    rows.forEach(function (r) { var v = fval(c, r); if (cnt[v] == null) { cnt[v] = 0; order.push(v); } cnt[v]++; });
+    order.sort(function (x, y) { if (x === EMPTYV) return 1; if (y === EMPTYV) return -1; return cmpV(x, y, c.t); });
+    var cur = fl[k], more = order.length > 800, shown = order.slice(0, 800);
+    var p = document.createElement('div'); p.id = 'fltpop'; p.className = 'fltpop';
+    p.innerHTML = '<a class="fi" data-a="asc">⇅ 오름차순 정렬</a><a class="fi" data-a="desc">⇅ 내림차순 정렬</a>' + (cur ? '<a class="fi fon" data-a="clr">⛉ ‘' + esc(c.l) + '’ 필터 해제</a>' : '<a class="fi dis">⛉ ‘' + esc(c.l) + '’ 필터 해제</a>') +
+      '<div class="fq"><input type="text" id="fq" placeholder="검색" autocomplete="off"></div><div class="fl"><label class="fall"><input type="checkbox" id="fall"> <b>(모두 선택)</b></label>' +
+      shown.map(function (v, i) { return '<label class="fr" data-v="' + i + '"><input type="checkbox" class="fck" data-i="' + i + '"' + (!cur || cur.indexOf(v) >= 0 ? ' checked' : '') + '> <span>' + esc(v) + '</span><em>' + cnt[v].toLocaleString() + '</em></label>'; }).join('') + '</div>' +
+      (more ? '<div class="note" style="padding:2px 10px">값이 많아 앞 800개만 표시됩니다. 검색으로 좁혀 주세요.</div>' : '') + '<div class="fb"><button class="btn sm pri" id="fok" type="button">확인</button><button class="btn sm" id="fno" type="button">취소</button></div>';
+    document.body.appendChild(p);
+    var r = th.getBoundingClientRect(), x = Math.min(r.left + window.pageXOffset, window.pageXOffset + document.documentElement.clientWidth - 280), y = r.bottom + window.pageYOffset + 2;
+    p.style.left = Math.max(4, x) + 'px'; p.style.top = y + 'px';
+    var cks = [].slice.call(p.querySelectorAll('.fck')), all = p.querySelector('#fall');
+    function vis(l) { return l.style.display !== 'none'; }
+    function syncAll() { var v = cks.filter(function (q) { return vis(q.parentNode); }); all.checked = v.length > 0 && v.every(function (q) { return q.checked; }); }
+    syncAll();
+    all.onchange = function () { cks.forEach(function (q) { if (vis(q.parentNode)) q.checked = all.checked; }); };
+    cks.forEach(function (q) { q.onchange = syncAll; });
+    var fq = p.querySelector('#fq');
+    fq.oninput = function () { var t = fq.value.trim().toLowerCase(); cks.forEach(function (q) { q.parentNode.style.display = !t || shown[+q.dataset.i].toLowerCase().indexOf(t) >= 0 ? '' : 'none'; }); syncAll(); };
+    p.querySelectorAll('.fi[data-a]').forEach(function (a) {
+      a.onclick = function () {
+        var d = a.dataset.a; closeFlt();
+        if (d === 'clr') { delete FLT[key][k]; } else { SORT[key] = { k: k, d: d }; }
+        if (FREDO[key]) FREDO[key]();
       };
     });
+    p.querySelector('#fno').onclick = closeFlt;
+    p.querySelector('#fok').onclick = function () {
+      var sel = [], vs = {}; cks.forEach(function (q) { if (q.checked) sel.push(shown[+q.dataset.i]); });
+      if (more) { shown.forEach(function () { }); sel = sel.concat(order.slice(800).filter(function () { return !fq.value.trim(); })); }
+      FLT[key] = FLT[key] || {};
+      if (sel.length >= order.length) delete FLT[key][k]; else FLT[key][k] = sel;
+      closeFlt(); if (FREDO[key]) FREDO[key]();
+    };
+    setTimeout(function () { document.addEventListener('mousedown', fltOut, true); fq.focus(); }, 0);
+  }
+  function bindSort(key, redo) {
+    FREDO[key] = redo;
+    $$('th[data-srt^="' + key + '|"]').forEach(function (t) { t.onclick = function (e) { e.stopPropagation(); openFlt(t, key, t.dataset.srt.split('|')[1]); }; });
     $$('[data-sclr="' + key + '"]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); delete SORT[key]; redo(); }; });
+    $$('[data-fclr="' + key + '"]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); delete FLT[key]; redo(); }; });
+    $$('[data-fx^="' + key + '|"]').forEach(function (b) { b.onclick = function () { var k = b.dataset.fx.split('|')[1]; if (FLT[key]) delete FLT[key][k]; redo(); }; });
   }
 
   // ---------- v1.9.4: 로그인 계정(사번)·권한 ----------
@@ -300,7 +356,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.6</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.7</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -464,7 +520,7 @@
     var s0 = Math.max(0, i - 14), e0 = Math.min(text.length, i + q.length + 24);
     return (s0 > 0 ? '…' : '') + esc(text.slice(s0, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length, e0)) + (e0 < text.length ? '…' : '');
   }
-  var AC = {
+  var ACOL = {
     asset_no: { f: function (a) { return a.asset_no; }, t: 's', l: '관리번호' }, category: { f: function (a) { return a.category; }, t: 's', l: '자산분류' },
     manufacturer: { f: function (a) { return a.manufacturer; }, t: 's', l: '제조사' }, model: { f: function (a) { return a.model; }, t: 's', l: '모델명' },
     mfg_ym: { f: function (a) { return a.mfg_ym; }, t: 'd', l: '제조년월' }, status: { f: function (a) { return a.status; }, t: 's', l: '자산상태' },
@@ -490,7 +546,7 @@
       }
       if (q && !searchHas(a, q)) return false;
       return true;
-    }), 'assets', AC);
+    }), 'assets', ACOL);
   }
   var PS = 20;
   function pageAssets(partial) {
@@ -529,7 +585,7 @@
     }
     var innerHtml = (
       chipHtml + bulk +
-      sortBar('assets', AC, list.length) + '<div style="overflow:auto"><table class="tbl ctr"><thead><tr><th><input type="checkbox" id="all"></th>' + thS('assets', 'asset_no', '관리번호') + (qLow ? '<th>일치한 항목</th>' : '') + thS('assets', 'category', '자산분류') + thS('assets', 'manufacturer', '제조사') + thS('assets', 'model', '모델명') + thS('assets', 'mfg_ym', '제조년월') + thS('assets', 'status', '자산상태') + thS('assets', 'warr', '보증 (제조년월+5년)') + thS('assets', 'user_name', '사용자명') + thS('assets', 'dept', '소속명') + thS('assets', 'company', '회사') + thS('assets', 'title', '직책') + thS('assets', 'pc_name', '컴퓨터 이름', 'auto') + thS('assets', 'ip', 'IP', 'auto') + thS('assets', 'spec', '사양', 'auto') + thS('assets', 'last_seen', '최종 확인', 'auto') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      sortBar('assets', ACOL, list.length) + '<div style="overflow:auto"><table class="tbl ctr"><thead><tr><th><input type="checkbox" id="all"></th>' + thS('assets', 'asset_no', '관리번호') + (qLow ? '<th>일치한 항목</th>' : '') + thS('assets', 'category', '자산분류') + thS('assets', 'manufacturer', '제조사') + thS('assets', 'model', '모델명') + thS('assets', 'mfg_ym', '제조년월') + thS('assets', 'status', '자산상태') + thS('assets', 'warr', '보증 (제조년월+5년)') + thS('assets', 'user_name', '사용자명') + thS('assets', 'dept', '소속명') + thS('assets', 'company', '회사') + thS('assets', 'title', '직책') + thS('assets', 'pc_name', '컴퓨터 이름', 'auto') + thS('assets', 'ip', 'IP', 'auto') + thS('assets', 'spec', '사양', 'auto') + thS('assets', 'last_seen', '최종 확인', 'auto') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="pager"><span>' + (list.length ? ((F.page - 1) * PS + 1) + '–' + Math.min(list.length, F.page * PS) : 0) + ' / ' + list.length.toLocaleString() + '건</span><span><button class="btn sm" id="prev"' + (F.page <= 1 ? ' disabled' : '') + '>‹ 이전</button> ' + F.page + ' / ' + pages + ' <button class="btn sm" id="next"' + (F.page >= pages ? ' disabled' : '') + '>다음 ›</button></span></div>'
     );
     // v1.9.2: 위쪽 [QR코드 출력] — 선택한 항목이 있으면 선택한 것만, 없으면 검색·조건으로 걸러진 목록 전체
@@ -810,7 +866,7 @@
   }
 
   // ---------- 데이터 관리 (엑셀 업로드/다운로드) ----------
-  var ASSET_MAP = { asset_no: ['관리번호', '자산번호', 'QR번호', '자산코드'], category: ['자산분류', '분류', '자산유형'], manufacturer: ['제조사'], model: ['모델명', '모델'], mfg_ym: ['제조년월', '제조일'], status: ['자산상태', '상태'], user_name: ['사용자명', '사용자', '사용자 이름'], user_id: ['사용자 ID', '사용자ID', '사번', '사용자ID(사번)'], dept: ['소속명', '부서', '부서명', '조직명'], company: ['회사', '회사명', '법인', '법인명'], title: ['직책', '직위'], location: ['위치', '설치위치', '소속위치'], purchase_date: ['구매일', '구입일', '구매일자', '입고일자', '취득일자'], warranty_end: ['보증만료', '보증 만료', '보증만료일'], memo: ['비고', '메모'], serial_no: ['시리얼번호', '시리얼 번호', '시리얼', '일련번호', 'S/N'] };
+  var ASSET_MAP = { asset_no: ['관리번호', '자산번호', 'QR번호', '자산코드'], category: ['자산분류', '분류', '자산유형'], manufacturer: ['제조사'], model: ['모델명', '모델'], mfg_ym: ['제조년월', '제조일'], status: ['자산상태', '상태'], user_name: ['사용자명', '사용자', '사용자 이름'], user_id: ['사용자 ID', '사용자ID', '사번', '사용자ID(사번)'], dept: ['소속명', '부서', '부서명', '조직명'], company: ['회사', '회사명', '법인', '법인명'], title: ['직책', '직위'], location: ['위치', '설치위치', '소속위치'], purchase_date: ['구매일', '구입일', '구매일자', '입고일자', '취득일자'], warranty_end: ['보증만료', '보증 만료', '보증만료일'], memo: ['비고', '메모'], serial_no: ['시리얼 넘버', '시리얼넘버', '시리얼번호', '시리얼 번호', '시리얼', '일련번호', 'S/N'] };
   var EMP_MAP = {
     emp_no: ['사번', '사원번호', '직원번호', '인사ID', '인사아이디'], name: ['성명', '이름'],
     dept: ['조직명', '부서', '부서명'], team: ['본부/팀', '소속', '본부', '소속명'],
@@ -979,6 +1035,73 @@
       } catch (e) { fail(e); b.disabled = false; b.textContent = '적용'; if (/company/.test(String(e && e.message))) toast('SQL(update_v1.9.6.sql)을 실행했는지 확인하세요.'); }
     };
   }
+  // ---------- v1.9.7: 시리얼 번호 채우기 (엑셀 다시 올리기) ----------
+  function serialHtml() {
+    var n = S.assets.filter(function (a) { return a.serial_no; }).length;
+    return '<div class="card" style="margin-top:12px" id="ser_card"><h2>시리얼 번호 채우기 <span class="note" style="font-weight:400">처음 등록한 자산현황 엑셀의 ‘시리얼 넘버’를 읽어 대장의 빈 시리얼 번호를 채움</span></h2>' +
+      '<div class="note" style="margin:4px 0 8px">현재 대장에 시리얼 번호가 있는 자산 <b>' + n.toLocaleString() + '</b> / ' + S.assets.length.toLocaleString() + '건 · 관리번호(자산코드)로 짝을 맞추고, 대장에서 비어 있는 칸만 채웁니다.</div>' +
+      '<div class="drop"><input type="file" id="f_serial" accept=".xlsx,.xls,.csv"><div class="note" style="margin-top:6px">필수: 관리번호(자산코드), 시리얼 넘버(시리얼 번호)</div></div><div id="pv_serial" style="margin-top:10px"></div></div>';
+  }
+  function bindSerial() {
+    var inp = $('#f_serial'); if (!inp) return;
+    inp.onchange = function (e) {
+      var f = e.target.files[0]; if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        var pv = $('#pv_serial');
+        try {
+          var p = parseSheet(rd.result, { asset_no: ASSET_MAP.asset_no, serial_no: ASSET_MAP.serial_no }, 'asset_no');
+          if (p.cols.indexOf('asset_no') < 0 || p.cols.indexOf('serial_no') < 0) { pv.innerHTML = '<div class="err">관리번호(자산코드)와 시리얼 넘버(시리얼 번호) 항목을 모두 찾지 못했습니다. 첫 줄이 항목 이름인지 확인하세요.</div>'; return; }
+          var by = {}; S.assets.forEach(function (a) { by[String(a.asset_no).toUpperCase()] = a; });
+          var cnt = {}; p.rows.forEach(function (r) { if (r.serial_no) cnt[r.serial_no.toUpperCase()] = (cnt[r.serial_no.toUpperCase()] || 0) + 1; });
+          var fill = [], diff = [], same = 0, nomatch = 0, noxl = 0;
+          p.rows.forEach(function (r) {
+            var a = by[String(r.asset_no).toUpperCase()];
+            if (!a) { nomatch++; return; }
+            if (!r.serial_no) { noxl++; return; }
+            if (!a.serial_no) fill.push({ a: a, v: r.serial_no });
+            else if (String(a.serial_no).trim().toUpperCase() === r.serial_no.toUpperCase()) same++;
+            else diff.push({ a: a, v: r.serial_no });
+          });
+          var dupKeys = Object.keys(cnt).filter(function (k) { return cnt[k] > 1; }), dupN = dupKeys.reduce(function (t, k) { return t + cnt[k]; }, 0);
+          function draw(over) {
+            var tg = fill.length + (over ? diff.length : 0);
+            var dl = diff.slice(0, 8).map(function (x) { return '<tr><td class="mono">' + esc(x.a.asset_no) + '</td><td class="mono">' + esc(x.a.serial_no) + '</td><td class="mono">' + esc(x.v) + '</td></tr>'; }).join('');
+            pv.innerHTML = '<div class="card" style="background:#fafbfc"><h3>미리보기 <span class="note" style="font-weight:400">· ' + esc(f.name) + '</span></h3>' +
+              '<div class="kpis"><div class="kpi ok"><div class="t">채울 항목 (대장이 빈 칸)</div><div class="n">' + fill.length.toLocaleString() + '</div></div><div class="kpi warn"><div class="t">다른 값이 이미 있음</div><div class="n">' + diff.length.toLocaleString() + '</div></div><div class="kpi"><div class="t">이미 같음</div><div class="n">' + same.toLocaleString() + '</div></div><div class="kpi"><div class="t">엑셀에 시리얼 없음·대장에 없는 관리번호</div><div class="n">' + (noxl + nomatch).toLocaleString() + '</div></div></div>' +
+              '<div style="font-size:12px;margin:6px 0">다른 값이 이미 있으면 <label><input type="radio" name="ser_mode" value="keep"' + (over ? '' : ' checked') + '> 현재 값 유지</label> <label><input type="radio" name="ser_mode" value="over"' + (over ? ' checked' : '') + '> 엑셀 값으로 덮어쓰기</label></div>' +
+              (diff.length ? '<div style="max-height:200px;overflow:auto"><table class="tbl"><thead><tr><th>관리번호</th><th>현재 대장 값</th><th>엑셀 값</th></tr></thead><tbody>' + dl + '</tbody></table></div>' + (diff.length > 8 ? '<div class="note">상위 8건만 표시 (전체 ' + diff.length + '건)</div>' : '') : '') +
+              (dupKeys.length ? '<div class="note" style="margin-top:6px">같은 시리얼이 여러 자산에 있는 경우 ' + dupKeys.length + '종(' + dupN + '건)이 있습니다. 그대로 입력합니다. 예: ' + esc(dupKeys.slice(0, 3).join(', ')) + '</div>' : '') +
+              '<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="ser_cancel">취소</button><button class="btn pri" id="ser_go"' + (tg ? '' : ' disabled') + '>시리얼 채우기 (' + tg.toLocaleString() + '건)</button></div></div>';
+            $$('input[name=ser_mode]').forEach(function (r) { r.onchange = function () { draw(r.value === 'over'); }; });
+            $('#ser_cancel').onclick = function () { pv.innerHTML = ''; inp.value = ''; };
+            $('#ser_go').onclick = async function () {
+              var btn = this; btn.disabled = true;
+              var list = fill.concat(over ? diff : []);
+              try {
+                needWrite();
+                var aoa = [['관리번호', '변경 전', '변경 후']]; list.forEach(function (x) { aoa.push([x.a.asset_no, x.a.serial_no || '', x.v]); });
+                try { var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Sheet1'); XLSX.writeFile(wb, '시리얼_변경내역_' + new Date().toISOString().slice(0, 10) + '.xlsx'); } catch (x1) { }
+                auditPost({ action: 'import', target: '자산 대장 · 시리얼 번호', summary: '시리얼 번호 일괄 채움 · ' + list.length.toLocaleString() + '건', detail: { via: '데이터 관리 · 시리얼 번호 채우기', note: esc(f.name), changes: [{ k: '시리얼 번호', from: '공란 ' + fill.length + '건' + (over ? ' · 다른 값 ' + diff.length + '건' : ''), to: '엑셀 값 ' + list.length + '건' }] } });
+                var now = new Date().toISOString();
+                for (var i = 0; i < list.length; i += 500) {
+                  btn.textContent = '채우는 중… ' + Math.min(i + 500, list.length).toLocaleString() + ' / ' + list.length.toLocaleString();
+                  var chunk = list.slice(i, i + 500).map(function (x) { return { asset_no: x.a.asset_no, serial_no: x.v, updated_at: now }; });
+                  if (!DEMO) { AC = { skip: 1, table: 'assets', t: Date.now() }; var r = await sb.from('assets').upsert(chunk, { onConflict: 'asset_no' }); if (r.error) throw r.error; }
+                }
+                list.forEach(function (x) { x.a.serial_no = x.v; });
+                if (!DEMO) await loadAll();
+                toast('시리얼 번호 ' + list.length.toLocaleString() + '건을 채웠습니다.'); pageData();
+                $('#pv_wide').innerHTML = '<div class="badge b-ok">완료: 시리얼 번호 ' + list.length.toLocaleString() + '건 (변경 내역 엑셀을 내려받았습니다)</div>';
+              } catch (er) { fail(er); btn.disabled = false; }
+            };
+          }
+          draw(false);
+        } catch (er) { fail(er); }
+      };
+      rd.readAsArrayBuffer(f);
+    };
+  }
   function pageData() {
     var cats = groupCount(S.assets, function (a) { return a.category; }).map(function (x) { return x[0]; });
     var stats = groupCount(S.assets, function (a) { return a.status; }).map(function (x) { return x[0]; });
@@ -998,9 +1121,9 @@
       '<div class="dsep"></div>' + sec('다운로드', '현재 시스템에 등록된 인사 명단') +
       '<div class="row wrap"><label style="font-size:12px"><input type="radio" name="dl_hr" value="act" checked> 재직자만 (' + act.toLocaleString() + '명)</label><label style="font-size:12px"><input type="radio" name="dl_hr" value="all"> 퇴사 포함 (' + S.employees.length.toLocaleString() + '명)</label><span class="grow"></span><button class="btn pri" id="dl_hr">엑셀 내려받기</button></div>' +
       '<div class="note" style="margin-top:8px">퇴사 포함 파일을 다시 올려도 "재직상태"가 퇴사인 사람은 재직으로 되돌아가지 않습니다. <button class="btn sm" id="tpl_hr">빈 양식 내려받기</button></div></div></div>' +
-      coAssignHtml() +
+      coAssignHtml() + serialHtml() +
       '<div id="pv_wide" style="margin-top:12px"></div>');
-    bindCoAssign();
+    bindCoAssign(); bindSerial();
     function filt() { return S.assets.filter(function (a) { return (!$('#dl_cat').value || a.category === $('#dl_cat').value) && (!$('#dl_st').value || a.status === $('#dl_st').value); }); }
     function cnt() { $('#dl_cnt').innerHTML = '해당 <b style="color:#1a1a1a">' + filt().length.toLocaleString() + '</b>건'; }
     $('#dl_cat').onchange = cnt; $('#dl_st').onchange = cnt; cnt();
