@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.28 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.29 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -96,9 +96,9 @@
     var m = {}; arr.forEach(function (x) { var k = fn(x) || '(없음)'; m[k] = (m[k] || 0) + 1; });
     return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; });
   }
-  function bars(list, color, kind) {
+  function bars(list, color, kind) {   // v1.9.29: 라벨을 막대 위 줄로 올려 긴 이름도 안 잘리게, 막대는 더 얇게
     var max = list.length ? list[0][1] : 1;
-    return list.map(function (r) { return '<div class="bar' + (kind ? ' go" data-go="' + kind + ':' + esc(r[0]) + '"' : '"') + '><div class="l" title="' + esc(r[0]) + '">' + esc(r[0]) + '</div><div class="b"><i style="width:' + Math.max(2, r[1] / max * 100) + '%;' + (color ? 'background:' + color : '') + '"></i></div><div class="v">' + r[1].toLocaleString() + '</div></div>'; }).join('') || '<div class="note">데이터가 없습니다.</div>';
+    return list.map(function (r) { return '<div class="bar2' + (kind ? ' go" data-go="' + kind + ':' + esc(r[0]) + '"' : '"') + '><div class="bar2row"><span class="bar2l">' + esc(r[0]) + '</span><b class="bar2v">' + r[1].toLocaleString() + '</b></div><div class="bar2track"><i style="width:' + Math.max(2, r[1] / max * 100) + '%;' + (color ? 'background:' + color : '') + '"></i></div></div>'; }).join('') || '<div class="note">데이터가 없습니다.</div>';
   }
   function getHold() { try { return JSON.parse(localStorage.getItem(HOLD_KEY) || '{}'); } catch (e) { return {}; } }
   function setHold(h) { try { localStorage.setItem(HOLD_KEY, JSON.stringify(h)); } catch (e) { } }
@@ -408,7 +408,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.28</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.29</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -499,7 +499,7 @@
     if (isMain()) $$('.ar.clk').forEach(function (el) { el.onclick = function () { AUDV = { from: el.dataset.at, to: el.dataset.at, actor: '', target: el.dataset.tg, q: '', chip: 'all', page: 0 }; location.hash = '#/audit'; }; });
     $$('.corow').forEach(function (el) { el.onclick = function () { DASH_CO = el.getAttribute('data-co'); pageDashboard(); }; });
     $$('[data-go]').forEach(function (el) { var p0 = el.getAttribute('data-go'); if (p0.indexOf('ipOrg:') === 0) return; el.onclick = function () { var p = el.getAttribute('data-go'), i = p.indexOf(':'); goAssets(p.slice(0, i), p.slice(i + 1), el.getAttribute('data-co')); }; });
-    $$('.bar.go[data-go^="ipOrg:"]').forEach(function (el) { el.onclick = function () { goIp('org', el.getAttribute('data-go').slice(6)); }; });
+    $$('.bar2.go[data-go^="ipOrg:"]').forEach(function (el) { el.onclick = function () { goIp('org', el.getAttribute('data-go').slice(6)); }; });
   }
   // ---------- v1.9.6: 회사별 자산 상세 ----------
   function pageCompany(arg) {
@@ -668,7 +668,6 @@
     function updTop() {
       var b = $('#qrtop'); if (!b) return;
       b.textContent = 'QR코드 출력 (' + (nIn > 0 ? '선택 ' + nIn.toLocaleString() + '개' : hasFilter ? '조회 ' + list.length.toLocaleString() + '건' : '전체 ' + list.length.toLocaleString() + '건') + ')';
-      var da = $('#a_delall'); if (da) { da.textContent = '조회 ' + list.length.toLocaleString() + '건 전체 삭제…'; da.disabled = !list.length; da.onclick = function () { assetDeleteDlg('all', list); }; }
       b.disabled = !list.length;
       b.onclick = function () {
         if (!nIn && !hasFilter && !confirm('조건이 없어 전체 ' + list.length.toLocaleString() + '건이 출력 대상입니다. 계속할까요?')) return;
@@ -683,7 +682,7 @@
       sel('cat', '자산분류: 전체', cats, F.cat) + sel('status', '자산상태: 전체', stats, F.status) +
       '<select id="collect"><option value="">수집상태: 전체</option><option value="today"' + (F.collect === 'today' ? ' selected' : '') + '>오늘 확인</option><option value="stale"' + (F.collect === 'stale' ? ' selected' : '') + '>7일 이상 미확인</option><option value="none"' + (F.collect === 'none' ? ' selected' : '') + '>미수집 PC</option><option value="mismatch"' + (F.collect === 'mismatch' ? ' selected' : '') + '>사용자 불일치</option></select>' +
       (F.cat === '모니터' ? '<select id="linkst"><option value="">연결 상태: 전체</option><option value="linked"' + (F.linkst === 'linked' ? ' selected' : '') + '>연결됨</option><option value="unlinked"' + (F.linkst === 'unlinked' ? ' selected' : '') + '>미연결</option></select>' + (!isViewer() ? '<button class="btn" id="b-relink" type="button">⟳ 전체 재매칭</button>' : '') : '') +
-      '<button class="btn pri" id="qrtop">QR코드 출력</button><button class="btn" id="xl">엑셀 다운로드</button>' + (isMain() ? '<button class="btn dng" id="a_delall" type="button">전체 삭제…</button>' : '') + '<button class="btn pri wonly" id="a_new" type="button">＋ 직접 등록</button></div>' +
+      '<button class="btn pri" id="qrtop">QR코드 출력</button><button class="btn" id="xl">엑셀 다운로드</button><button class="btn pri wonly" id="a_new" type="button">＋ 직접 등록</button></div>' +   // v1.9.29: 상단 상시 노출 "전체 삭제…" 버튼 제거 — "전체 선택 ▾" 안의 m-del로만 남김
       '<div class="note" style="margin:6px 0">기존 시스템 항목 · <span style="color:#0f6cbd">파란 배경 = 프로그램이 자동으로 채우는 항목</span> · <span class="dot" style="background:#1e8e3e"></span>오늘 <span class="dot" style="background:#faad14"></span>3일 이상 <span class="dot" style="background:#c42b1c"></span>7일 이상 미확인</div>' +
       '<div id="alist">' + innerHtml + '</div>');
     function sel(id, ph, opts, cur) { return '<select id="' + id + '"><option value="">' + ph + '</option>' + opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>'; }
@@ -3224,7 +3223,7 @@
       el.onclick = function (e) { e.preventDefault(); var k = el.getAttribute('data-go'); if (k === 'total' || k === 'orgcnt') location.hash = '#/ip/list'; else goIp('chk', k); };
     });
     // 소속별 막대(위 bars())는 data-go="org:소속명" 형태로 생성됨
-    $$('.bar.go[data-go^="org:"]', $('#view')).forEach(function (el) { el.onclick = function () { var org = el.getAttribute('data-go').slice(4); goIp('org', org); }; });
+    $$('.bar2.go[data-go^="org:"]', $('#view')).forEach(function (el) { el.onclick = function () { var org = el.getAttribute('data-go').slice(4); goIp('org', org); }; });
     // v1.9.18: 소속별 대역 도넛·범례 숫자를 눌러 해당 소속+대역으로 바로 이동
     $$('[data-go^="band:"]', $('#view')).forEach(function (el) { el.onclick = function () { goIpOrgBand(el.getAttribute('data-co'), el.getAttribute('data-go').slice(5)); }; });
   }
@@ -3739,7 +3738,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.28', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.29', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -3751,7 +3750,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환)'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;

@@ -37,6 +37,15 @@ h1{margin:0;font-size:18px;font-weight:600}
 .bar .b{flex:1;height:9px;background:#eee;border-radius:5px}
 .bar .b i{display:block;height:9px;border-radius:5px;background:#0f6cbd}
 .bar .v{width:48px;text-align:right;font-weight:600}
+.bar2{margin:7px 0;font-size:11.5px}   /* v1.9.29: 라벨을 막대 위 줄로 올린 막대그래프 */
+.bar2row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:3px}
+.bar2l{overflow-wrap:anywhere}
+.bar2v{font-weight:600;flex-shrink:0}
+.bar2track{height:6px;background:#eee;border-radius:4px}
+.bar2track i{display:block;height:6px;border-radius:4px;background:#0f6cbd}
+.bar2.go{cursor:pointer;border-radius:6px;padding:2px 4px;margin:5px -4px}
+.bar2.go:hover{background:#e7f1fb}
+.bar2.go:hover .bar2l{color:#0f6cbd;font-weight:600}
 .btn{height:30px;padding:0 12px;border:1px solid #c8c8c8;border-radius:6px;background:#fff;font-size:12px;white-space:nowrap}
 .btn.pri{background:#0f6cbd;border-color:#0f6cbd;color:#fff;font-weight:600}
 .btn.sm{height:26px;padding:0 10px}
