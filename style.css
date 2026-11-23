@@ -49,6 +49,10 @@ textarea{height:70px;padding:8px 10px;width:100%}
 .tbl th{background:#f3f4f6;font-size:11px;color:#5c5c5c;text-align:left;padding:8px;border-bottom:1px solid #e0e0e0;white-space:nowrap}
 .tbl td{padding:7px 8px;font-size:11.5px;border-bottom:1px solid #eee;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
 .tbl tr.clk{cursor:pointer}.tbl tr.clk:hover td{background:#f7fbff}
+/* v1.9.20: 목록 표 헤더 고정(스크롤해도 th가 상단에 붙어있음) — 자산 관리·IP 대장·인사 정보·이력 관리·관리자 */
+.tscroll{max-height:calc(100vh - 300px);min-height:220px;overflow:auto;border:1px solid #e5e5e5;border-radius:6px}
+.tscroll .tbl{border:0;border-radius:0;overflow:visible}
+.tscroll table.tbl thead th{position:sticky;top:0;z-index:2;box-shadow:0 1px 0 #e0e0e0}
 .tbl td.auto,.tbl th.auto{background:#f2f8fe}
 .tbl th.auto{color:#0f6cbd}
 .mono{font-family:Consolas,monospace}
