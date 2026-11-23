@@ -397,14 +397,14 @@
   // v1.9.6: 자산 유형 묶음 (대시보드 고정 순서: 모니터 → PC → 노트북 → 스캐너 → 기타)
   var CATG = ['모니터', 'PC', '노트북', '스캐너', '기타'], CATG_COL = { '모니터': '#2f7df6', 'PC': '#1e8e3e', '노트북': '#c42b1c', '스캐너': '#e9a100', '기타': '#b0b7c3' };
   function catGrp(c) { c = String(c || ''); return c === '모니터' ? '모니터' : (c === 'PC' || c === 'PC 본체') ? 'PC' : c === '노트북' ? '노트북' : /스캐너/.test(c) ? '스캐너' : '기타'; }
-  var ROUTES = [['dashboard', '대시보드'], ['assets', '자산 관리'], ['ip', 'IP 관리'], ['check', '현황 점검'], ['support', '원격 지원'], ['employees', '인사 정보'], ['data', '데이터 관리'], ['inventory', '실사 (재물조사)']];
-  function navRoutes() { if (isMain()) return ROUTES.concat([['audit', '이력 관리'], ['admins', '관리자'], ['reports', '보고서'], ['security', '보안 설정']]); if (!isViewer()) return ROUTES.concat([['myaccount', '내 계정']]); return ROUTES; }   // v1.9.5: 이력 관리·관리자·보고서는 메인 관리자 전용 / v1.9.11: 보안 설정도 메인 관리자 전용 / v1.9.12: 일반 관리자는 "내 계정"에서 본인 OTP 관리
-  function denyPage() { shell('dashboard', '<div class="card" style="text-align:center;padding:30px 20px;max-width:560px;margin:30px auto"><div style="font-size:30px">🔒</div><h2 style="margin:6px 0">접근 권한이 없습니다</h2><div class="note" style="line-height:1.8">이 메뉴(이력 관리 · 관리자 · 보고서)는 <b>메인 관리자</b>만 열 수 있습니다.<br>주소를 직접 입력해 들어와도 이 화면이 표시됩니다.</div><div style="margin-top:14px"><a class="btn pri" href="#/dashboard">대시보드로 이동</a></div></div>'); }
+  var ROUTES = [['dashboard', '대시보드'], ['assets', '자산 관리'], ['ip', 'IP 관리'], ['check', '현황 점검'], ['support', '원격 지원'], ['employees', '인사 정보'], ['inventory', '실사 (재물조사)']];
+  function navRoutes() { if (isMain()) return ROUTES.concat([['data', '데이터 관리'], ['audit', '이력 관리'], ['admins', '관리자'], ['reports', '보고서'], ['security', '보안 설정']]); if (!isViewer()) return ROUTES.concat([['myaccount', '내 계정']]); return ROUTES; }   // v1.9.5: 이력 관리·관리자·보고서는 메인 관리자 전용 / v1.9.11: 보안 설정도 메인 관리자 전용 / v1.9.12: 일반 관리자는 "내 계정"에서 본인 OTP 관리 / v1.9.18: 데이터 관리(엑셀 업로드)도 메인 관리자 전용으로 변경
+  function denyPage() { shell('dashboard', '<div class="card" style="text-align:center;padding:30px 20px;max-width:560px;margin:30px auto"><div style="font-size:30px">🔒</div><h2 style="margin:6px 0">접근 권한이 없습니다</h2><div class="note" style="line-height:1.8">이 메뉴(데이터 관리 · 이력 관리 · 관리자 · 보고서)는 <b>메인 관리자</b>만 열 수 있습니다.<br>주소를 직접 입력해 들어와도 이 화면이 표시됩니다.</div><div style="margin-top:14px"><a class="btn pri" href="#/dashboard">대시보드로 이동</a></div></div>'); }
   function shell(active, html) {
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/" style="text-decoration:none;color:inherit">IT Asset<span>v1.9.18</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.18</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -2994,7 +2994,7 @@
       else if (p === 'inventory') { var iv = arg.split('/')[0]; if (iv) pageInvDetail(iv); else pageInventory(); }
       else if (p === 'inv-scan') pageInvScan(arg);
       else if (p === 'scan') pageScan(arg);
-      else if (p === 'data' || p === 'import') pageData();
+      else if (p === 'data' || p === 'import') { if (!isMain()) denyPage(); else pageData(); }
       else pageDashboard();
     } catch (e) { fail(e); }
   }
@@ -3144,7 +3144,7 @@
     var legendCards = orgsForLegend.map(function (org) {
       var rows = S.ips.filter(function (r) { return r.org === org; });
       var parts = top4(rows, function (r) { return r.band || '미기재'; }, function (band) { return ipBandColor(org, band); });
-      return '<div class="card"><h3>' + esc(org) + ' <span class="note" style="font-weight:400">대역별 ' + rows.length.toLocaleString() + '건</span></h3><div class="dn">' + donut(parts, rows.length.toLocaleString()) + '<div class="lgs">' + legend(parts) + '</div></div></div>';
+      return '<div class="card"><h3>' + esc(org) + ' <span class="note" style="font-weight:400">대역별 ' + rows.length.toLocaleString() + '건 · 누르면 해당 목록</span></h3><div class="dn">' + donut(parts, rows.length.toLocaleString(), 'band', org) + '<div class="lgs">' + legend(parts, 'band', org) + '</div></div></div>';
     }).join('');
     shell('ip', '<h1>IP 관리</h1>' + ipTabs('summary') + cards + '<div class="dgrid">' + orgCard + '</div><div class="dgrid4">' + legendCards + '</div>');
     $$('.dk[data-go]', $('#view')).forEach(function (el) {
@@ -3152,6 +3152,12 @@
     });
     // 소속별 막대(위 bars())는 data-go="org:소속명" 형태로 생성됨
     $$('.bar.go[data-go^="org:"]', $('#view')).forEach(function (el) { el.onclick = function () { var org = el.getAttribute('data-go').slice(4); goIp('org', org); }; });
+    // v1.9.18: 소속별 대역 도넛·범례 숫자를 눌러 해당 소속+대역으로 바로 이동
+    $$('[data-go^="band:"]', $('#view')).forEach(function (el) { el.onclick = function () { goIpOrgBand(el.getAttribute('data-co'), el.getAttribute('data-go').slice(5)); }; });
+  }
+  function goIpOrgBand(org, band) {
+    IPF.q = ''; IPF.org = org || ''; IPF.floor = ''; IPF.band = (band === '미기재' ? '' : band); IPF.kind = ''; IPF.status = ''; IPF.chk = ''; IPF.page = 1; IPF.sel = {};
+    location.hash = '#/ip/list';
   }
   function ipFiltered() {
     var flags = ipCalc(), q = IPF.q.trim().toLowerCase();
