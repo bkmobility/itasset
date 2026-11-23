@@ -154,6 +154,8 @@ a.kpi{display:block;color:inherit}a.kpi:hover{border-color:#bcd7f2}
 .allwrap{position:relative;display:inline-block}
 .allmenu{position:absolute;left:0;top:30px;min-width:300px;background:#fff;border:1px solid #cfd6df;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.2);padding:6px;z-index:20}
 .combo{position:relative;display:inline-block;width:200px}
+.combo .xbtn{position:absolute;right:7px;top:7px;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:#cfd6df;color:#fff;font-size:10px;cursor:pointer}
+.combo .xbtn:hover{background:#8a8f98}
 .combo input{width:100%;box-sizing:border-box}
 .combolist{position:absolute;top:32px;left:0;width:100%;background:#fff;border:1px solid #cfd6df;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.2);max-height:220px;overflow-y:auto;z-index:20}
 .combolist div{padding:6px 10px;font-size:12px;cursor:pointer}
