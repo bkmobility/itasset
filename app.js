@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.18 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.19 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -404,7 +404,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.18</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.19</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -1592,9 +1592,10 @@
   function pageLoginOtpSetup(sabun, password, secret, otpauth) {
     var q = qrcode(0, 'M'); q.addData(otpauth); q.make();
     var key = (secret.match(/.{1,4}/g) || [secret]).join(' ');
-    $app.innerHTML = '<div class="login" style="width:420px"><div class="lgh"><div class="lgt">2단계 인증(OTP) 등록이 필요합니다</div><div class="lgs">회사 정책에 따라 이 계정은 2단계 인증을 설정해야 로그인할 수 있습니다</div></div>' +
-      '<div style="display:flex;gap:16px;align-items:flex-start;margin:10px 0">' + q.createSvgTag({ cellSize: 4, margin: 0 }) +
-      '<div style="flex:1"><div class="note">Google Authenticator(또는 Microsoft Authenticator) 앱으로 QR코드를 스캔하세요.<br>스캔할 수 없으면 아래 키를 앱에 직접 입력하세요.</div><div class="pwbox" style="margin-top:6px"><code>' + esc(key) + '</code></div></div></div>' +
+    $app.innerHTML = '<div class="login otpsetup"><div class="lgh"><div class="lgt">2단계 인증(OTP) 등록이 필요합니다</div><div class="lgs">회사 정책에 따라 이 계정은 2단계 인증을 설정해야 로그인할 수 있습니다</div></div>' +
+      '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin:10px 0 16px">' + q.createSvgTag({ cellSize: 5, margin: 0 }) +
+      '<div class="note" style="text-align:center">Google Authenticator(또는 Microsoft Authenticator) 앱으로<br>QR코드를 스캔하세요. 스캔할 수 없으면 아래 키를 앱에 직접 입력하세요.</div>' +
+      '<div class="pwbox" style="width:100%"><code>' + esc(key) + '</code></div></div>' +
       '<label>앱에 표시된 6자리 코드</label><input type="text" id="setupc" inputmode="numeric" maxlength="6" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:6px;font-size:20px">' +
       '<div style="margin-top:16px"><button class="btn pri" id="setupgo" style="width:100%;height:36px">등록 완료하고 로그인</button></div>' +
       '<div class="err" id="setuper"></div><div class="note" style="margin-top:10px;font-size:11px"><a href="#" id="setupback">‹ 사번으로 돌아가기</a></div></div>';
@@ -3177,7 +3178,7 @@
     });
   }
   var IPCOL = {
-    org: { f: function (r) { return r.org; }, t: 's', l: '소속' }, dept1: { f: function (r) { return r.dept1; }, t: 's', l: '본부/부문' }, floor: { f: function (r) { return r.floor; }, t: 's', l: '층' },
+    org: { f: function (r) { return r.org; }, t: 's', l: '소속' }, dept1: { f: function (r) { return r.dept2; }, t: 's', l: '팀/파트' }, floor: { f: function (r) { return r.floor; }, t: 's', l: '층' },   // v1.9.19: IP 대장 목록 열을 본부/부문(dept1) 대신 팀/파트(dept2)로 표시
     band: { f: function (r) { return r.band; }, t: 's', l: '대역' }, ip: { f: function (r) { return r.ip; }, t: 'ip', l: 'IP' },
     kind: { f: function (r) { return r.kind; }, t: 's', l: '구분' }, user_name: { f: function (r) { return r.user_name; }, t: 's', l: '사용자' },
     title: { f: function (r) { return r.title; }, t: 's', l: '직책' }, status: { f: function (r) { return r.status; }, t: 's', l: '상태' }
@@ -3187,7 +3188,7 @@
     var pages = Math.max(1, Math.ceil(list.length / IPS_PS)); if (IPF.page > pages) IPF.page = pages;
     var pageRows = list.slice((IPF.page - 1) * IPS_PS, IPF.page * IPS_PS), vw = isViewer();
     var rows = pageRows.map(function (r) {
-      return '<tr class="clk" data-id="' + r.id + '"><td>' + esc(r.org) + '</td><td>' + esc(r.dept1 || '—') + '</td><td>' + esc(r.floor || '—') + '</td><td>' + esc(r.band || '—') + '</td><td class="mono">' + esc(vw ? mkIp(r.ip) : r.ip) + '</td><td>' + esc(r.kind) + '</td>' +
+      return '<tr class="clk" data-id="' + r.id + '"><td>' + esc(r.org) + '</td><td>' + esc(r.dept2 || '—') + '</td><td>' + esc(r.floor || '—') + '</td><td>' + esc(r.band || '—') + '</td><td class="mono">' + esc(vw ? mkIp(r.ip) : r.ip) + '</td><td>' + esc(r.kind) + '</td>' +
         '<td>' + esc(vw ? mkName(r.user_name) : r.user_name) + '</td><td>' + esc(r.title || '') + '</td><td>' + ipChkBadge(flags[r.id]) + '</td><td>' + esc(r.status) + '</td></tr>';
     }).join('') || '<tr><td colspan="10" class="note" style="padding:24px;text-align:center">조건에 맞는 IP가 없습니다.</td></tr>';
     var chips = [];
@@ -3196,7 +3197,7 @@
     if (IPF.chk) chips.push(['chk', '점검: ' + (IPF.chk === 'info' ? '정보 확인' : IPF.chk)]); if (IPF.q.trim()) chips.push(['q', '검색: ' + IPF.q.trim()]);
     var chipHtml = chips.length ? '<div class="fchips"><span class="note">적용된 조건</span>' + chips.map(function (c) { return '<span class="fchip">' + esc(c[1]) + '<button type="button" data-clr="' + c[0] + '" title="해제">✕</button></span>'; }).join('') + '<a href="#" id="ipclrall">모두 해제</a><span class="grow"></span><span class="note">해당 <b>' + list.length.toLocaleString() + '</b>건</span></div>' : '';
     var inner = chipHtml + sortBar('ip', IPCOL, list.length) +
-      '<div style="overflow:auto"><table class="tbl ctr"><thead><tr>' + thS('ip', 'org', '소속') + thS('ip', 'dept1', '본부/부문') + thS('ip', 'floor', '층') + thS('ip', 'band', '대역') + thS('ip', 'ip', 'IP') + thS('ip', 'kind', '구분') + thS('ip', 'user_name', '사용자') + thS('ip', 'title', '직책') + '<th>점검(자동)</th>' + thS('ip', 'status', '상태') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div style="overflow:auto"><table class="tbl ctr"><thead><tr>' + thS('ip', 'org', '소속') + thS('ip', 'dept1', '팀/파트') + thS('ip', 'floor', '층') + thS('ip', 'band', '대역') + thS('ip', 'ip', 'IP') + thS('ip', 'kind', '구분') + thS('ip', 'user_name', '사용자') + thS('ip', 'title', '직책') + '<th>점검(자동)</th>' + thS('ip', 'status', '상태') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="pager"><span>' + (list.length ? ((IPF.page - 1) * IPS_PS + 1) + '–' + Math.min(list.length, IPF.page * IPS_PS) : 0) + ' / ' + list.length.toLocaleString() + '건</span><span><button class="btn sm" id="ipprev"' + (IPF.page <= 1 ? ' disabled' : '') + '>‹ 이전</button> ' + IPF.page + ' / ' + pages + ' <button class="btn sm" id="ipnext"' + (IPF.page >= pages ? ' disabled' : '') + '>다음 ›</button></span></div>';
     if (partial && $('#iplist')) { $('#iplist').innerHTML = inner; bindIpList(); return; }
     function sel(id, ph, opts, cur) { return '<select id="' + id + '"><option value="">' + ph + '</option>' + opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>'; }
@@ -3616,7 +3617,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.17', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.19', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -3628,7 +3629,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기)'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;
