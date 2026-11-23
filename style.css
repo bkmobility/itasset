@@ -153,6 +153,12 @@ a.kpi{display:block;color:inherit}a.kpi:hover{border-color:#bcd7f2}
 .bulk{position:relative}
 .allwrap{position:relative;display:inline-block}
 .allmenu{position:absolute;left:0;top:30px;min-width:300px;background:#fff;border:1px solid #cfd6df;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.2);padding:6px;z-index:20}
+.combo{position:relative;display:inline-block;width:200px}
+.combo input{width:100%;box-sizing:border-box}
+.combolist{position:absolute;top:32px;left:0;width:100%;background:#fff;border:1px solid #cfd6df;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.2);max-height:220px;overflow-y:auto;z-index:20}
+.combolist div{padding:6px 10px;font-size:12px;cursor:pointer}
+.combolist div:hover{background:#e7f1fb}
+.combolist .cnt{padding:5px 10px;font-size:11px;color:#8a8f98;border-top:1px solid #eef0f3;cursor:default}
 .allmenu[hidden]{display:none}
 .allmenu a{display:block;padding:7px 10px;border-radius:5px;font-size:12.5px;color:#1a1a1a;cursor:pointer;white-space:nowrap}
 .allmenu a:hover{background:#e7f1fb;color:#0f6cbd}

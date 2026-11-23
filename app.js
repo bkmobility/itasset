@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.24 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.25 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -404,7 +404,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.24</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.25</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -3053,7 +3053,11 @@
   // v1.9.16: RPA PC 탭 · 엑셀 내보내기(10개 시트) 추가
   // =====================================================================
   var IPS_PS = 50;
-  var IPF = { q: '', org: '', floor: '', band: '', kind: '', status: '', chk: '', page: 1, sel: {} };
+  var IPF = { q: '', org: '', dept2: '', floor: '', band: '', kind: '', status: '', chk: '', page: 1, sel: {} };
+  function ipDept2List() {   // v1.9.25: IP 대장에 실제로 쓰인 조직명(dept2) 목록 (검색형 콤보박스용)
+    var set = {}; S.ips.forEach(function (r) { if (r.dept2) set[r.dept2] = 1; });
+    return Object.keys(set).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+  }
   var ORG_LIST = ['A+에셋(미림타워)', '파인랩(익성빌딩)', '강북사업본부', '강남사업본부', '경인사업본부', '수도권사업본부', '서울하이브리드본부', '본사직할', '전략채널본부', '전략채널지원파트', '가온본부', '속초사업단', '충청사업본부(사학연금회관)', '온탑HB본부', '호남사업본부(제갈량빌딩)', '부산사업본부(ABL생명빌딩)', '신부산사업본부(코스웬빌딩)', '대구사업본부(디에스라이프빌딩)', '강원사업본부(남전빌딩)'];
   var IP_KINDS = ['PC', 'PC(RPA)', '예약', '회의실', '서버', '프린터', '복합기', '기타'];
   var IP_STATUS = ['사용', '예약', '회수 예정', '반납', '공석'];
@@ -3109,7 +3113,7 @@
     n.orgCnt = Object.keys(n.orgs).length; return n;
   }
   function goIp(kind, val) {
-    IPF.q = ''; IPF.org = ''; IPF.floor = ''; IPF.band = ''; IPF.kind = ''; IPF.status = ''; IPF.chk = ''; IPF.page = 1; IPF.sel = {}; IPF[kind] = val;
+    IPF.q = ''; IPF.org = ''; IPF.dept2 = ''; IPF.floor = ''; IPF.band = ''; IPF.kind = ''; IPF.status = ''; IPF.chk = ''; IPF.page = 1; IPF.sel = {}; IPF[kind] = val;
     location.hash = '#/ip/list';
   }
   function ipTabs(active) {
@@ -3159,13 +3163,14 @@
     $$('[data-go^="band:"]', $('#view')).forEach(function (el) { el.onclick = function () { goIpOrgBand(el.getAttribute('data-co'), el.getAttribute('data-go').slice(5)); }; });
   }
   function goIpOrgBand(org, band) {
-    IPF.q = ''; IPF.org = org || ''; IPF.floor = ''; IPF.band = (band === '미기재' ? '' : band); IPF.kind = ''; IPF.status = ''; IPF.chk = ''; IPF.page = 1; IPF.sel = {};
+    IPF.q = ''; IPF.org = org || ''; IPF.dept2 = ''; IPF.floor = ''; IPF.band = (band === '미기재' ? '' : band); IPF.kind = ''; IPF.status = ''; IPF.chk = ''; IPF.page = 1; IPF.sel = {};
     location.hash = '#/ip/list';
   }
   function ipFiltered() {
     var flags = ipCalc(), q = IPF.q.trim().toLowerCase();
     return S.ips.filter(function (r) {
       if (IPF.org && r.org !== IPF.org) return false;
+      if (IPF.dept2 && (r.dept2 || '') !== IPF.dept2) return false;   // v1.9.25: 조직명(dept2) 검색형 콤보박스 필터
       if (IPF.floor && (r.floor || '') !== IPF.floor) return false;
       if (IPF.band && (r.band || '') !== IPF.band) return false;
       if (IPF.kind && r.kind !== IPF.kind) return false;
@@ -3194,7 +3199,7 @@
         '<td>' + esc(vw ? mkName(r.user_name) : r.user_name) + '</td><td>' + esc(r.title || '') + '</td><td>' + ipChkBadge(flags[r.id]) + '</td><td>' + esc(r.status) + '</td></tr>';
     }).join('') || '<tr><td colspan="10" class="note" style="padding:24px;text-align:center">조건에 맞는 IP가 없습니다.</td></tr>';
     var chips = [];
-    if (IPF.org) chips.push(['org', '소속: ' + IPF.org]); if (IPF.floor) chips.push(['floor', '층: ' + IPF.floor]); if (IPF.band) chips.push(['band', '대역: ' + IPF.band]);
+    if (IPF.org) chips.push(['org', '소속: ' + IPF.org]); if (IPF.dept2) chips.push(['dept2', '조직명: ' + IPF.dept2]); if (IPF.floor) chips.push(['floor', '층: ' + IPF.floor]); if (IPF.band) chips.push(['band', '대역: ' + IPF.band]);
     if (IPF.kind) chips.push(['kind', '구분: ' + IPF.kind]); if (IPF.status) chips.push(['status', '상태: ' + IPF.status]);
     if (IPF.chk) chips.push(['chk', '점검: ' + (IPF.chk === 'info' ? '정보 확인' : IPF.chk)]); if (IPF.q.trim()) chips.push(['q', '검색: ' + IPF.q.trim()]);
     var chipHtml = chips.length ? '<div class="fchips"><span class="note">적용된 조건</span>' + chips.map(function (c) { return '<span class="fchip">' + esc(c[1]) + '<button type="button" data-clr="' + c[0] + '" title="해제">✕</button></span>'; }).join('') + '<a href="#" id="ipclrall">모두 해제</a><span class="grow"></span><span class="note">해당 <b>' + list.length.toLocaleString() + '</b>건</span></div>' : '';
@@ -3205,16 +3210,47 @@
     function sel(id, ph, opts, cur) { return '<select id="' + id + '"><option value="">' + ph + '</option>' + opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>'; }
     shell('ip', '<h1>IP 관리</h1>' + ipTabs('list') +
       '<div class="row wrap" style="margin-top:10px"><input type="text" id="ipq" placeholder="검색 (IP·이름·사번 등)" style="width:260px" value="' + esc(IPF.q) + '">' +
-      sel('iporg', '소속: 전체', ipOrgsVisible(), IPF.org) + sel('ipkind', '구분: 전체', IP_KINDS, IPF.kind) + sel('ipstatus', '상태: 전체', IP_STATUS, IPF.status) +
+      sel('iporg', '소속: 전체', ipOrgsVisible(), IPF.org) +
+      '<div class="combo" id="ipd2combo"><input type="text" id="ipd2q" placeholder="조직명: 전체 (입력해서 검색)" autocomplete="off" value="' + esc(IPF.dept2) + '"><div class="combolist" id="ipd2list" style="display:none"></div></div>' +
+      sel('ipkind', '구분: 전체', IP_KINDS, IPF.kind) + sel('ipstatus', '상태: 전체', IP_STATUS, IPF.status) +
       '<select id="ipchk"><option value="">점검: 전체</option>' + ['중복', '중복 의심', '대역 확인', '사용자 확인', '기한 확인', '직책 확인', '동명 확인', '회수 예정'].map(function (c) { return '<option' + (IPF.chk === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>' +
       '<div class="grow"></div><button class="btn" id="ipxl" type="button">엑셀 내보내기</button><button class="btn pri wonly" id="ipnew" type="button">＋ IP 추가</button></div>' +
       (S.ipErr ? '' : '<div class="note" style="margin:6px 0">점검 색 · <span class="dot" style="background:#c42b1c"></span>중복 <span class="dot" style="background:#c9a400"></span>확인 필요 <span class="dot" style="background:#d46b08"></span>회수 예정 <span class="dot" style="background:#1e8e3e"></span>정상</div>') +
       '<div id="iplist">' + inner + '</div>');
     $('#ipq').oninput = function () { IPF.q = this.value; IPF.page = 1; pageIpList(true); };
     ['iporg', 'ipkind', 'ipstatus', 'ipchk'].forEach(function (id, i) { var key = ['org', 'kind', 'status', 'chk'][i]; $('#' + id).onchange = function () { IPF[key] = this.value; IPF.page = 1; pageIpList(); }; });
+    bindIpDept2Combo();
     $('#ipxl').onclick = function () { ipExportExcel(this); };
     $('#ipnew').onclick = function () { ipDialog(null); };
     bindIpList();
+    function bindIpDept2Combo() {   // v1.9.25: 조직명 검색형 콤보박스
+      var inp = $('#ipd2q'), list = $('#ipd2list'); if (!inp) return;
+      function render(q) {
+        var all = ipDept2List(), m = q ? all.filter(function (o) { return o.toLowerCase().indexOf(q.toLowerCase()) >= 0; }) : all;
+        if (!m.length) { list.innerHTML = '<div class="cnt">일치하는 조직명이 없습니다</div>'; list.style.display = 'block'; return; }
+        list.innerHTML = m.slice(0, 200).map(function (o) { return '<div data-v="' + esc(o) + '">' + esc(o) + '</div>'; }).join('') + '<div class="cnt">' + m.length.toLocaleString() + '개 일치' + (m.length > 200 ? ' (상위 200개만 표시)' : '') + '</div>';
+        list.style.display = 'block';
+        $$('div[data-v]', list).forEach(function (d) {
+          d.onclick = function () { IPF.dept2 = d.getAttribute('data-v'); IPF.page = 1; list.style.display = 'none'; pageIpList(); };
+        });
+      }
+      inp.oninput = function () { render(this.value.trim()); };
+      inp.onfocus = function () { render(this.value.trim()); };
+      inp.onkeydown = function (e) {
+        if (e.key === 'Enter') {
+          var v = this.value.trim(), all = ipDept2List();
+          if (v && all.indexOf(v) >= 0) { IPF.dept2 = v; IPF.page = 1; list.style.display = 'none'; pageIpList(); }
+          else if (!v) { IPF.dept2 = ''; IPF.page = 1; list.style.display = 'none'; pageIpList(); }
+        }
+      };
+      if (!window.__ipd2ClrBound) {
+        window.__ipd2ClrBound = 1;
+        document.addEventListener('click', function (e) {
+          var box = document.getElementById('ipd2combo'), l = document.getElementById('ipd2list');
+          if (box && l && !box.contains(e.target)) l.style.display = 'none';
+        });
+      }
+    }
     function bindIpList() {
       bindSort('ip', function () { IPF.page = 1; pageIpList(true); });
       var p1 = $('#ipprev'); if (p1) p1.onclick = function () { IPF.page--; pageIpList(true); };
@@ -3619,7 +3655,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.24', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.25', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -3631,7 +3667,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정)'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;
