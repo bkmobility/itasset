@@ -4,7 +4,7 @@ button{font-family:inherit;cursor:pointer}
 a{color:#0f6cbd;text-decoration:none}
 .layout{display:flex;height:100vh}
 .side{width:200px;flex:none;background:#14233a;padding-top:10px;display:flex;flex-direction:column}
-.brand{padding:8px 18px 16px;font-size:15px;font-weight:700;color:#fff}.brand span{color:#4aa3ff;font-size:12px;margin-left:6px;font-weight:600}
+.brand{display:block;padding:8px 18px 16px;font-size:15px;font-weight:700;color:#fff;cursor:pointer}.brand:hover{color:#fff;opacity:.85}.brand span{color:#4aa3ff;font-size:12px;margin-left:6px;font-weight:600}
 .nav a{display:flex;align-items:center;height:36px;padding:0 18px;color:#b8c4d6;font-size:12.5px;border-left:3px solid transparent}
 .nav a:before{content:'';width:13px;height:13px;border-radius:3px;background:#45566f;margin-right:10px}
 .nav a:hover{background:#1b2f4d}
@@ -281,7 +281,14 @@ body.viewer .wonly{display:none!important}
 /* v1.9.17 대시보드 하단 3등분 (부서별 자산 수 | PC 수집 현황 | 소속별 등록 IP) */
 .dgrid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px;align-items:stretch}
 .dgrid3 .card{min-width:0;margin:0}
-@media (max-width:980px){.dgrid3{grid-template-columns:1fr}}
+@media (max-width:980px){.dgrid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:620px){.dgrid3{grid-template-columns:1fr}}
+/* v1.9.18 IP 요약: 소속별 도넛 카드 4열 */
+.dgrid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px;align-items:stretch}
+.dgrid4 .card{min-width:0;margin:0}
+@media (max-width:1200px){.dgrid4{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:900px){.dgrid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.dgrid4{grid-template-columns:1fr}}
 /* v1.9.5 이력 선택 */
 .audmenu{position:fixed;z-index:60;width:320px;background:#fff;border:1px solid #cfd6df;border-radius:8px;box-shadow:0 6px 18px #0003;padding:4px 0}
 .audmenu button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 14px;font-size:12.5px;cursor:pointer}
@@ -335,3 +342,15 @@ body.viewer .wonly{display:none!important}
 .chip .n{display:block;color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .chip.res{background:#e3ecfa}
 .chip.res .n{color:#4263eb}
+
+/* v1.9.18 관리자 목록: OTP 필수 토글 스위치 */
+.lock{color:#b45309;font-size:12px;white-space:nowrap}
+.dash{color:#9aa0a8}
+.tgl{position:relative;display:inline-block;width:38px;height:21px;vertical-align:middle;cursor:pointer}
+.tgl input{display:none}
+.tgl .tslider{position:absolute;inset:0;background:#d7dbe0;border-radius:21px;transition:.15s}
+.tgl .tslider:before{content:"";position:absolute;width:17px;height:17px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 2px #0003}
+.tgl input:checked + .tslider{background:#1e8e3e}
+.tgl input:checked + .tslider:before{transform:translateX(17px)}
+.tglrow{display:flex;align-items:center;gap:6px}
+.tglrow .st{font-size:11px;color:#5c5c5c;width:26px}

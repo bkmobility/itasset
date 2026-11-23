@@ -1,8 +1,11 @@
-/* IT 자산관리시스템 v1.9.17 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.18 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
-            IP 대장에 본부/부문 열 추가, 대역 현황의 사용 중 IP를 대역별 접기/펼치기 + 칩 그리드로 개편. */
+            IP 대장에 본부/부문 열 추가, 대역 현황의 사용 중 IP를 대역별 접기/펼치기 + 칩 그리드로 개편.
+   v1.9.18: 일반 관리자 OTP(2단계 인증) 기본 필수화 — 미등록 상태로 로그인하면 비밀번호 확인 직후 그 자리에서 QR 등록 →
+            코드 확인 즉시 로그인 완료(건너뛰기 없음). 메인 관리자가 "관리자" 화면에서 계정별로 "OTP 필수" ON/OFF 가능
+            (OFF면 기존처럼 비밀번호만으로 로그인, 긴급 우회용). 메인 관리자·조회 전용은 기존과 동일. */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -383,7 +386,7 @@
   // v1.9.4: 로그인 계정 표시 = 권한 · 부서명 · 성명 · 직책 (부서·성명·직책은 인사 명단에서 자동 반영)
   function whoParts() {
     var m = S.me || {}, e = m.sabun && S.empBy && S.empBy[m.sabun];
-    return { dept: e ? e.dept : m.dept, name: e ? e.name : m.name, title: e ? e.title : m.title };
+    return { dept: e ? e.team : m.dept, name: e ? e.name : m.name, title: e ? e.title : m.title };   // v1.9.18: 상단 표시를 조직명(dept) 대신 본부/팀(team)으로
   }
   function adminLabel() { var w = whoParts(); if (w.name) return [w.dept, w.name, w.title].filter(Boolean).join(' '); return S.user ? S.user.email : '데모 관리자'; }
   function whoHtml() {
@@ -401,7 +404,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.17</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/" style="text-decoration:none;color:inherit">IT Asset<span>v1.9.18</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -1556,6 +1559,7 @@
       try {
         var j = await fnCall('admin-login', { sabun: n, password: pw });
         if (j.need_otp) { busy = false; pageLoginOtp(n, pw); return; }   // v1.9.11: 메인 관리자는 비밀번호가 맞아도 OTP 단계로 전환
+        if (j.need_otp_setup) { busy = false; pageLoginOtpSetup(n, pw, j.otp_secret, j.otpauth); return; }   // v1.9.18: OTP 필수인데 미등록 → 강제 등록 화면
         var r = await sb.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token });
         if (r.error) throw r.error;
         busy = false; start();
@@ -1584,6 +1588,33 @@
     $('#go2').onclick = go2; $('#otpc').onkeydown = function (e) { if (e.key === 'Enter') go2(); };
     $('#otpc').focus();
   }
+  // v1.9.18: OTP 필수 계정인데 아직 등록 안 된 경우 — 비밀번호 확인 직후 강제 등록 화면(건너뛰기 없음). 등록 완료 즉시 로그인까지 완료.
+  function pageLoginOtpSetup(sabun, password, secret, otpauth) {
+    var q = qrcode(0, 'M'); q.addData(otpauth); q.make();
+    var key = (secret.match(/.{1,4}/g) || [secret]).join(' ');
+    $app.innerHTML = '<div class="login" style="width:420px"><div class="lgh"><div class="lgt">2단계 인증(OTP) 등록이 필요합니다</div><div class="lgs">회사 정책에 따라 이 계정은 2단계 인증을 설정해야 로그인할 수 있습니다</div></div>' +
+      '<div style="display:flex;gap:16px;align-items:flex-start;margin:10px 0">' + q.createSvgTag({ cellSize: 4, margin: 0 }) +
+      '<div style="flex:1"><div class="note">Google Authenticator(또는 Microsoft Authenticator) 앱으로 QR코드를 스캔하세요.<br>스캔할 수 없으면 아래 키를 앱에 직접 입력하세요.</div><div class="pwbox" style="margin-top:6px"><code>' + esc(key) + '</code></div></div></div>' +
+      '<label>앱에 표시된 6자리 코드</label><input type="text" id="setupc" inputmode="numeric" maxlength="6" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:6px;font-size:20px">' +
+      '<div style="margin-top:16px"><button class="btn pri" id="setupgo" style="width:100%;height:36px">등록 완료하고 로그인</button></div>' +
+      '<div class="err" id="setuper"></div><div class="note" style="margin-top:10px;font-size:11px"><a href="#" id="setupback">‹ 사번으로 돌아가기</a></div></div>';
+    var busy = false;
+    $('#setupback').onclick = function (e) { e.preventDefault(); pageLogin(); };
+    async function go3() {
+      if (busy) return;
+      var code = $('#setupc').value.trim(); $('#setuper').textContent = '';
+      if (!/^\d{6}$/.test(code)) { $('#setuper').textContent = '6자리 숫자를 입력하세요.'; return; }
+      busy = true; $('#setupgo').disabled = true;
+      try {
+        var j = await fnCall('admin-login', { sabun: sabun, password: password, otp_setup_secret: secret, otp_code: code });
+        var r = await sb.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token });
+        if (r.error) throw r.error;
+        busy = false; toast('2단계 인증을 등록했습니다.'); start();
+      } catch (e) { busy = false; $('#setupgo').disabled = false; $('#setuper').textContent = e.message || '등록에 실패했습니다.'; $('#setupc').value = ''; }
+    }
+    $('#setupgo').onclick = go3; $('#setupc').onkeydown = function (e) { if (e.key === 'Enter') go3(); };
+    $('#setupc').focus();
+  }
   // ---------- v1.9.4: 관리자 등록 (메인 관리자 전용) ----------
   var ADM = { list: null, demo: null };
   function roleText(r) { return r === 'main' ? '메인 관리자' : r === 'viewer' ? '조회 전용' : '일반 관리자'; }
@@ -1594,17 +1625,18 @@
   }
   function demoAdm(action, b) {
     if (action !== 'list') { var rowD = (ADM.demo || []).filter(function (x) { return x.sabun === b.sabun; })[0] || {}, nm = '관리자 ' + (rowD.name || (S.empBy[b.sabun] || {}).name || '') + '(' + b.sabun + ')', RT = { main: '메인 관리자', admin: '일반 관리자', viewer: '조회 전용' };
-      auditPost({ action: action === 'create' ? 'create' : action === 'delete' ? 'delete' : 'change', target: nm, summary: { create: '관리자 등록 · 권한 ' + RT[b.role], setrole: '권한 변경 ' + RT[rowD.role] + ' → ' + RT[b.role], setactive: b.active ? '다시 사용' : '사용 중지', resetpw: '비밀번호 초기화', 'delete': '관리자 삭제' }[action], reason: b.reason || null }); }
+      auditPost({ action: action === 'create' ? 'create' : action === 'delete' ? 'delete' : 'change', target: nm, summary: { create: '관리자 등록 · 권한 ' + RT[b.role], setrole: '권한 변경 ' + RT[rowD.role] + ' → ' + RT[b.role], setactive: b.active ? '다시 사용' : '사용 중지', setotp: 'OTP 필수 ' + (b.otp_required ? '켬' : '끔(긴급 우회)'), resetpw: '비밀번호 초기화', 'delete': '관리자 삭제' }[action], reason: b.reason || null }); }
     if (!ADM.demo) ADM.demo = [
-      { sabun: '99999012', role: 'main', active: true, name: '배병욱', dept: '전산지원파트', last_login: new Date().toISOString() },
-      { sabun: 'A20871', role: 'admin', active: true, name: '김서연', dept: 'IT지원팀', last_login: '2026-11-18T08:05:00Z' },
-      { sabun: '70000212', role: 'viewer', active: true, name: '최도윤', dept: '영업2팀', last_login: '2026-11-17T00:40:00Z' },
-      { sabun: '20000006', role: 'viewer', active: false, name: '박옥경', dept: '센트럴사업단', last_login: '2026-10-30T05:12:00Z' }];
+      { sabun: '99999012', role: 'main', active: true, name: '배병욱', dept: '전산지원파트', last_login: new Date().toISOString(), otp_required: true, otp_enabled: true },
+      { sabun: 'A20871', role: 'admin', active: true, name: '김서연', dept: 'IT지원팀', last_login: '2026-11-18T08:05:00Z', otp_required: true, otp_enabled: false },
+      { sabun: '70000212', role: 'viewer', active: true, name: '최도윤', dept: '영업2팀', last_login: '2026-11-17T00:40:00Z', otp_required: false, otp_enabled: false },
+      { sabun: '20000006', role: 'viewer', active: false, name: '박옥경', dept: '센트럴사업단', last_login: '2026-10-30T05:12:00Z', otp_required: false, otp_enabled: false }];
     var L = ADM.demo, row = function () { return L.filter(function (x) { return x.sabun === b.sabun; })[0]; };
     if (action === 'list') return Promise.resolve({ admins: L.slice() });
-    if (action === 'create') { var e = S.empBy[b.sabun] || {}; L.push({ sabun: b.sabun, role: b.role, active: true, name: e.name, dept: e.dept, last_login: null }); return Promise.resolve({ ok: 1 }); }
+    if (action === 'create') { var e = S.empBy[b.sabun] || {}; L.push({ sabun: b.sabun, role: b.role, active: true, name: e.name, dept: e.dept, last_login: null, otp_required: true, otp_enabled: false }); return Promise.resolve({ ok: 1 }); }
     if (action === 'setrole') { row().role = b.role; return Promise.resolve({ ok: 1 }); }
     if (action === 'setactive') { row().active = !!b.active; return Promise.resolve({ ok: 1 }); }
+    if (action === 'setotp') { row().otp_required = !!b.otp_required; return Promise.resolve({ ok: 1 }); }
     if (action === 'resetpw') return Promise.resolve({ password: genPw() });
     if (action === 'delete') { ADM.demo = L.filter(function (x) { return x.sabun !== b.sabun; }); return Promise.resolve({ ok: 1 }); }
     return Promise.resolve({});
@@ -1632,18 +1664,33 @@
     var n = rows.length, nOn = rows.filter(function (x) { return x.active; }).length;
     var sorted = sortRows(rows, 'adm', ADC);
     var body = sorted.map(function (x) {
-      var main = x.role === 'main', me = S.me && x.sabun === S.me.sabun;
+      var main = x.role === 'main', viewer = x.role === 'viewer', me = S.me && x.sabun === S.me.sabun;
       var act = main ? '<span class="note" style="color:#b45309">🔒 고정</span>' :
         (x.active ? '<a href="#" data-a="role" data-s="' + esc(x.sabun) + '">권한 변경</a> · <a href="#" data-a="pw" data-s="' + esc(x.sabun) + '">비밀번호 초기화</a> · <a href="#" data-a="off" data-s="' + esc(x.sabun) + '">사용 중지</a>' :
           '<a href="#" data-a="on" data-s="' + esc(x.sabun) + '">다시 사용</a> · <a href="#" data-a="del" data-s="' + esc(x.sabun) + '">삭제</a>');
-      return '<tr><td class="mono">' + esc(x.sabun) + '</td><td>' + esc(admName(x) || '') + (me ? ' (나)' : '') + '</td><td>' + esc(admDept(x) || '') + '</td><td>' + roleBadge(x.role) + '</td><td>' + (x.active ? badge('사용 중', 'ok') : badge('사용 중지', 'bad')) + '</td><td>' + (x.last_login ? esc(ymd(x.last_login).slice(5) + ' ' + hm(x.last_login)) : '<span class="note">없음</span>') + '</td><td class="admact">' + act + '</td></tr>';
-    }).join('') || '<tr><td colspan="7" class="note" style="padding:20px;text-align:center">등록된 관리자가 없습니다.</td></tr>';
+      var otpCell = main ? '<span class="lock">🔒 항상 필수</span>' : viewer ? '<span class="dash">해당 없음</span>' :
+        '<div class="tglrow"><label class="tgl"><input type="checkbox" data-otp="' + esc(x.sabun) + '"' + (x.otp_required === false ? '' : ' checked') + '><span class="tslider"></span></label><span class="st">' + (x.otp_required === false ? 'OFF' : 'ON') + '</span></div>';
+      return '<tr><td class="mono">' + esc(x.sabun) + '</td><td>' + esc(admName(x) || '') + (me ? ' (나)' : '') + '</td><td>' + esc(admDept(x) || '') + '</td><td>' + roleBadge(x.role) + '</td><td>' + (x.active ? badge('사용 중', 'ok') : badge('사용 중지', 'bad')) + '</td><td>' + (x.last_login ? esc(ymd(x.last_login).slice(5) + ' ' + hm(x.last_login)) : '<span class="note">없음</span>') + '</td><td>' + otpCell + '</td><td class="admact">' + act + '</td></tr>';
+    }).join('') || '<tr><td colspan="8" class="note" style="padding:20px;text-align:center">등록된 관리자가 없습니다.</td></tr>';
     shell('admins', '<div class="row wrap"><h1>관리자</h1><span class="note">IT Asset 웹페이지에 로그인할 수 있는 사람과 권한을 관리합니다 · 로그인 ID = 사번</span><div class="grow"></div><button class="btn pri" id="adnew">관리자 등록</button></div>' +
       '<div class="note" style="margin:6px 0">관리자 ' + n + '명 (사용 중 ' + nOn + ')</div>' + sortBar('adm', ADC, n) +
-      '<table class="tbl"><thead><tr>' + thS('adm', 'sabun', '사번 (로그인 ID)') + thS('adm', 'name', '성명') + thS('adm', 'dept', '조직명') + thS('adm', 'role', '권한') + thS('adm', 'active', '상태') + thS('adm', 'last', '최근 접속') + '<th>관리</th></tr></thead><tbody>' + body + '</tbody></table>' +
-      '<div class="card" style="margin-top:12px"><div class="note" style="line-height:1.8">· 메인 관리자는 1명이며 변경·중지·삭제할 수 없습니다 (Supabase에서 처음 한 번 등록)<br>· 인사 명단에서 <b>퇴사 처리된 사람은 관리자도 자동으로 사용 중지</b>되어 로그인할 수 없습니다<br>· [삭제]하면 Supabase 로그인 계정도 함께 지워집니다 (Supabase 화면은 직접 열 필요가 없습니다)</div></div>');
+      '<table class="tbl"><thead><tr>' + thS('adm', 'sabun', '사번 (로그인 ID)') + thS('adm', 'name', '성명') + thS('adm', 'dept', '조직명') + thS('adm', 'role', '권한') + thS('adm', 'active', '상태') + thS('adm', 'last', '최근 접속') + '<th>OTP 필수</th><th>관리</th></tr></thead><tbody>' + body + '</tbody></table>' +
+      '<div class="card" style="margin-top:12px"><div class="note" style="line-height:1.8">· 메인 관리자는 1명이며 변경·중지·삭제할 수 없습니다 (Supabase에서 처음 한 번 등록)<br>· 인사 명단에서 <b>퇴사 처리된 사람은 관리자도 자동으로 사용 중지</b>되어 로그인할 수 없습니다<br>· [삭제]하면 Supabase 로그인 계정도 함께 지워집니다 (Supabase 화면은 직접 열 필요가 없습니다)<br>· <b>OTP 필수</b>는 일반 관리자 기본값 ON — 꺼진 상태(OFF)인 계정은 OTP 등록 여부와 관계없이 비밀번호만으로 로그인할 수 있습니다 (급하거나 필요한 경우만 OFF로 전환하세요)</div></div>');
     bindSort('adm', pageAdmins);
     $('#adnew').onclick = admNewDialog;
+    $$('input[data-otp]').forEach(function (cb) {
+      cb.onchange = async function () {
+        var sab = this.dataset.otp, nm = (rows.filter(function (x) { return x.sabun === sab; })[0] || {}), who = sab + ' ' + (admName(nm) || ''), turnOn = this.checked, cbx = this;
+        if (!turnOn) {
+          var rs = await askReason('OTP 필수 끄기(긴급 우회)', esc(who) + ' 계정의 OTP 필수를 끕니다. OTP 등록 여부와 관계없이 비밀번호만으로 로그인할 수 있게 됩니다.', '끄기');
+          if (!rs) { cbx.checked = true; return; }
+          try { await admCall('setotp', { sabun: sab, otp_required: false, reason: rs }); toast('OTP 필수를 껐습니다.'); } catch (e) { cbx.checked = true; fail(e); return; }
+        } else {
+          try { await admCall('setotp', { sabun: sab, otp_required: true }); toast('OTP 필수를 켰습니다.'); } catch (e) { cbx.checked = false; fail(e); return; }
+        }
+        pageAdmins();
+      };
+    });
     $$('.admact a').forEach(function (a) {
       a.onclick = async function (e) {
         e.preventDefault(); var sab = a.dataset.s, k = a.dataset.a, nm = (rows.filter(function (x) { return x.sabun === sab; })[0] || {}); var who = sab + ' ' + (admName(nm) || '');
@@ -3085,7 +3132,7 @@
       '<a class="dk" href="#" data-go="회수 예정"><span class="ic" style="background:#d46b0822"><i style="background:#d46b08"></i></span><span><span class="t">회수 예정</span><span class="n">' + n.recall.toLocaleString() + '</span><span class="s">상태 = 회수 예정</span></span></a>' +
       '<a class="dk" href="#" data-go="info"><span class="ic" style="background:#8a6d0022"><i style="background:#c9a400"></i></span><span><span class="t">정보 확인</span><span class="n">' + n.info.toLocaleString() + '</span><span class="s">사용자·기한·직책 확인</span></span></a>' +
       '<a class="dk" href="#" data-go="동명 확인"><span class="ic" style="background:#8a6d0022"><i style="background:#c9a400"></i></span><span><span class="t">동명 확인</span><span class="n">' + n.name.toLocaleString() + '</span><span class="s">동명이인 가능성</span></span></a>' +
-      '<div class="dk" style="cursor:default"><span class="ic" style="background:#7a4bd622"><i style="background:#7a4bd6"></i></span><span><span class="t">소속 수</span><span class="n">' + n.orgCnt.toLocaleString() + '</span><span class="s">건물·사업본부</span></span></div>' +
+      '<a class="dk" href="#" data-go="orgcnt"><span class="ic" style="background:#7a4bd622"><i style="background:#7a4bd6"></i></span><span><span class="t">소속 수</span><span class="n">' + n.orgCnt.toLocaleString() + '</span><span class="s">건물·사업본부</span></span></a>' +
       '</div>';
     var allOrgCounts = groupCount(S.ips, function (r) { return r.org; });
     var byOrg = allOrgCounts.slice(0, 5);
@@ -3099,9 +3146,9 @@
       var parts = top4(rows, function (r) { return r.band || '미기재'; }, function (band) { return ipBandColor(org, band); });
       return '<div class="card"><h3>' + esc(org) + ' <span class="note" style="font-weight:400">대역별 ' + rows.length.toLocaleString() + '건</span></h3><div class="dn">' + donut(parts, rows.length.toLocaleString()) + '<div class="lgs">' + legend(parts) + '</div></div></div>';
     }).join('');
-    shell('ip', '<h1>IP 관리</h1>' + ipTabs('summary') + cards + '<div class="dgrid">' + orgCard + '</div><div class="dgrid">' + legendCards + '</div>');
+    shell('ip', '<h1>IP 관리</h1>' + ipTabs('summary') + cards + '<div class="dgrid">' + orgCard + '</div><div class="dgrid4">' + legendCards + '</div>');
     $$('.dk[data-go]', $('#view')).forEach(function (el) {
-      el.onclick = function (e) { e.preventDefault(); var k = el.getAttribute('data-go'); if (k === 'total') location.hash = '#/ip/list'; else goIp('chk', k); };
+      el.onclick = function (e) { e.preventDefault(); var k = el.getAttribute('data-go'); if (k === 'total' || k === 'orgcnt') location.hash = '#/ip/list'; else goIp('chk', k); };
     });
     // 소속별 막대(위 bars())는 data-go="org:소속명" 형태로 생성됨
     $$('.bar.go[data-go^="org:"]', $('#view')).forEach(function (el) { el.onclick = function () { var org = el.getAttribute('data-go').slice(4); goIp('org', org); }; });
@@ -3189,7 +3236,7 @@
       var free = numeric ? Math.max(0, cap - Object.keys(usedOct).length) : null;
       var next = null; if (numeric) { for (var i = 2; i <= 254; i++) if (!usedOct[i]) { next = '192.168.' + b + '.' + i; break; } }
       var pct = numeric ? Math.round(Object.keys(usedOct).length / cap * 100) : 0;
-      return '<div class="card" style="margin-bottom:10px"><div class="row wrap"><h3 style="flex:1;margin:0">대역 ' + esc(b) + '</h3>' +
+      return '<div class="card" style="margin:0"><div class="row wrap"><h3 style="flex:1;margin:0">대역 ' + esc(b) + '</h3>' +
         (numeric ? '<span class="note">사용 ' + Object.keys(usedOct).length + ' · 빈 IP ' + free + '</span>' : '<span class="note">특수 대역 · 직접 관리</span>') + '</div>' +
         (numeric ? '<div class="pb big" style="margin:8px 0"><i style="width:' + pct + '%;background:' + ipBandColor(org, b) + '"></i></div>' : '') +
         '<div class="row wrap" style="margin:6px 0">' +
@@ -3199,7 +3246,7 @@
     }).join('') || '<div class="note">이 소속의 IP가 없습니다.</div>';
     shell('ip', '<h1>IP 관리</h1>' + ipTabs('band') +
       '<div class="row" style="margin-top:10px"><select id="bandorg">' + ipOrgs().map(function (o) { return '<option' + (o === org ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select><span class="note">총 ' + rows.length.toLocaleString() + '건</span></div>' +
-      '<div style="margin-top:10px">' + body + '</div>');
+      '<div class="dgrid3" style="margin-top:10px">' + body + '</div>');
     $('#bandorg').onchange = function () { IPF.bandOrg = this.value; pageIpBand(); };
     $$('[data-cp]').forEach(function (b) { b.onclick = function () { try { navigator.clipboard.writeText(b.dataset.cp); toast('복사했습니다.'); } catch (e) { toast('직접 선택해서 복사하세요.'); } }; });
     $$('[data-reg]').forEach(function (b) { b.onclick = function () { ipDialog(null, { org: b.dataset.org, band: b.dataset.band, ip: b.dataset.reg }); }; });
