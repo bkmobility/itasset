@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.27 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.28 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -408,7 +408,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.27</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.28</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -635,9 +635,10 @@
       var nameExtra = (!qLow && monBadge(a) ? '<div>' + monBadge(a) + '</div>' : '');
       var vw = isViewer();
       return '<tr class="clk" data-no="' + esc(a.asset_no) + '"><td><input type="checkbox" class="sel" data-no="' + esc(a.asset_no) + '"' + (F.sel[a.asset_no] ? ' checked' : '') + '></td>' +
+        '<td>' + esc(a.company || '') + '</td><td>' + esc(a.dept) + '</td>' +
+        '<td>' + esc(vw ? mkName(a.user_name) : a.user_name) + (a.user_mismatch ? ' ' + badge('불일치', 'warn') : '') + '</td><td>' + esc(a.title) + '</td>' +
         '<td class="mono">' + esc(a.asset_no) + '</td>' + hitCell + '<td>' + esc(a.category) + '</td><td>' + esc(a.manufacturer) + '</td><td>' + esc(a.model) + '</td><td>' + esc(a.mfg_ym) + '</td><td>' + esc(a.status) + '</td><td>' + warrantyBadge(a.warr_end, a.warr_calc) + '</td>' +
-        '<td>' + esc(vw ? mkName(a.user_name) : a.user_name) + (a.user_mismatch ? ' ' + badge('불일치', 'warn') : '') + '</td><td>' + esc(a.dept) + '</td><td>' + esc(a.company || '') + '</td><td>' + esc(a.title) + '</td>' +
-        '<td class="auto">' + esc(vw ? mkPc(cName) : cName) + nameExtra + '</td><td class="auto mono">' + esc(vw ? mkIp(cIp) : cIp) + '</td><td class="auto">' + esc(a.category === '모니터' ? monSpec(a) : specStr(a)) + '</td><td class="auto">' + (cSeen ? seenHtml(cSeen) + (!a.last_seen && dPc ? '<div class="note" style="font-size:10.5px">연결 PC 기준</div>' : '') : seenHtml(a.last_seen)) + '</td></tr>';
+        '<td class="auto">' + esc(vw ? mkPc(cName) : cName) + nameExtra + '</td><td class="auto mono">' + esc(vw ? mkIp(cIp) : cIp) + '</td><td class="auto">' + esc(a.category === '모니터' ? monSpec(a) : specStr(a)) + '</td><td class="auto">' + (cSeen ? seenHtml(cSeen) + (!a.last_seen && dPc ? '<div class="note" style="font-size:10.5px">연결 PC 기준</div>' : '') : seenHtml(a.last_seen)) + '</td></tr>';   // v1.9.28: 열 순서 변경(회사·소속명·사용자명·직책 → 관리번호~제조년월 묶음 → 자산상태·보증 → 나머지)
     }).join('') || '<tr><td colspan="17" class="note" style="padding:24px;text-align:center">조건에 맞는 자산이 없습니다.</td></tr>';
     var nsel = Object.keys(F.sel).length;
     var hasFilter = !!(qLow || F.dept || F.cat || F.catg || F.status || F.company || F.collect);
@@ -660,7 +661,7 @@
     var assetDefSortBar = (!SORT.assets || !ACOL[SORT.assets.k]) ? '<div class="sortbar"><span class="fchip on">정렬: 소속 → 자산분류 (기본)</span></div>' : '';   // v1.9.26
     var innerHtml = (
       chipHtml + bulk + assetDefSortBar +
-      sortBar('assets', ACOL, list.length) + '<div class="tscroll"><table class="tbl ctr"><thead><tr><th><input type="checkbox" id="all"></th>' + thS('assets', 'asset_no', '관리번호') + (qLow ? '<th>일치한 항목</th>' : '') + thS('assets', 'category', '자산분류') + thS('assets', 'manufacturer', '제조사') + thS('assets', 'model', '모델명') + thS('assets', 'mfg_ym', '제조년월') + thS('assets', 'status', '자산상태') + thS('assets', 'warr', '보증 (제조년월+5년)') + thS('assets', 'user_name', '사용자명') + thS('assets', 'dept', '소속명') + thS('assets', 'company', '회사') + thS('assets', 'title', '직책') + thS('assets', 'pc_name', '컴퓨터 이름', 'auto') + thS('assets', 'ip', 'IP', 'auto') + thS('assets', 'spec', '사양', 'auto') + thS('assets', 'last_seen', '최종 확인', 'auto') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      sortBar('assets', ACOL, list.length) + '<div class="tscroll"><table class="tbl ctr"><thead><tr><th><input type="checkbox" id="all"></th>' + thS('assets', 'company', '회사') + thS('assets', 'dept', '소속명') + thS('assets', 'user_name', '사용자명') + thS('assets', 'title', '직책') + thS('assets', 'asset_no', '관리번호') + (qLow ? '<th>일치한 항목</th>' : '') + thS('assets', 'category', '자산분류') + thS('assets', 'manufacturer', '제조사') + thS('assets', 'model', '모델명') + thS('assets', 'mfg_ym', '제조년월') + thS('assets', 'status', '자산상태') + thS('assets', 'warr', '보증 (제조년월+5년)') + thS('assets', 'pc_name', '컴퓨터 이름', 'auto') + thS('assets', 'ip', 'IP', 'auto') + thS('assets', 'spec', '사양', 'auto') + thS('assets', 'last_seen', '최종 확인', 'auto') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +   // v1.9.28: 열 순서 변경(Frame 19 채택)
       '<div class="pager"><span>' + (list.length ? ((F.page - 1) * PS + 1) + '–' + Math.min(list.length, F.page * PS) : 0) + ' / ' + list.length.toLocaleString() + '건</span><span><button class="btn sm" id="prev"' + (F.page <= 1 ? ' disabled' : '') + '>‹ 이전</button> ' + F.page + ' / ' + pages + ' <button class="btn sm" id="next"' + (F.page >= pages ? ' disabled' : '') + '>다음 ›</button></span></div>'
     );
     // v1.9.2: 위쪽 [QR코드 출력] — 선택한 항목이 있으면 선택한 것만, 없으면 검색·조건으로 걸러진 목록 전체
@@ -3341,18 +3342,21 @@
     var rows = S.ips.filter(function (r) { return r.org === org; });
     var byBand = {}; rows.forEach(function (r) { var b = r.band || '미기재'; byBand[b] = byBand[b] || []; byBand[b].push(r); });
     var bands = Object.keys(byBand).sort(function (a, b) { var na = parseFloat(a), nb = parseFloat(b); if (!isNaN(na) && !isNaN(nb)) return na - nb; return String(a).localeCompare(String(b)); });
+    var bandFreeList = {};   // v1.9.28: 대역별 빈 옥텟 전체 목록(“다음 추천 IP” 순환용)
     var body = bands.map(function (b, bi) {
       var rs = byBand[b], used = rs.length, numeric = /^\d+$/.test(b);
       var cap = numeric ? 253 : null;   // 192.168.b.2~254 가정
       var usedOct = {}; if (numeric) rs.forEach(function (r) { var p = String(r.ip).split('.'); if (p.length === 4) usedOct[p[3]] = 1; });
-      var free = numeric ? Math.max(0, cap - Object.keys(usedOct).length) : null;
-      var next = null; if (numeric) { for (var i = 2; i <= 254; i++) if (!usedOct[i]) { next = '192.168.' + b + '.' + i; break; } }
+      var freeList = []; if (numeric) { for (var i = 2; i <= 254; i++) if (!usedOct[i]) freeList.push(i); }
+      bandFreeList[bi] = freeList;
+      var free = numeric ? freeList.length : null;
+      var next = freeList.length ? '192.168.' + b + '.' + freeList[0] : null;
       var pct = numeric ? Math.round(Object.keys(usedOct).length / cap * 100) : 0;
       return '<div class="card" style="margin:0"><div class="row wrap"><h3 style="flex:1;margin:0">대역 ' + esc(b) + '</h3>' +
         (numeric ? '<span class="note">사용 ' + Object.keys(usedOct).length + ' · 빈 IP ' + free + '</span>' : '<span class="note">특수 대역 · 직접 관리</span>') + '</div>' +
         (numeric ? '<div class="pb big" style="margin:8px 0"><i style="width:' + pct + '%;background:' + ipBandColor(org, b) + '"></i></div>' : '') +
         '<div class="row wrap" style="margin:6px 0">' +
-        (numeric && next ? '<span class="note">다음 빈 IP 후보</span><code class="mono">' + esc(next) + '</code><button class="btn sm" data-cp="' + esc(next) + '" type="button">복사</button><button class="btn sm pri wonly" data-reg="' + esc(next) + '" data-org="' + esc(org) + '" data-band="' + esc(b) + '" type="button">이 IP로 등록</button>' : '<span class="note">사용 ' + used + '건</span>') +
+        (numeric && next ? '<span class="note">다음 빈 IP 후보</span><code class="mono" id="ipnextcode' + bi + '">' + esc(next) + '</code><button class="btn sm" data-cp="' + esc(next) + '" id="ipcp' + bi + '" type="button">복사</button><button class="btn sm" data-bi="' + bi + '" type="button">다음 추천 IP</button><button class="btn sm pri wonly" data-reg="' + esc(next) + '" data-org="' + esc(org) + '" data-band="' + esc(b) + '" id="ipreg' + bi + '" type="button">이 IP로 등록</button>' : '<span class="note">사용 ' + used + '건</span>') +
         '<div class="grow"></div><button class="toggle" type="button" data-i="' + bi + '" data-n="' + used + '"><span class="tglabel">사용 중 IP 보기 (' + used + ')</span> <span class="toparrow">▾</span></button></div>' +
         '<div class="chipgrid" id="ipgrid' + bi + '">' + ipUseChips(rs, numeric, vw) + '</div></div>';
     }).join('') || '<div class="note">이 소속의 IP가 없습니다.</div>';
@@ -3362,6 +3366,19 @@
     $('#bandorg').onchange = function () { IPF.bandOrg = this.value; pageIpBand(); };
     $$('[data-cp]').forEach(function (b) { b.onclick = function () { try { navigator.clipboard.writeText(b.dataset.cp); toast('복사했습니다.'); } catch (e) { toast('직접 선택해서 복사하세요.'); } }; });
     $$('[data-reg]').forEach(function (b) { b.onclick = function () { ipDialog(null, { org: b.dataset.org, band: b.dataset.band, ip: b.dataset.reg }); }; });
+    var bandNextIdx = {};   // v1.9.28: "다음 추천 IP" 버튼 — 대역별 현재 순번(순환)
+    $$('[data-bi]').forEach(function (btn) {
+      btn.onclick = function () {
+        var bi = btn.dataset.bi, fl = bandFreeList[bi];
+        if (!fl || !fl.length) return;
+        bandNextIdx[bi] = ((bandNextIdx[bi] || 0) + 1) % fl.length;
+        var val = '192.168.' + bands[bi] + '.' + fl[bandNextIdx[bi]];
+        var codeEl = $('#ipnextcode' + bi), cpBtn = $('#ipcp' + bi), regBtn = $('#ipreg' + bi);
+        if (codeEl) codeEl.textContent = val;
+        if (cpBtn) cpBtn.setAttribute('data-cp', val);
+        if (regBtn) regBtn.setAttribute('data-reg', val);
+      };
+    });
     $$('.toggle', $('#view')).forEach(function (btn) {
       btn.onclick = function () {
         var g = $('#ipgrid' + this.dataset.i), open = g.classList.toggle('open');
@@ -3722,7 +3739,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.27', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.28', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -3734,7 +3751,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환)'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;
