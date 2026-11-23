@@ -1,6 +1,8 @@
-/* IT 자산관리시스템 v1.9.16 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.17 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
-   v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트. */
+   v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
+   v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
+            IP 대장에 본부/부문 열 추가, 대역 현황의 사용 중 IP를 대역별 접기/펼치기 + 칩 그리드로 개편. */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -399,7 +401,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.16</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.17</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -481,14 +483,16 @@
       '<div class="card"><h3>회사별 자산</h3>' + coRows + '<div class="note codet">회사를 누르면 오른쪽 두 카드가 바뀝니다<a href="#/company/' + encodeURIComponent(co) + '">회사별 상세 보기 ›</a></div></div>' +
       '<div class="card"><h3>자산 유형 · ' + esc(co) + '</h3><div class="dn">' + donut(typC, cA.length.toLocaleString(), 'catg', co, true) + '<div class="lgs">' + legend(typC, 'catg', co, true) + '</div></div></div>' +
       '<div class="card"><h3>자산 상태 · ' + esc(co) + '</h3><div class="dn">' + donut(stsC, cA.length.toLocaleString(), 'status', co) + '<div class="lgs">' + legend(stsC, 'status', co) + '</div></div></div></div>' +
-      '<div class="dgrid">' +
+      '<div class="dgrid3">' +
       '<div class="card"><h3>부서별 자산 수 <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + bars(groupCount(A, function (a) { return a.dept; }).slice(0, 5), null, 'dept') + '</div>' +
-      '<div class="card"><h3>PC 수집 현황</h3>' + cbar + legend(coll) + '<div class="note" style="margin-top:6px">프로그램을 한 번도 실행하지 않은 PC는 미수집으로 집계됩니다.</div></div></div>' +
+      '<div class="card"><h3>PC 수집 현황</h3>' + cbar + legend(coll) + '<div class="note" style="margin-top:6px">프로그램을 한 번도 실행하지 않은 PC는 미수집으로 집계됩니다.</div></div>' +
+      '<div class="card"><h3>소속별 등록 IP <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + (S.ipErr ? '<div class="note">IP 관리 데이터가 아직 없습니다.</div>' : bars(groupCount(S.ips, function (r) { return r.org; }).slice(0, 5), null, 'ipOrg')) + '</div></div>' +
       '<div class="card dwide"><div class="row"><h3 style="flex:1;margin:0">보증 만료·교체 알림</h3>' + (wr.length > 6 ? '<span class="note">외 ' + (wr.length - 6) + '건</span>' : '') + '<a href="#/assets" style="font-size:11.5px">자산 목록 ›</a></div><table class="tbl dtbl"><thead><tr><th>자산번호</th><th>유형</th><th>사용자</th><th>만료일/기준</th><th>상태</th></tr></thead><tbody>' + wrows + '</tbody></table><div class="note" style="margin-top:6px">보증 만료 30일 전~만료 후 90일, 그리고 구매일(없으면 제조년월) 기준 5년 이상 사용한 PC·노트북을 표시합니다.</div></div>' +
       '<div class="card dwide"><h3>최근 활동</h3>' + arows + '</div>');
     if (isMain()) $$('.ar.clk').forEach(function (el) { el.onclick = function () { AUDV = { from: el.dataset.at, to: el.dataset.at, actor: '', target: el.dataset.tg, q: '', chip: 'all', page: 0 }; location.hash = '#/audit'; }; });
     $$('.corow').forEach(function (el) { el.onclick = function () { DASH_CO = el.getAttribute('data-co'); pageDashboard(); }; });
-    $$('[data-go]').forEach(function (el) { el.onclick = function () { var p = el.getAttribute('data-go'), i = p.indexOf(':'); goAssets(p.slice(0, i), p.slice(i + 1), el.getAttribute('data-co')); }; });
+    $$('[data-go]').forEach(function (el) { var p0 = el.getAttribute('data-go'); if (p0.indexOf('ipOrg:') === 0) return; el.onclick = function () { var p = el.getAttribute('data-go'), i = p.indexOf(':'); goAssets(p.slice(0, i), p.slice(i + 1), el.getAttribute('data-co')); }; });
+    $$('.bar.go[data-go^="ipOrg:"]').forEach(function (el) { el.onclick = function () { goIp('org', el.getAttribute('data-go').slice(6)); }; });
   }
   // ---------- v1.9.6: 회사별 자산 상세 ----------
   function pageCompany(arg) {
@@ -3083,10 +3087,13 @@
       '<a class="dk" href="#" data-go="동명 확인"><span class="ic" style="background:#8a6d0022"><i style="background:#c9a400"></i></span><span><span class="t">동명 확인</span><span class="n">' + n.name.toLocaleString() + '</span><span class="s">동명이인 가능성</span></span></a>' +
       '<div class="dk" style="cursor:default"><span class="ic" style="background:#7a4bd622"><i style="background:#7a4bd6"></i></span><span><span class="t">소속 수</span><span class="n">' + n.orgCnt.toLocaleString() + '</span><span class="s">건물·사업본부</span></span></div>' +
       '</div>';
-    var byOrg = groupCount(S.ips, function (r) { return r.org; }).slice(0, 5);
+    var allOrgCounts = groupCount(S.ips, function (r) { return r.org; });
+    var byOrg = allOrgCounts.slice(0, 5);
     var orgCard = '<div class="card"><h3>소속별 등록 IP <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + bars(byOrg, null, 'org') + '</div>';
     // 소속별 대역 도넛+범례 (그래프 대신 — 기존 "자산 유형" 위젯과 같은 방식: 상위 4개 + 기타)
-    var orgsForLegend = byOrg.map(function (x) { return x[0]; });
+    // 건물·사업단위가 아닌 소속(속초사업단 · 전략채널지원파트 · 본사직할)은 도넛 카드에서 제외
+    var IP_ORG_DONUT_EXCL = ['속초사업단', '전략채널지원파트', '본사직할'];
+    var orgsForLegend = allOrgCounts.filter(function (x) { return IP_ORG_DONUT_EXCL.indexOf(x[0]) < 0; }).map(function (x) { return x[0]; });
     var legendCards = orgsForLegend.map(function (org) {
       var rows = S.ips.filter(function (r) { return r.org === org; });
       var parts = top4(rows, function (r) { return r.band || '미기재'; }, function (band) { return ipBandColor(org, band); });
@@ -3117,7 +3124,7 @@
     });
   }
   var IPCOL = {
-    org: { f: function (r) { return r.org; }, t: 's', l: '소속' }, floor: { f: function (r) { return r.floor; }, t: 's', l: '층' },
+    org: { f: function (r) { return r.org; }, t: 's', l: '소속' }, dept1: { f: function (r) { return r.dept1; }, t: 's', l: '본부/부문' }, floor: { f: function (r) { return r.floor; }, t: 's', l: '층' },
     band: { f: function (r) { return r.band; }, t: 's', l: '대역' }, ip: { f: function (r) { return r.ip; }, t: 'ip', l: 'IP' },
     kind: { f: function (r) { return r.kind; }, t: 's', l: '구분' }, user_name: { f: function (r) { return r.user_name; }, t: 's', l: '사용자' },
     title: { f: function (r) { return r.title; }, t: 's', l: '직책' }, status: { f: function (r) { return r.status; }, t: 's', l: '상태' }
@@ -3127,16 +3134,16 @@
     var pages = Math.max(1, Math.ceil(list.length / IPS_PS)); if (IPF.page > pages) IPF.page = pages;
     var pageRows = list.slice((IPF.page - 1) * IPS_PS, IPF.page * IPS_PS), vw = isViewer();
     var rows = pageRows.map(function (r) {
-      return '<tr class="clk" data-id="' + r.id + '"><td>' + esc(r.org) + '</td><td>' + esc(r.floor || '—') + '</td><td>' + esc(r.band || '—') + '</td><td class="mono">' + esc(vw ? mkIp(r.ip) : r.ip) + '</td><td>' + esc(r.kind) + '</td>' +
+      return '<tr class="clk" data-id="' + r.id + '"><td>' + esc(r.org) + '</td><td>' + esc(r.dept1 || '—') + '</td><td>' + esc(r.floor || '—') + '</td><td>' + esc(r.band || '—') + '</td><td class="mono">' + esc(vw ? mkIp(r.ip) : r.ip) + '</td><td>' + esc(r.kind) + '</td>' +
         '<td>' + esc(vw ? mkName(r.user_name) : r.user_name) + '</td><td>' + esc(r.title || '') + '</td><td>' + ipChkBadge(flags[r.id]) + '</td><td>' + esc(r.status) + '</td></tr>';
-    }).join('') || '<tr><td colspan="9" class="note" style="padding:24px;text-align:center">조건에 맞는 IP가 없습니다.</td></tr>';
+    }).join('') || '<tr><td colspan="10" class="note" style="padding:24px;text-align:center">조건에 맞는 IP가 없습니다.</td></tr>';
     var chips = [];
     if (IPF.org) chips.push(['org', '소속: ' + IPF.org]); if (IPF.floor) chips.push(['floor', '층: ' + IPF.floor]); if (IPF.band) chips.push(['band', '대역: ' + IPF.band]);
     if (IPF.kind) chips.push(['kind', '구분: ' + IPF.kind]); if (IPF.status) chips.push(['status', '상태: ' + IPF.status]);
     if (IPF.chk) chips.push(['chk', '점검: ' + (IPF.chk === 'info' ? '정보 확인' : IPF.chk)]); if (IPF.q.trim()) chips.push(['q', '검색: ' + IPF.q.trim()]);
     var chipHtml = chips.length ? '<div class="fchips"><span class="note">적용된 조건</span>' + chips.map(function (c) { return '<span class="fchip">' + esc(c[1]) + '<button type="button" data-clr="' + c[0] + '" title="해제">✕</button></span>'; }).join('') + '<a href="#" id="ipclrall">모두 해제</a><span class="grow"></span><span class="note">해당 <b>' + list.length.toLocaleString() + '</b>건</span></div>' : '';
     var inner = chipHtml + sortBar('ip', IPCOL, list.length) +
-      '<div style="overflow:auto"><table class="tbl ctr"><thead><tr>' + thS('ip', 'org', '소속') + thS('ip', 'floor', '층') + thS('ip', 'band', '대역') + thS('ip', 'ip', 'IP') + thS('ip', 'kind', '구분') + thS('ip', 'user_name', '사용자') + thS('ip', 'title', '직책') + '<th>점검(자동)</th>' + thS('ip', 'status', '상태') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div style="overflow:auto"><table class="tbl ctr"><thead><tr>' + thS('ip', 'org', '소속') + thS('ip', 'dept1', '본부/부문') + thS('ip', 'floor', '층') + thS('ip', 'band', '대역') + thS('ip', 'ip', 'IP') + thS('ip', 'kind', '구분') + thS('ip', 'user_name', '사용자') + thS('ip', 'title', '직책') + '<th>점검(자동)</th>' + thS('ip', 'status', '상태') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="pager"><span>' + (list.length ? ((IPF.page - 1) * IPS_PS + 1) + '–' + Math.min(list.length, IPF.page * IPS_PS) : 0) + ' / ' + list.length.toLocaleString() + '건</span><span><button class="btn sm" id="ipprev"' + (IPF.page <= 1 ? ' disabled' : '') + '>‹ 이전</button> ' + IPF.page + ' / ' + pages + ' <button class="btn sm" id="ipnext"' + (IPF.page >= pages ? ' disabled' : '') + '>다음 ›</button></span></div>';
     if (partial && $('#iplist')) { $('#iplist').innerHTML = inner; bindIpList(); return; }
     function sel(id, ph, opts, cur) { return '<select id="' + id + '"><option value="">' + ph + '</option>' + opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>'; }
@@ -3161,12 +3168,21 @@
       $$('tr.clk', $('#iplist')).forEach(function (tr) { tr.onclick = function () { var r = S.ips.filter(function (x) { return String(x.id) === tr.dataset.id; })[0]; if (r) ipDialog(r); }; });
     }
   }
+  function ipUseChips(rs, numeric, vw) {   // v1.9.17: 사용 중 IP를 칩 그리드로 (뷰어는 마스킹)
+    return rs.map(function (r) {
+      var resv = r.status === '회수 예정' || r.status === '반납' || r.status === '공석';
+      var oct = numeric ? '.' + (vw ? '**' : String(r.ip).split('.').slice(-1)[0]) : esc(vw ? mkIp(r.ip) : r.ip);
+      var label = resv ? r.status : (vw ? mkName(r.user_name) : (r.user_name || ''));
+      var tip = (vw ? '' : esc(r.ip)) + (r.title && !vw ? (r.ip ? ' · ' : '') + esc(r.title) : '');
+      return '<div class="chip' + (resv ? ' res' : '') + '"' + (tip ? ' title="' + tip + '"' : '') + '><span class="o">' + oct + '</span><span class="n">' + esc(label) + '</span></div>';
+    }).join('') || '<div class="note" style="grid-column:1/-1">사용 중인 IP가 없습니다.</div>';
+  }
   function pageIpBand() {
-    var org = IPF.bandOrg || ipOrgs()[0];
+    var org = IPF.bandOrg || ipOrgs()[0], vw = isViewer();
     var rows = S.ips.filter(function (r) { return r.org === org; });
     var byBand = {}; rows.forEach(function (r) { var b = r.band || '미기재'; byBand[b] = byBand[b] || []; byBand[b].push(r); });
     var bands = Object.keys(byBand).sort(function (a, b) { var na = parseFloat(a), nb = parseFloat(b); if (!isNaN(na) && !isNaN(nb)) return na - nb; return String(a).localeCompare(String(b)); });
-    var body = bands.map(function (b) {
+    var body = bands.map(function (b, bi) {
       var rs = byBand[b], used = rs.length, numeric = /^\d+$/.test(b);
       var cap = numeric ? 253 : null;   // 192.168.b.2~254 가정
       var usedOct = {}; if (numeric) rs.forEach(function (r) { var p = String(r.ip).split('.'); if (p.length === 4) usedOct[p[3]] = 1; });
@@ -3176,8 +3192,10 @@
       return '<div class="card" style="margin-bottom:10px"><div class="row wrap"><h3 style="flex:1;margin:0">대역 ' + esc(b) + '</h3>' +
         (numeric ? '<span class="note">사용 ' + Object.keys(usedOct).length + ' · 빈 IP ' + free + '</span>' : '<span class="note">특수 대역 · 직접 관리</span>') + '</div>' +
         (numeric ? '<div class="pb big" style="margin:8px 0"><i style="width:' + pct + '%;background:' + ipBandColor(org, b) + '"></i></div>' : '') +
-        (numeric && next ? '<div class="row" style="margin:6px 0"><span class="note">다음 빈 IP 후보</span><code class="mono">' + esc(next) + '</code><button class="btn sm" data-cp="' + esc(next) + '" type="button">복사</button><button class="btn sm pri wonly" data-reg="' + esc(next) + '" data-org="' + esc(org) + '" data-band="' + esc(b) + '" type="button">이 IP로 등록</button></div>' : '') +
-        '<div class="note">' + rs.map(function (r) { return esc(r.ip) + (r.status === '회수 예정' || r.status === '반납' || r.status === '공석' ? ' <span style="color:#8a8a8a">(' + esc(r.status) + ')</span>' : ' ' + esc(r.user_name || '')); }).join(' · ') + '</div></div>';
+        '<div class="row wrap" style="margin:6px 0">' +
+        (numeric && next ? '<span class="note">다음 빈 IP 후보</span><code class="mono">' + esc(next) + '</code><button class="btn sm" data-cp="' + esc(next) + '" type="button">복사</button><button class="btn sm pri wonly" data-reg="' + esc(next) + '" data-org="' + esc(org) + '" data-band="' + esc(b) + '" type="button">이 IP로 등록</button>' : '<span class="note">사용 ' + used + '건</span>') +
+        '<div class="grow"></div><button class="toggle" type="button" data-i="' + bi + '" data-n="' + used + '"><span class="tglabel">사용 중 IP 보기 (' + used + ')</span> <span class="toparrow">▾</span></button></div>' +
+        '<div class="chipgrid" id="ipgrid' + bi + '">' + ipUseChips(rs, numeric, vw) + '</div></div>';
     }).join('') || '<div class="note">이 소속의 IP가 없습니다.</div>';
     shell('ip', '<h1>IP 관리</h1>' + ipTabs('band') +
       '<div class="row" style="margin-top:10px"><select id="bandorg">' + ipOrgs().map(function (o) { return '<option' + (o === org ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select><span class="note">총 ' + rows.length.toLocaleString() + '건</span></div>' +
@@ -3185,6 +3203,13 @@
     $('#bandorg').onchange = function () { IPF.bandOrg = this.value; pageIpBand(); };
     $$('[data-cp]').forEach(function (b) { b.onclick = function () { try { navigator.clipboard.writeText(b.dataset.cp); toast('복사했습니다.'); } catch (e) { toast('직접 선택해서 복사하세요.'); } }; });
     $$('[data-reg]').forEach(function (b) { b.onclick = function () { ipDialog(null, { org: b.dataset.org, band: b.dataset.band, ip: b.dataset.reg }); }; });
+    $$('.toggle', $('#view')).forEach(function (btn) {
+      btn.onclick = function () {
+        var g = $('#ipgrid' + this.dataset.i), open = g.classList.toggle('open');
+        this.querySelector('.toparrow').classList.toggle('open-arrow', open);
+        this.querySelector('.tglabel').textContent = (open ? '사용 중 IP 접기 (' : '사용 중 IP 보기 (') + this.dataset.n + ')';
+      };
+    });
   }
   // ---------- 등록 · 수정 창 ----------
   var IPFLBL = { org: '소속', floor: '층', band: '대역', ip: 'IP', kind: '구분', user_name: '사용자', title: '직책', dept1: '본부/부문', dept2: '팀/파트', emp_no: '사번', seat: '자리', status: '상태', note: '비고' };
@@ -3538,7 +3563,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.16', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.17', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -3550,7 +3575,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공)'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기)'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;

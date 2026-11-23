@@ -278,6 +278,10 @@ body.viewer .wonly{display:none!important}
 .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch}
 .dgrid .card{min-width:0;margin:0}
 @media (max-width:760px){.dgrid{grid-template-columns:1fr}}
+/* v1.9.17 대시보드 하단 3등분 (부서별 자산 수 | PC 수집 현황 | 소속별 등록 IP) */
+.dgrid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px;align-items:stretch}
+.dgrid3 .card{min-width:0;margin:0}
+@media (max-width:980px){.dgrid3{grid-template-columns:1fr}}
 /* v1.9.5 이력 선택 */
 .audmenu{position:fixed;z-index:60;width:320px;background:#fff;border:1px solid #cfd6df;border-radius:8px;box-shadow:0 6px 18px #0003;padding:4px 0}
 .audmenu button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 14px;font-size:12.5px;cursor:pointer}
@@ -318,3 +322,16 @@ body.viewer .wonly{display:none!important}
 .fltpop .fl label span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fltpop .fl em{font-style:normal;color:#8a8a8a;font-size:11px}
 .fltpop .fb{padding:10px;display:flex;justify-content:flex-end;gap:8px}
 .sortbar .fchip button{border:0;background:none;cursor:pointer;color:#0f6cbd;margin-left:4px}
+
+/* v1.9.17 대역 현황: 사용 중 IP 접기/펼치기 + 칩 그리드 */
+.toggle{background:none;border:1px solid #d7dbe0;border-radius:6px;font-size:12px;padding:4px 10px;cursor:pointer;color:#0f6cbd;white-space:nowrap}
+.toggle:hover{background:#f0f4fa}
+.toparrow{display:inline-block;transition:transform .15s}
+.toparrow.open-arrow{transform:rotate(180deg)}
+.chipgrid{display:none;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-top:10px}
+.chipgrid.open{display:grid}
+.chip{border:1px solid #e3e5e8;border-radius:6px;padding:5px 7px;font-size:11px;background:#f8fafb;overflow:hidden}
+.chip .o{font-weight:700;color:#0f6cbd;font-family:monospace}
+.chip .n{display:block;color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.chip.res{background:#e3ecfa}
+.chip.res .n{color:#4263eb}
