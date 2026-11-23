@@ -60,6 +60,7 @@ textarea{height:70px;padding:8px 10px;width:100%}
 .tbl tr.clk{cursor:pointer}.tbl tr.clk:hover td{background:#f7fbff}
 /* v1.9.20: 목록 표 헤더 고정(스크롤해도 th가 상단에 붙어있음) — 자산 관리·IP 대장·인사 정보·이력 관리·관리자 */
 .tscroll{max-height:calc(100vh - 300px);min-height:220px;overflow:auto;border:1px solid #e5e5e5;border-radius:6px}
+.tscroll-emp{max-height:calc(100vh - 430px)}   /* v1.9.31: 인사 정보는 KPI 카드 5개만큼 머리말이 더 길어서 전용 높이 계산(Frame 25) */
 .tscroll .tbl{border:0;border-radius:0;overflow:visible}
 .tscroll table.tbl thead th{position:sticky;top:0;z-index:2;box-shadow:0 1px 0 #e0e0e0}
 .tbl td.auto,.tbl th.auto{background:#f2f8fe}
@@ -91,6 +92,14 @@ textarea{height:70px;padding:8px 10px;width:100%}
 .tbl tr.sel td{background:#eef5fc}
 
 .gs{width:320px;height:30px;border:0;border-radius:15px;background:#f2f4f8;padding:0 14px;font-size:12px;font-family:inherit}
+.gswrap{position:relative;display:inline-block}   /* v1.9.31: Frame 28 통합 검색 드롭다운 */
+.gsdrop{position:absolute;top:36px;left:0;width:340px;max-height:360px;overflow-y:auto;background:#fff;border:1px solid #cfd6df;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);z-index:50}
+.gssec{padding:6px 12px;font-size:10.5px;color:#8a8f98;background:#f7f8fa;border-top:1px solid #eef0f3}
+.gssec:first-child{border-top:0}
+.gssec a{float:right;color:#0f6cbd}
+.gsitem{padding:7px 12px;font-size:12px;border-top:1px solid #f3f4f6;cursor:pointer}
+.gsitem:hover{background:#e7f1fb}
+.gsempty{padding:12px;font-size:12px;color:#8a8f98;text-align:center}
 .dks{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap}
 .dk{flex:1;min-width:170px;background:#fff;border:1px solid #e5e8ee;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;color:inherit}
 .dk:hover{border-color:#bcd7f2;box-shadow:0 2px 8px rgba(15,108,189,.08)}
@@ -252,7 +261,7 @@ body.viewer #qrtop,body.viewer #b-qr,body.viewer #b-status,body.viewer #supremot
 .invlist .invrow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid #e5e8ee;border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;font-size:12.5px}
 .scanfab{position:sticky;bottom:10px;text-align:center;margin-top:10px}.btn.big{height:42px;padding:0 22px;font-size:14px}.scbtns{display:flex;gap:8px;flex-wrap:wrap}
 body.viewer .wonly{display:none!important}
-@media (max-width:760px){.layout{flex-direction:column;height:auto!important}.side{width:100%;padding:0;flex-direction:row;align-items:center;overflow-x:auto}.side .brand{padding:0 12px;white-space:nowrap}.nav{display:flex;flex-direction:row}.nav a{white-space:nowrap;height:40px;border-left:0}.nav .sep,.nav .soon{display:none}.top .gs{display:none}.kpis{flex-wrap:wrap}.kpi{min-width:44%}.cards{flex-direction:column}table.tbl{display:block;overflow-x:auto}}
+@media (max-width:760px){.layout{flex-direction:column;height:auto!important}.side{width:100%;padding:0;flex-direction:row;align-items:center;overflow-x:auto}.side .brand{padding:0 12px;white-space:nowrap}.nav{display:flex;flex-direction:row}.nav a{white-space:nowrap;height:40px;border-left:0}.nav .sep,.nav .soon{display:none}.top .gswrap{display:none}.kpis{flex-wrap:wrap}.kpi{min-width:44%}.cards{flex-direction:column}table.tbl{display:block;overflow-x:auto}}
 
 .login{max-width:380px;padding:32px 30px}
 .login.otpsetup{max-width:460px}
