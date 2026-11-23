@@ -1,4 +1,6 @@
-/* IT 자산관리시스템 v1.9.13 - 관리자 웹 (정적 페이지, Supabase 연동) */
+/* IT 자산관리시스템 v1.9.15 - 관리자 웹 (정적 페이지, Supabase 연동)
+   v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
+            RPA PC 탭과 엑셀 내보내기는 2차에서 추가 예정. */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -9,9 +11,9 @@
   if (!DEMO) sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
   var PC_CATS = ['PC', '노트북', 'PC 본체'];
-  var S = { assets: [], employees: [], devices: [], history: [], support: [], supportErr: false, imports: [], impErr: false, user: null };
+  var S = { assets: [], employees: [], devices: [], history: [], support: [], supportErr: false, imports: [], impErr: false, ips: [], ipErr: false, user: null };
   var CO = ['A+에셋', '파인랩', '원수사'];   // v1.9.6: 자산의 회사 (대시보드·회사별 자산)
-  var F = { q: '', dept: '', cat: '', catg: '', status: '', company: '', collect: '', page: 1, sel: {} };
+  var F = { q: '', dept: '', cat: '', catg: '', status: '', company: '', collect: '', linkst: '', page: 1, sel: {} };
   var HOLD_KEY = 'itam_hold_v1';
   // v1.9.4: 조회 전용 계정은 쓰기를 화면에서도 막음 (서버 RLS가 최종으로 막음)
   if (sb) {
@@ -133,7 +135,23 @@
     var mAs = assets.filter(function (a) { return a.category === '모니터'; }), d0 = devices[0], monitors = [];
     mAs.forEach(function (a, k) { a.serial_no = 'ZZN5H4' + ('0000' + (k * 37 + 11)).slice(-4); });
     if (d0 && mAs[0]) { mAs[0].linked_pc = d0.asset_no; monitors.push({ id: 'm1', device_id: d0.id, maker: '삼성', model: mAs[0].model, serial: mAs[0].serial_no, made_ym: '2021-08', resolution: '1920×1080', size_inch: '24', asset_no: mAs[0].asset_no, link_source: 'auto', gone: false, last_seen: new Date().toISOString() }, { id: 'm2', device_id: d0.id, maker: 'LG', model: '24MK430H', serial: '003NTAB7001', made_ym: '2020-03', resolution: '1920×1080', size_inch: '24', asset_no: null, link_source: null, gone: false, last_seen: new Date().toISOString() }); }
-    return { assets: assets, employees: emps, devices: devices, history: hist, support: sup, monitors: monitors };
+    // v1.9.15: IP 관리 데모 데이터 (실제 19개 소속 중 일부만 간략히 재현)
+    var ipOrgList = ['A+에셋(미림타워)', '파인랩(익성빌딩)', '강북사업본부', '대구사업본부(디에스라이프빌딩)'];
+    var ipBandsDemo = { 'A+에셋(미림타워)': ['101', '45'], '파인랩(익성빌딩)': ['1', '45', '미기재'], '강북사업본부': ['63'], '대구사업본부(디에스라이프빌딩)': ['170'] };
+    var ips = [], ipId = 1;
+    ipOrgList.forEach(function (org) {
+      (ipBandsDemo[org] || []).forEach(function (band) {
+        for (var i = 0; i < 6; i++) {
+          var e2 = emps[(ipId + i) % emps.length], last = 10 + i;
+          var ip = band === '미기재' ? '192.168.0.' + (200 + i) : '192.168.' + band + '.' + last;
+          ips.push({ id: ipId++, org: org, floor: org === '파인랩(익성빌딩)' ? '4' : '14', band: band, ip: ip, kind: 'PC', user_name: e2.name, title: e2.title, dept1: e2.dept, dept2: e2.team, emp_no: e2.emp_no, seat: null, status: '사용', note: null, changed_at: ymd(new Date()) });
+        }
+      });
+    });
+    // 데모용 중복 1건, 직책 미확인 1건
+    ips.push({ id: ipId++, org: 'A+에셋(미림타워)', floor: '14', band: '101', ip: ips[0].ip, kind: 'PC', user_name: '데모중복', title: '프로', dept1: '전사', dept2: '', emp_no: '', seat: null, status: '사용', note: null, changed_at: ymd(new Date()) });
+    ips.push({ id: ipId++, org: '강북사업본부', floor: '-', band: '63', ip: '192.168.63.90', kind: 'PC', user_name: '데모미확인', title: '직책 미확인', dept1: '', dept2: '', emp_no: '', seat: null, status: '사용', note: null, changed_at: ymd(new Date()) });
+    return { assets: assets, employees: emps, devices: devices, history: hist, support: sup, monitors: monitors, ips: ips };
   }
   async function fetchAll(table, order) {
     var out = [], from = 0, step = 1000;
@@ -152,7 +170,7 @@
     var q = S.employees[S.employees.length - 1]; if (q && !q.__d) { q.__d = 1; q.active = false; q.left_at = dstr(new Date(y, m, 2)); q.left_est = true; }
   }
   async function loadAll() {
-    if (DEMO) { var d = demoData(); S.assets = d.assets.map(function (a) { return a; }); S.employees = d.employees; S.devices = d.devices; S.history = d.history; S.support = d.support; S.monitors = d.monitors; S.imports = S.imports || []; S.dates = true; S.est = true; demoDates(); rebuildAssets(); return; }
+    if (DEMO) { var d = demoData(); S.assets = d.assets.map(function (a) { return a; }); S.employees = d.employees; S.devices = d.devices; S.history = d.history; S.support = d.support; S.monitors = d.monitors; S.ips = d.ips; S.imports = S.imports || []; S.dates = true; S.est = true; demoDates(); rebuildAssets(); return; }
     var res = await Promise.all([fetchAll('assets', 'asset_no'), fetchAll('employees', 'emp_no'), fetchAll('devices', 'mac'),
       sb.from('asset_history').select('*').order('created_at', { ascending: false }).limit(50)]);
     S.assets = res[0]; S.employees = res[1]; S.devices = res[2]; S.history = res[3].data || [];
@@ -164,6 +182,7 @@
     S.supportErr = !!sr.error; S.support = sr.error ? [] : sr.data;   // v1.0 DB(표 없음)에서도 나머지 화면은 동작
     var mr = await sb.from('device_monitors').select('*').eq('gone', false).limit(5000);
     S.monErr = !!mr.error; S.monitors = mr.error ? [] : mr.data;   // v1.9.4 SQL 실행 전에도 나머지 화면은 동작
+    try { S.ips = await fetchAll('ip_ledger', 'id'); S.ipErr = false; } catch (e) { S.ips = []; S.ipErr = true; }   // v1.9.15 SQL 실행 전에도 나머지 화면은 동작
     rebuildAssets(); snapDaily();
   }
   // 자산 + 연결된 PC + 사용자 불일치를 클라이언트에서 계산 (v_assets 와 같은 규칙)
@@ -178,6 +197,20 @@
       a.storage = d ? d.storage : null; a.os = d ? d.os : null; a.gpu = d ? d.gpu : null; a.mac = d ? d.mac : null; a.last_seen = d ? d.last_seen : null;
       a.user_mismatch = !!(a.user_name && e && a.user_name !== e.name && a.user_name.charAt(0) !== '(');
     });
+  }
+  // v1.9.14: 모니터 자산 "전체 재매칭" — 미연결 모니터 전체를 서버에서 즉시 재비교
+  async function monitorRelinkAll(btn) {
+    if (isViewer()) { toast('조회 전용 계정은 사용할 수 없습니다.'); return; }
+    if (DEMO) { toast('데모 모드에서는 재매칭을 실행할 수 없습니다.'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = '재매칭 중…'; }
+    try {
+      var r = await sb.rpc('monitor_relink_all'); if (r.error) throw r.error;
+      var n = r.data || 0;
+      await loadAll();
+      toast(n > 0 ? '재매칭 완료 — ' + n + '건이 새로 연결되었습니다.' : '재매칭 완료 — 새로 연결된 건이 없습니다.');
+      pageAssets();
+    } catch (e) { fail(e); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = '⟳ 전체 재매칭'; } }
   }
   async function dbUpdateAsset(no, patch, reason, quiet) {
     needWrite();
@@ -354,14 +387,14 @@
   // v1.9.6: 자산 유형 묶음 (대시보드 고정 순서: 모니터 → PC → 노트북 → 스캐너 → 기타)
   var CATG = ['모니터', 'PC', '노트북', '스캐너', '기타'], CATG_COL = { '모니터': '#2f7df6', 'PC': '#1e8e3e', '노트북': '#c42b1c', '스캐너': '#e9a100', '기타': '#b0b7c3' };
   function catGrp(c) { c = String(c || ''); return c === '모니터' ? '모니터' : (c === 'PC' || c === 'PC 본체') ? 'PC' : c === '노트북' ? '노트북' : /스캐너/.test(c) ? '스캐너' : '기타'; }
-  var ROUTES = [['dashboard', '대시보드'], ['assets', '자산 관리'], ['check', '현황 점검'], ['support', '원격 지원'], ['employees', '인사 정보'], ['data', '데이터 관리'], ['inventory', '실사 (재물조사)']];
+  var ROUTES = [['dashboard', '대시보드'], ['assets', '자산 관리'], ['ip', 'IP 관리'], ['check', '현황 점검'], ['support', '원격 지원'], ['employees', '인사 정보'], ['data', '데이터 관리'], ['inventory', '실사 (재물조사)']];
   function navRoutes() { if (isMain()) return ROUTES.concat([['audit', '이력 관리'], ['admins', '관리자'], ['reports', '보고서'], ['security', '보안 설정']]); if (!isViewer()) return ROUTES.concat([['myaccount', '내 계정']]); return ROUTES; }   // v1.9.5: 이력 관리·관리자·보고서는 메인 관리자 전용 / v1.9.11: 보안 설정도 메인 관리자 전용 / v1.9.12: 일반 관리자는 "내 계정"에서 본인 OTP 관리
   function denyPage() { shell('dashboard', '<div class="card" style="text-align:center;padding:30px 20px;max-width:560px;margin:30px auto"><div style="font-size:30px">🔒</div><h2 style="margin:6px 0">접근 권한이 없습니다</h2><div class="note" style="line-height:1.8">이 메뉴(이력 관리 · 관리자 · 보고서)는 <b>메인 관리자</b>만 열 수 있습니다.<br>주소를 직접 입력해 들어와도 이 화면이 표시됩니다.</div><div style="margin-top:14px"><a class="btn pri" href="#/dashboard">대시보드로 이동</a></div></div>'); }
   function shell(active, html) {
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.13</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.15</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -480,7 +513,7 @@
     $$('.cgo').forEach(function (el) { el.onclick = function (e) { e.preventDefault(); var p = el.getAttribute('data-go'), i = p.indexOf(':'); goAssets(p.slice(0, i), p.slice(i + 1), co); }; });
   }
   function goAssets(kind, val, co) {   // 대시보드 항목 → 조건이 걸린 자산 목록
-    F.q = ''; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; F.sel = {}; F[kind] = val; if (co && co !== '전체') F.company = co;
+    F.q = ''; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.linkst = ''; F.page = 1; F.sel = {}; F[kind] = val; if (co && co !== '전체') F.company = co;
     location.hash = '#/assets';
   }
 
@@ -500,6 +533,8 @@
     var rec = (S.monitors || []).filter(function (m) { return m.asset_no === a.asset_no; })[0]; if (!rec) return '—';
     return [rec.size_inch ? rec.size_inch + '인치' : '', rec.resolution || ''].filter(Boolean).join(' · ') || '—';
   }
+  // v1.9.14: 모니터 자산이 PC 수집 모니터(device_monitors)에 연결되어 있는지
+  function monConnected(a) { return a.category === '모니터' && (S.monitors || []).some(function (m) { return m.asset_no === a.asset_no; }); }
   function monBadge(a) {
     var L = monLink(a); if (!L) return '';
     if (L.mon) return L.pcNo ? '<span class="lkb ok">' + esc(L.pcNo) + ' · ' + L.how + '</span>' : '<span class="lkb no">PC 미연결</span>';
@@ -549,6 +584,11 @@
         if (F.collect === 'none' && !(isPc(a) && !a._dev)) return false;
         if (F.collect === 'mismatch' && !a.user_mismatch) return false;
       }
+      if (F.linkst) {   // v1.9.14: 모니터 연결 상태(연결됨/미연결) 필터
+        var conn = monConnected(a);
+        if (F.linkst === 'linked' && !conn) return false;
+        if (F.linkst === 'unlinked' && conn) return false;
+      }
       if (q && !searchHas(a, q)) return false;
       return true;
     }), 'assets', ACOL);
@@ -578,7 +618,7 @@
     var CL = { today: '오늘 확인', stale: '7일 이상 미확인', none: '미수집 PC', mismatch: '사용자 불일치' };
     var chips = [];
     if (F.dept) chips.push(['dept', '소속: ' + F.dept]); if (F.cat) chips.push(['cat', '자산분류: ' + F.cat]); if (F.status) chips.push(['status', '자산상태: ' + F.status]); if (F.company) chips.push(['company', '회사: ' + F.company]); if (F.catg) chips.push(['catg', '자산유형: ' + F.catg]);
-    if (F.collect) chips.push(['collect', '수집상태: ' + (CL[F.collect] || F.collect)]); if (qLow) chips.push(['q', '검색: ' + F.q.trim()]);
+    if (F.collect) chips.push(['collect', '수집상태: ' + (CL[F.collect] || F.collect)]); if (F.linkst) chips.push(['linkst', '연결 상태: ' + (F.linkst === 'linked' ? '연결됨' : '미연결')]); if (qLow) chips.push(['q', '검색: ' + F.q.trim()]);
     var chipHtml = chips.length ? '<div class="fchips"><span class="note">적용된 조건</span>' + chips.map(function (c) { return '<span class="fchip">' + esc(c[1]) + '<button type="button" data-clr="' + c[0] + '" title="해제">✕</button></span>'; }).join('') + '<a href="#" id="clrall">모두 해제</a><span class="grow"></span><span class="note">해당 <b>' + list.length.toLocaleString() + '</b>건</span></div>' : '';
     var bulk = '';
     if (nsel) {
@@ -610,6 +650,7 @@
       '<input type="text" id="q" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목)" style="width:330px" value="' + esc(F.q) + '">' +
       sel('company', '회사: 전체', CO, F.company) + sel('cat', '자산분류: 전체', cats, F.cat) + sel('status', '자산상태: 전체', stats, F.status) +
       '<select id="collect"><option value="">수집상태: 전체</option><option value="today"' + (F.collect === 'today' ? ' selected' : '') + '>오늘 확인</option><option value="stale"' + (F.collect === 'stale' ? ' selected' : '') + '>7일 이상 미확인</option><option value="none"' + (F.collect === 'none' ? ' selected' : '') + '>미수집 PC</option><option value="mismatch"' + (F.collect === 'mismatch' ? ' selected' : '') + '>사용자 불일치</option></select>' +
+      (F.cat === '모니터' ? '<select id="linkst"><option value="">연결 상태: 전체</option><option value="linked"' + (F.linkst === 'linked' ? ' selected' : '') + '>연결됨</option><option value="unlinked"' + (F.linkst === 'unlinked' ? ' selected' : '') + '>미연결</option></select>' + (!isViewer() ? '<button class="btn" id="b-relink" type="button">⟳ 전체 재매칭</button>' : '') : '') +
       '<button class="btn pri" id="qrtop">QR코드 출력</button><button class="btn" id="xl">엑셀 다운로드</button>' + (isMain() ? '<button class="btn dng" id="a_delall" type="button">전체 삭제…</button>' : '') + '<button class="btn pri wonly" id="a_new" type="button">＋ 직접 등록</button></div>' +
       '<div class="note" style="margin:6px 0">기존 시스템 항목 · <span style="color:#0f6cbd">파란 배경 = 프로그램이 자동으로 채우는 항목</span> · <span class="dot" style="background:#1e8e3e"></span>오늘 <span class="dot" style="background:#faad14"></span>3일 이상 <span class="dot" style="background:#c42b1c"></span>7일 이상 미확인</div>' +
       '<div id="alist">' + innerHtml + '</div>');
@@ -617,7 +658,8 @@
     updTop();
     var qEl = $('#q');
     qEl.oninput = function () { F.q = qEl.value; F.page = 1; pageAssets(true); };   // 입력칸은 다시 그리지 않고 목록만 갱신 (한글 조합 유지)
-    ['company', 'cat', 'status', 'collect'].forEach(function (id) { $('#' + id).onchange = function (e) { F[id] = e.target.value; F.page = 1; pageAssets(); }; });
+    ['company', 'cat', 'status', 'collect', 'linkst'].forEach(function (id) { var el = $('#' + id); if (el) el.onchange = function (e) { F[id] = e.target.value; F.page = 1; pageAssets(); }; });
+    var brl = $('#b-relink'); if (brl) brl.onclick = function () { monitorRelinkAll(brl); };
     if (!window.__menuClose) { window.__menuClose = 1; document.addEventListener('click', function () { var m = document.getElementById('allmenu'); if (m) m.hidden = true; }); }
     function bindList() {
     bindSort('assets', function () { F.page = 1; pageAssets(true); });
@@ -628,7 +670,7 @@
     $$('.sel').forEach(function (c) { c.onclick = function (e) { e.stopPropagation(); if (c.checked) F.sel[c.dataset.no] = 1; else delete F.sel[c.dataset.no]; pageAssets(true); }; });
     $$('tr.clk').forEach(function (r) { r.onclick = function () { location.hash = '#/asset/' + encodeURIComponent(r.dataset.no); }; });
     $$('[data-clr]').forEach(function (bt) { bt.onclick = function () { var k = bt.dataset.clr; F[k] = ''; F.page = 1; pageAssets(); }; });
-    var ca = $('#clrall'); if (ca) ca.onclick = function (e) { e.preventDefault(); F.q = ''; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; pageAssets(); };
+    var ca = $('#clrall'); if (ca) ca.onclick = function (e) { e.preventDefault(); F.q = ''; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.linkst = ''; F.page = 1; pageAssets(); };
     var bx = $('#b-xl'); if (bx) bx.onclick = function () { exportXlsx(S.assets.filter(function (a) { return F.sel[a.asset_no]; }), '선택자산'); };
     var bc = $('#b-clear'); if (bc) bc.onclick = function () { F.sel = {}; pageAssets(true); };
     var bd = $('#b-del'); if (bd) bd.onclick = function () { assetDeleteDlg('sel', S.assets.filter(function (a) { return F.sel[a.asset_no]; })); };
@@ -1782,7 +1824,7 @@
     ];
     return L;
   }
-  var AUDL = { assets: '자산', employees: '인사 명단', devices: '수집 PC', support_requests: '지원 요청', admin_users: '관리자', device_monitors: '모니터 연결', inventories: '실사' };
+  var AUDL = { assets: '자산', employees: '인사 명단', devices: '수집 PC', support_requests: '지원 요청', admin_users: '관리자', device_monitors: '모니터 연결', inventories: '실사', ip_ledger: 'IP 대장' };
   var AC = null;   // 다음 쓰기에 붙일 이력 내용 (무엇을·어떻게·왜)
   function audCtx(c) { c.t = Date.now(); if (DEMO) auditPost(c); else AC = c; }
   function auditPost(r) {
@@ -2881,6 +2923,7 @@
     var h = (location.hash || '#/dashboard').replace(/^#\//, '').split('/'), p = h[0], arg = h.slice(1).join('/');
     try {
       if (p === 'assets') pageAssets();
+      else if (p === 'ip') pageIp(arg);
       else if (p === 'company') pageCompany(arg);
       else if (p === 'asset-new') pageAssetNew();
       else if (p === 'asset') pageDetail(decodeURIComponent(arg));
@@ -2947,6 +2990,282 @@
       window.addEventListener('hashchange', route); route();
       if (!DEMO) { startSupportPoll(); startIdleTimer(); }
     } catch (e) { $app.innerHTML = '<div style="padding:40px"><h1>오류</h1><p class="err">' + esc(e.message || e) + '</p><p class="note">config.js 의 주소와 키, DB 구조(schema.sql) 실행 여부를 확인하세요.</p></div>'; console.error(e); }
+  }
+  // =====================================================================
+  // v1.9.15: IP 관리 (IP 대장) — 1차: 요약 · IP 대장 · 대역 현황
+  // RPA PC 탭 · 엑셀 내보내기는 2차에서 추가 예정
+  // =====================================================================
+  var IPS_PS = 50;
+  var IPF = { q: '', org: '', floor: '', band: '', kind: '', status: '', chk: '', page: 1, sel: {} };
+  var ORG_LIST = ['A+에셋(미림타워)', '파인랩(익성빌딩)', '강북사업본부', '강남사업본부', '경인사업본부', '수도권사업본부', '서울하이브리드본부', '본사직할', '전략채널본부', '전략채널지원파트', '가온본부', '속초사업단', '충청사업본부(사학연금회관)', '온탑HB본부', '호남사업본부(제갈량빌딩)', '부산사업본부(ABL생명빌딩)', '신부산사업본부(코스웬빌딩)', '대구사업본부(디에스라이프빌딩)', '강원사업본부(남전빌딩)'];
+  var IP_KINDS = ['PC', 'PC(RPA)', '예약', '회의실', '서버', '프린터', '복합기', '기타'];
+  var IP_STATUS = ['사용', '예약', '회수 예정', '반납', '공석'];
+  var IPAL = PAL.concat(['#d6336c', '#0ca678', '#f08c00', '#4263eb', '#9c36b5', '#2b8a3e', '#1098ad', '#e8590c']);
+  function ipOrgs() {   // 스펙의 19개 소속 + 데이터에만 있는 소속(있다면)
+    var set = {}; ORG_LIST.forEach(function (o) { set[o] = 1; }); var extra = [];
+    S.ips.forEach(function (r) { if (!set[r.org]) { set[r.org] = 1; extra.push(r.org); } });
+    return ORG_LIST.concat(extra);
+  }
+  function ipBandsOf(org) {
+    var set = {}; S.ips.forEach(function (r) { if (r.org === org && r.band) set[r.band] = 1; });
+    if (org === '파인랩(익성빌딩)') set['미기재'] = 1;
+    return Object.keys(set).sort(function (a, b) { var na = parseFloat(a), nb = parseFloat(b); if (!isNaN(na) && !isNaN(nb)) return na - nb; return String(a).localeCompare(String(b)); });
+  }
+  function ipBandColor(org, band) {
+    var key = org + '|' + band, h = 0; for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+    return IPAL[h % IPAL.length];
+  }
+  // 점검(자동) — 위에서부터 먼저 맞는 규칙 하나만 표시 (저장하지 않고 화면에서 매번 계산)
+  function ipCalc() {
+    var list = S.ips, dupCnt = {}, finOct = {}, nameOrg = {};
+    list.forEach(function (r) { dupCnt[r.ip] = (dupCnt[r.ip] || 0) + 1; });
+    list.forEach(function (r) { if (r.band === '1' || r.band === '45') { var p = String(r.ip).split('.'); if (p.length === 4) { finOct[r.org] = finOct[r.org] || {}; finOct[r.org][p[3]] = 1; } } });
+    list.forEach(function (r) { if (r.kind === 'PC' && r.title) { nameOrg[r.user_name] = nameOrg[r.user_name] || []; nameOrg[r.user_name].push(r.org + '/' + r.floor); } });
+    var flags = {};
+    list.forEach(function (r) {
+      var f = null;
+      if (dupCnt[r.ip] > 1) f = '중복';
+      else if (r.band === '미기재') {
+        var p = String(r.ip).split('.'), last = p.length === 4 ? p[3] : null;
+        f = (last != null && finOct[r.org] && finOct[r.org][last]) ? '중복 의심' : '대역 확인';
+      }
+      else if ((r.user_name || '').indexOf('미기재') >= 0) f = '사용자 확인';
+      else if ((r.note || '').indexOf('4월 말') >= 0) f = '기한 확인';
+      else if (r.title === '직책 미확인') f = '직책 확인';
+      else if (r.kind === 'PC' && r.title) { var others = (nameOrg[r.user_name] || []).filter(function (k) { return k !== r.org + '/' + r.floor; }); if (others.length) f = '동명 확인'; }
+      if (!f && r.status === '회수 예정') f = '회수 예정';
+      flags[r.id] = f;
+    });
+    return flags;
+  }
+  var IPCHK_COL = { '중복': 'bad', '중복 의심': 'yellow', '대역 확인': 'yellow', '사용자 확인': 'yellow', '기한 확인': 'yellow', '직책 확인': 'yellow', '동명 확인': 'yellow', '회수 예정': 'warn' };
+  function ipChkBadge(f) { return f ? badge(f, IPCHK_COL[f] || 'gray') : badge('정상', 'ok'); }
+  function ipStats() {
+    var flags = ipCalc(), n = { total: S.ips.length, dup: 0, dupSusp: 0, band: 0, recall: 0, info: 0, name: 0, orgs: {} };
+    S.ips.forEach(function (r) {
+      n.orgs[r.org] = 1; var f = flags[r.id];
+      if (f === '중복') n.dup++; else if (f === '중복 의심') n.dupSusp++; else if (f === '대역 확인') n.band++; else if (f === '회수 예정') n.recall++;
+      else if (f === '사용자 확인' || f === '기한 확인' || f === '직책 확인') n.info++; else if (f === '동명 확인') n.name++;
+    });
+    n.orgCnt = Object.keys(n.orgs).length; return n;
+  }
+  function goIp(kind, val) {
+    IPF.q = ''; IPF.org = ''; IPF.floor = ''; IPF.band = ''; IPF.kind = ''; IPF.status = ''; IPF.chk = ''; IPF.page = 1; IPF.sel = {}; IPF[kind] = val;
+    location.hash = '#/ip/list';
+  }
+  function ipTabs(active) {
+    return '<div class="tabs">' +
+      '<a href="#/ip/summary" class="' + (active === 'summary' ? 'on' : '') + '">요약</a>' +
+      '<a href="#/ip/list" class="' + (active === 'list' ? 'on' : '') + '">IP 대장<span class="c">' + S.ips.length.toLocaleString() + '</span></a>' +
+      '<a href="#/ip/band" class="' + (active === 'band' ? 'on' : '') + '">대역 현황</a>' +
+      '</div>';
+  }
+  function pageIp(arg) {
+    if (S.ipErr) { shell('ip', '<h1>IP 관리</h1><div class="note" style="color:#c42b1c;margin-top:8px">IP 대장 표가 아직 없습니다. db/update_v1.9.15.sql(과 필요하면 db/seed_ip_ledger_768.sql)을 Supabase에서 실행한 뒤 새로고침하세요.</div>'); return; }
+    var tab = (arg || 'summary').split('/')[0] || 'summary';
+    if (tab === 'list') pageIpList(); else if (tab === 'band') pageIpBand(); else pageIpSummary();
+  }
+  function pageIpSummary() {
+    var n = ipStats();
+    var cards = '<div class="dks">' +
+      '<a class="dk" href="#" data-go="total"><span class="ic" style="background:#2f7df622"><i style="background:#2f7df6"></i></span><span><span class="t">등록 IP 총계</span><span class="n">' + n.total.toLocaleString() + '</span><span class="s">전체</span></span></a>' +
+      '<a class="dk" href="#" data-go="중복"><span class="ic" style="background:#c42b1c22"><i style="background:#c42b1c"></i></span><span><span class="t">중복 확정</span><span class="n">' + n.dup.toLocaleString() + '</span><span class="s">같은 대역·같은 IP</span></span></a>' +
+      '<a class="dk" href="#" data-go="중복 의심"><span class="ic" style="background:#8a6d0022"><i style="background:#c9a400"></i></span><span><span class="t">중복 의심</span><span class="n">' + n.dupSusp.toLocaleString() + '</span><span class="s">파인랩 미기재</span></span></a>' +
+      '<a class="dk" href="#" data-go="대역 확인"><span class="ic" style="background:#8a6d0022"><i style="background:#c9a400"></i></span><span><span class="t">대역 미기재</span><span class="n">' + n.band.toLocaleString() + '</span><span class="s">대역 확인 필요</span></span></a>' +
+      '<a class="dk" href="#" data-go="회수 예정"><span class="ic" style="background:#d46b0822"><i style="background:#d46b08"></i></span><span><span class="t">회수 예정</span><span class="n">' + n.recall.toLocaleString() + '</span><span class="s">상태 = 회수 예정</span></span></a>' +
+      '<a class="dk" href="#" data-go="info"><span class="ic" style="background:#8a6d0022"><i style="background:#c9a400"></i></span><span><span class="t">정보 확인</span><span class="n">' + n.info.toLocaleString() + '</span><span class="s">사용자·기한·직책 확인</span></span></a>' +
+      '<a class="dk" href="#" data-go="동명 확인"><span class="ic" style="background:#8a6d0022"><i style="background:#c9a400"></i></span><span><span class="t">동명 확인</span><span class="n">' + n.name.toLocaleString() + '</span><span class="s">동명이인 가능성</span></span></a>' +
+      '<div class="dk" style="cursor:default"><span class="ic" style="background:#7a4bd622"><i style="background:#7a4bd6"></i></span><span><span class="t">소속 수</span><span class="n">' + n.orgCnt.toLocaleString() + '</span><span class="s">건물·사업본부</span></span></div>' +
+      '</div>';
+    var byOrg = groupCount(S.ips, function (r) { return r.org; }).slice(0, 5);
+    var orgCard = '<div class="card"><h3>소속별 등록 IP <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + bars(byOrg, null, 'org') + '</div>';
+    // 소속별 대역 범례 표 (브라우저에서 그래프 대신 — 기존 "자산 유형" 범례와 같은 방식)
+    var orgsForLegend = byOrg.map(function (x) { return x[0]; });
+    var legendCards = orgsForLegend.map(function (org) {
+      var rows = S.ips.filter(function (r) { return r.org === org; });
+      var parts = groupCount(rows, function (r) { return r.band || '미기재'; }).map(function (x) { return [x[0], x[1], ipBandColor(org, x[0])]; });
+      return '<div class="card"><h3>' + esc(org) + ' <span class="note" style="font-weight:400">대역별 ' + rows.length.toLocaleString() + '건</span></h3>' + legend(parts) + '</div>';
+    }).join('');
+    shell('ip', '<h1>IP 관리</h1>' + ipTabs('summary') + cards + '<div class="dgrid">' + orgCard + '</div><div class="dgrid">' + legendCards + '</div>');
+    $$('.dk[data-go]', $('#view')).forEach(function (el) {
+      el.onclick = function (e) { e.preventDefault(); var k = el.getAttribute('data-go'); if (k === 'total') location.hash = '#/ip/list'; else goIp('chk', k); };
+    });
+    // 소속별 막대(위 bars())는 data-go="org:소속명" 형태로 생성됨
+    $$('.bar.go[data-go^="org:"]', $('#view')).forEach(function (el) { el.onclick = function () { var org = el.getAttribute('data-go').slice(4); goIp('org', org); }; });
+  }
+  function ipFiltered() {
+    var flags = ipCalc(), q = IPF.q.trim().toLowerCase();
+    return S.ips.filter(function (r) {
+      if (IPF.org && r.org !== IPF.org) return false;
+      if (IPF.floor && (r.floor || '') !== IPF.floor) return false;
+      if (IPF.band && (r.band || '') !== IPF.band) return false;
+      if (IPF.kind && r.kind !== IPF.kind) return false;
+      if (IPF.status && r.status !== IPF.status) return false;
+      if (IPF.chk) {
+        var f = flags[r.id];
+        if (IPF.chk === 'info') { if (['사용자 확인', '기한 확인', '직책 확인'].indexOf(f) < 0) return false; }
+        else if (f !== IPF.chk) return false;
+      }
+      if (q && [r.org, r.floor, r.band, r.ip, r.kind, r.user_name, r.title, r.emp_no, r.seat, r.note].join(' ').toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+  }
+  var IPCOL = {
+    org: { f: function (r) { return r.org; }, t: 's', l: '소속' }, floor: { f: function (r) { return r.floor; }, t: 's', l: '층' },
+    band: { f: function (r) { return r.band; }, t: 's', l: '대역' }, ip: { f: function (r) { return r.ip; }, t: 'ip', l: 'IP' },
+    kind: { f: function (r) { return r.kind; }, t: 's', l: '구분' }, user_name: { f: function (r) { return r.user_name; }, t: 's', l: '사용자' },
+    title: { f: function (r) { return r.title; }, t: 's', l: '직책' }, status: { f: function (r) { return r.status; }, t: 's', l: '상태' }
+  };
+  function pageIpList(partial) {
+    var flags = ipCalc(), list = sortRows(ipFiltered(), 'ip', IPCOL);
+    var pages = Math.max(1, Math.ceil(list.length / IPS_PS)); if (IPF.page > pages) IPF.page = pages;
+    var pageRows = list.slice((IPF.page - 1) * IPS_PS, IPF.page * IPS_PS), vw = isViewer();
+    var rows = pageRows.map(function (r) {
+      return '<tr class="clk" data-id="' + r.id + '"><td>' + esc(r.org) + '</td><td>' + esc(r.floor || '—') + '</td><td>' + esc(r.band || '—') + '</td><td class="mono">' + esc(vw ? mkIp(r.ip) : r.ip) + '</td><td>' + esc(r.kind) + '</td>' +
+        '<td>' + esc(vw ? mkName(r.user_name) : r.user_name) + '</td><td>' + esc(r.title || '') + '</td><td>' + ipChkBadge(flags[r.id]) + '</td><td>' + esc(r.status) + '</td></tr>';
+    }).join('') || '<tr><td colspan="9" class="note" style="padding:24px;text-align:center">조건에 맞는 IP가 없습니다.</td></tr>';
+    var chips = [];
+    if (IPF.org) chips.push(['org', '소속: ' + IPF.org]); if (IPF.floor) chips.push(['floor', '층: ' + IPF.floor]); if (IPF.band) chips.push(['band', '대역: ' + IPF.band]);
+    if (IPF.kind) chips.push(['kind', '구분: ' + IPF.kind]); if (IPF.status) chips.push(['status', '상태: ' + IPF.status]);
+    if (IPF.chk) chips.push(['chk', '점검: ' + (IPF.chk === 'info' ? '정보 확인' : IPF.chk)]); if (IPF.q.trim()) chips.push(['q', '검색: ' + IPF.q.trim()]);
+    var chipHtml = chips.length ? '<div class="fchips"><span class="note">적용된 조건</span>' + chips.map(function (c) { return '<span class="fchip">' + esc(c[1]) + '<button type="button" data-clr="' + c[0] + '" title="해제">✕</button></span>'; }).join('') + '<a href="#" id="ipclrall">모두 해제</a><span class="grow"></span><span class="note">해당 <b>' + list.length.toLocaleString() + '</b>건</span></div>' : '';
+    var inner = chipHtml + sortBar('ip', IPCOL, list.length) +
+      '<div style="overflow:auto"><table class="tbl ctr"><thead><tr>' + thS('ip', 'org', '소속') + thS('ip', 'floor', '층') + thS('ip', 'band', '대역') + thS('ip', 'ip', 'IP') + thS('ip', 'kind', '구분') + thS('ip', 'user_name', '사용자') + thS('ip', 'title', '직책') + '<th>점검(자동)</th>' + thS('ip', 'status', '상태') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="pager"><span>' + (list.length ? ((IPF.page - 1) * IPS_PS + 1) + '–' + Math.min(list.length, IPF.page * IPS_PS) : 0) + ' / ' + list.length.toLocaleString() + '건</span><span><button class="btn sm" id="ipprev"' + (IPF.page <= 1 ? ' disabled' : '') + '>‹ 이전</button> ' + IPF.page + ' / ' + pages + ' <button class="btn sm" id="ipnext"' + (IPF.page >= pages ? ' disabled' : '') + '>다음 ›</button></span></div>';
+    if (partial && $('#iplist')) { $('#iplist').innerHTML = inner; bindIpList(); return; }
+    function sel(id, ph, opts, cur) { return '<select id="' + id + '"><option value="">' + ph + '</option>' + opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>'; }
+    shell('ip', '<h1>IP 관리</h1>' + ipTabs('list') +
+      '<div class="row wrap" style="margin-top:10px"><input type="text" id="ipq" placeholder="검색 (IP·이름·사번 등)" style="width:260px" value="' + esc(IPF.q) + '">' +
+      sel('iporg', '소속: 전체', ipOrgs(), IPF.org) + sel('ipkind', '구분: 전체', IP_KINDS, IPF.kind) + sel('ipstatus', '상태: 전체', IP_STATUS, IPF.status) +
+      '<select id="ipchk"><option value="">점검: 전체</option>' + ['중복', '중복 의심', '대역 확인', '사용자 확인', '기한 확인', '직책 확인', '동명 확인', '회수 예정'].map(function (c) { return '<option' + (IPF.chk === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>' +
+      '<div class="grow"></div><button class="btn" id="ipxl" type="button">엑셀 내보내기</button><button class="btn pri wonly" id="ipnew" type="button">＋ IP 추가</button></div>' +
+      (S.ipErr ? '' : '<div class="note" style="margin:6px 0">점검 색 · <span class="dot" style="background:#c42b1c"></span>중복 <span class="dot" style="background:#c9a400"></span>확인 필요 <span class="dot" style="background:#d46b08"></span>회수 예정 <span class="dot" style="background:#1e8e3e"></span>정상</div>') +
+      '<div id="iplist">' + inner + '</div>');
+    $('#ipq').oninput = function () { IPF.q = this.value; IPF.page = 1; pageIpList(true); };
+    ['iporg', 'ipkind', 'ipstatus', 'ipchk'].forEach(function (id, i) { var key = ['org', 'kind', 'status', 'chk'][i]; $('#' + id).onchange = function () { IPF[key] = this.value; IPF.page = 1; pageIpList(); }; });
+    $('#ipxl').onclick = function () { toast('엑셀 내보내기는 2차에서 제공됩니다.'); };
+    $('#ipnew').onclick = function () { ipDialog(null); };
+    bindIpList();
+    function bindIpList() {
+      bindSort('ip', function () { IPF.page = 1; pageIpList(true); });
+      var p1 = $('#ipprev'); if (p1) p1.onclick = function () { IPF.page--; pageIpList(true); };
+      var p2 = $('#ipnext'); if (p2) p2.onclick = function () { IPF.page++; pageIpList(true); };
+      $$('[data-clr]').forEach(function (b) { b.onclick = function () { IPF[b.dataset.clr] = ''; IPF.page = 1; pageIpList(); }; });
+      var ca = $('#ipclrall'); if (ca) ca.onclick = function (e) { e.preventDefault(); IPF.q = ''; IPF.org = ''; IPF.floor = ''; IPF.band = ''; IPF.kind = ''; IPF.status = ''; IPF.chk = ''; IPF.page = 1; pageIpList(); };
+      $$('tr.clk', $('#iplist')).forEach(function (tr) { tr.onclick = function () { var r = S.ips.filter(function (x) { return String(x.id) === tr.dataset.id; })[0]; if (r) ipDialog(r); }; });
+    }
+  }
+  function pageIpBand() {
+    var org = IPF.bandOrg || ipOrgs()[0];
+    var rows = S.ips.filter(function (r) { return r.org === org; });
+    var byBand = {}; rows.forEach(function (r) { var b = r.band || '미기재'; byBand[b] = byBand[b] || []; byBand[b].push(r); });
+    var bands = Object.keys(byBand).sort(function (a, b) { var na = parseFloat(a), nb = parseFloat(b); if (!isNaN(na) && !isNaN(nb)) return na - nb; return String(a).localeCompare(String(b)); });
+    var body = bands.map(function (b) {
+      var rs = byBand[b], used = rs.length, numeric = /^\d+$/.test(b);
+      var cap = numeric ? 253 : null;   // 192.168.b.2~254 가정
+      var usedOct = {}; if (numeric) rs.forEach(function (r) { var p = String(r.ip).split('.'); if (p.length === 4) usedOct[p[3]] = 1; });
+      var free = numeric ? Math.max(0, cap - Object.keys(usedOct).length) : null;
+      var next = null; if (numeric) { for (var i = 2; i <= 254; i++) if (!usedOct[i]) { next = '192.168.' + b + '.' + i; break; } }
+      var pct = numeric ? Math.round(Object.keys(usedOct).length / cap * 100) : 0;
+      return '<div class="card" style="margin-bottom:10px"><div class="row wrap"><h3 style="flex:1;margin:0">대역 ' + esc(b) + '</h3>' +
+        (numeric ? '<span class="note">사용 ' + Object.keys(usedOct).length + ' · 빈 IP ' + free + '</span>' : '<span class="note">특수 대역 · 직접 관리</span>') + '</div>' +
+        (numeric ? '<div class="pb big" style="margin:8px 0"><i style="width:' + pct + '%;background:' + ipBandColor(org, b) + '"></i></div>' : '') +
+        (numeric && next ? '<div class="row" style="margin:6px 0"><span class="note">다음 빈 IP 후보</span><code class="mono">' + esc(next) + '</code><button class="btn sm" data-cp="' + esc(next) + '" type="button">복사</button><button class="btn sm pri wonly" data-reg="' + esc(next) + '" data-org="' + esc(org) + '" data-band="' + esc(b) + '" type="button">이 IP로 등록</button></div>' : '') +
+        '<div class="note">' + rs.map(function (r) { return esc(r.ip) + (r.status === '회수 예정' || r.status === '반납' || r.status === '공석' ? ' <span style="color:#8a8a8a">(' + esc(r.status) + ')</span>' : ' ' + esc(r.user_name || '')); }).join(' · ') + '</div></div>';
+    }).join('') || '<div class="note">이 소속의 IP가 없습니다.</div>';
+    shell('ip', '<h1>IP 관리</h1>' + ipTabs('band') +
+      '<div class="row" style="margin-top:10px"><select id="bandorg">' + ipOrgs().map(function (o) { return '<option' + (o === org ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select><span class="note">총 ' + rows.length.toLocaleString() + '건</span></div>' +
+      '<div style="margin-top:10px">' + body + '</div>');
+    $('#bandorg').onchange = function () { IPF.bandOrg = this.value; pageIpBand(); };
+    $$('[data-cp]').forEach(function (b) { b.onclick = function () { try { navigator.clipboard.writeText(b.dataset.cp); toast('복사했습니다.'); } catch (e) { toast('직접 선택해서 복사하세요.'); } }; });
+    $$('[data-reg]').forEach(function (b) { b.onclick = function () { ipDialog(null, { org: b.dataset.org, band: b.dataset.band, ip: b.dataset.reg }); }; });
+  }
+  // ---------- 등록 · 수정 창 ----------
+  var IPFLBL = { org: '소속', floor: '층', band: '대역', ip: 'IP', kind: '구분', user_name: '사용자', title: '직책', dept1: '본부/부문', dept2: '팀/파트', emp_no: '사번', seat: '자리', status: '상태', note: '비고' };
+  function ipDiffs(old, patch) {
+    var out = []; Object.keys(patch).forEach(function (k) { if (!IPFLBL[k]) return; var a = old && old[k] != null ? String(old[k]) : '', b = patch[k] != null ? String(patch[k]) : ''; if (a !== b) out.push({ k: IPFLBL[k], from: a || '없음', to: b || '없음' }); });
+    return out;
+  }
+  async function dbIpSave(row, patch) {
+    needWrite();
+    if (row) {
+      var ch = ipDiffs(row, patch);
+      if (ch.length) audCtx({ table: 'ip_ledger', target: 'IP 대장 ' + row.ip, summary: 'IP 대장 ' + row.ip + ' 수정 (' + ch.length + '개 항목): ' + chgText(ch), detail: { changes: ch } });
+      patch.updated_at = new Date().toISOString();
+      if (!DEMO) { var r = await sb.from('ip_ledger').update(patch).eq('id', row.id); if (r.error) throw r.error; }
+      Object.assign(row, patch);
+    } else {
+      audCtx({ table: 'ip_ledger', target: 'IP 대장 ' + patch.ip, summary: 'IP 대장 ' + patch.ip + ' (' + (patch.user_name || patch.kind) + ') 등록' });
+      if (!DEMO) { var r2 = await sb.from('ip_ledger').insert(patch).select().single(); if (r2.error) throw r2.error; S.ips.push(r2.data); }
+      else { patch.id = (S.ips.reduce(function (m, x) { return Math.max(m, x.id); }, 0) || 0) + 1; S.ips.push(patch); }
+    }
+  }
+  async function dbIpDelete(row) {
+    needWrite();
+    audCtx({ table: 'ip_ledger', action: 'delete', target: 'IP 대장 ' + row.ip, summary: 'IP 대장 ' + row.ip + ' (' + (row.user_name || row.kind) + ') 삭제' });
+    if (!DEMO) { var r = await sb.from('ip_ledger').delete().eq('id', row.id); if (r.error) throw r.error; }
+    S.ips = S.ips.filter(function (x) { return x.id !== row.id; });
+  }
+  function ipDialog(row, preset) {
+    if (isViewer()) { toast('조회 전용 계정은 사용할 수 없습니다.'); return; }
+    var v = row ? Object.assign({}, row) : Object.assign({ org: ipOrgs()[0], kind: 'PC', status: '사용' }, preset || {});
+    var fullIpMode = !!row && (!/^192\.168\.\d+\.\d+$/.test(row.ip) || !/^\d+$/.test(row.band || ''));
+    function bandOpts(org, cur) {
+      var bs = ipBandsOf(org); if (cur && bs.indexOf(cur) < 0) bs = bs.concat([cur]);
+      return bs.map(function (b) { return '<option' + (b === cur ? ' selected' : '') + '>' + esc(b) + '</option>'; }).join('') + '<option value="__new__">+ 새 대역 직접 입력</option>';
+    }
+    var d = openModal('<div class="mh"><b>' + (row ? 'IP 수정' : 'IP 추가') + '</b><button class="mx" type="button">✕</button></div>' +
+      '<div class="ms">소속(건물명)</div><select id="ip_org" style="width:100%">' + ipOrgs().map(function (o) { return '<option' + (o === v.org ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>' +
+      '<div class="row wrap" style="margin-top:8px"><div style="flex:1"><div class="ms">층</div><input type="text" id="ip_floor" value="' + esc(v.floor || '') + '" style="width:100%"></div>' +
+      '<div style="flex:1"><div class="ms">대역</div><select id="ip_band" style="width:100%">' + bandOpts(v.org, v.band) + '</select><input type="text" id="ip_band_new" placeholder="새 대역 번호" style="width:100%;margin-top:4px;display:none"></div></div>' +
+      '<label style="display:block;margin:8px 0 2px"><input type="checkbox" id="ip_full"' + (fullIpMode ? ' checked' : '') + '> IP 전체 직접 입력 (대역-IP가 일치하지 않는 특수한 경우만)</label>' +
+      '<div id="ip_ip_simple" class="row" style="' + (fullIpMode ? 'display:none' : '') + '"><span class="note mono">192.168.<span id="ip_band_disp">' + esc(v.band || '') + '</span>.</span><input type="text" id="ip_last" placeholder="끝자리" style="width:90px" value="' + esc(v.ip ? v.ip.split('.').slice(-1)[0] : (preset && preset.ip ? preset.ip.split('.').slice(-1)[0] : '')) + '"><button class="btn sm" id="ip_sugg" type="button">빈 IP 추천</button></div>' +
+      '<input type="text" id="ip_full_ip" placeholder="예: 192.168.63.33" value="' + esc(v.ip || '') + '" style="width:100%;' + (fullIpMode ? '' : 'display:none') + '">' +
+      '<div class="row wrap" style="margin-top:8px"><div style="flex:1"><div class="ms">구분</div><select id="ip_kind" style="width:100%">' + IP_KINDS.map(function (k) { return '<option' + (k === v.kind ? ' selected' : '') + '>' + k + '</option>'; }).join('') + '</select></div>' +
+      '<div style="flex:1"><div class="ms">상태</div><select id="ip_status" style="width:100%">' + IP_STATUS.map(function (k) { return '<option' + (k === v.status ? ' selected' : '') + '>' + k + '</option>'; }).join('') + '</select></div></div>' +
+      '<div class="row wrap" style="margin-top:8px"><div style="flex:1"><div class="ms">사용자</div><input type="text" id="ip_user" value="' + esc(v.user_name || '') + '" style="width:100%"></div><div style="flex:1"><div class="ms">직책</div><input type="text" id="ip_title" value="' + esc(v.title || '') + '" style="width:100%"></div></div>' +
+      '<div class="row wrap" style="margin-top:8px"><div style="flex:1"><div class="ms">본부/부문</div><input type="text" id="ip_d1" value="' + esc(v.dept1 || '') + '" style="width:100%"></div><div style="flex:1"><div class="ms">팀/파트</div><input type="text" id="ip_d2" value="' + esc(v.dept2 || '') + '" style="width:100%"></div></div>' +
+      '<div class="row wrap" style="margin-top:8px"><div style="flex:1"><div class="ms">사번</div><input type="text" id="ip_emp" value="' + esc(v.emp_no || '') + '" style="width:100%"></div><div style="flex:1"><div class="ms">자리</div><input type="text" id="ip_seat" value="' + esc(v.seat || '') + '" style="width:100%"></div></div>' +
+      '<div class="ms">비고 (변경 사유 — 이력에 함께 저장됩니다)</div><textarea id="ip_note" rows="2" style="width:100%;box-sizing:border-box">' + esc(v.note || '') + '</textarea>' +
+      '<div id="ip_warn"></div>' +
+      '<div class="mf">' + (row ? '<button class="btn dng" id="ip_del" type="button" style="margin-right:auto">삭제</button>' : '') + '<button class="btn" id="ip_cancel" type="button">취소</button><button class="btn pri" id="ip_ok" type="button">저장</button></div>', 480);
+    function curIp() { return $('#ip_full', d.d).checked ? $('#ip_full_ip', d.d).value.trim() : ('192.168.' + $('#ip_band', d.d).value.replace('__new__', $('#ip_band_new', d.d).value.trim()) + '.' + $('#ip_last', d.d).value.trim()); }
+    function curBand() { var b = $('#ip_band', d.d).value; return b === '__new__' ? $('#ip_band_new', d.d).value.trim() : b; }
+    function refreshWarn() {
+      var org = $('#ip_org', d.d).value, band = curBand(), ip = curIp(), warns = [];
+      if (ip && S.ips.some(function (r) { return (!row || r.id !== row.id) && r.band === band && r.ip === ip; })) warns.push('같은 대역에 이미 같은 IP가 있습니다 (중복).');
+      var m = /^\d+\.\d+\.(\d+)\.\d+$/.exec(ip); if (m && band && /^\d+$/.test(band) && m[1] !== band) warns.push('입력한 대역(' + band + ')과 IP의 3번째 자리(' + m[1] + ')가 다릅니다.');
+      if ($('#ip_kind', d.d).value === 'PC' && !$('#ip_title', d.d).value.trim()) warns.push('직책이 비어 있습니다.');
+      $('#ip_warn', d.d).innerHTML = warns.length ? '<div class="warnbox" style="background:#fff8e1;color:#7a5b00">' + warns.map(esc).join('<br>') + '</div>' : '';
+    }
+    function bandChange() {
+      var isNewB = $('#ip_band', d.d).value === '__new__'; $('#ip_band_new', d.d).style.display = isNewB ? '' : 'none';
+      var disp = $('#ip_band_disp', d.d); if (disp) disp.textContent = isNewB ? $('#ip_band_new', d.d).value : $('#ip_band', d.d).value;
+      if (!/^\d+$/.test(curBand())) { $('#ip_full', d.d).checked = true; $('#ip_ip_simple', d.d).style.display = 'none'; $('#ip_full_ip', d.d).style.display = ''; }   // 숫자가 아닌 대역(미기재 등)은 IP를 직접 입력
+      refreshWarn();
+    }
+    $('#ip_org', d.d).onchange = function () { var sel = $('#ip_band', d.d); sel.innerHTML = bandOpts(this.value, ''); bandChange(); };
+    $('#ip_band', d.d).onchange = bandChange;
+    $('#ip_band_new', d.d).oninput = bandChange;
+    $('#ip_last', d.d).oninput = refreshWarn;
+    $('#ip_full_ip', d.d).oninput = refreshWarn;
+    $('#ip_kind', d.d).onchange = refreshWarn; $('#ip_title', d.d).oninput = refreshWarn;
+    $('#ip_full', d.d).onchange = function () { var on = this.checked; $('#ip_ip_simple', d.d).style.display = on ? 'none' : ''; $('#ip_full_ip', d.d).style.display = on ? '' : 'none'; refreshWarn(); };
+    $('#ip_sugg', d.d).onclick = function () {
+      var org = $('#ip_org', d.d).value, band = curBand(); if (!/^\d+$/.test(band)) { toast('숫자 대역에서만 추천할 수 있습니다.'); return; }
+      var used = {}; S.ips.forEach(function (r) { if (r.band === band) { var p = String(r.ip).split('.'); if (p.length === 4) used[p[3]] = 1; } });
+      for (var i = 2; i <= 254; i++) if (!used[i]) { $('#ip_last', d.d).value = i; refreshWarn(); return; }
+      toast('이 대역에는 빈 IP가 없습니다.');
+    };
+    $('#ip_cancel', d.d).onclick = d.close;
+    var delB = $('#ip_del', d.d); if (delB) delB.onclick = function () { if (!confirm('이 IP(' + row.ip + ')를 삭제할까요?')) return; dbIpDelete(row).then(function () { d.close(); toast('삭제했습니다.'); pageIpList(); }).catch(fail); };
+    $('#ip_ok', d.d).onclick = async function () {
+      var patch = { org: $('#ip_org', d.d).value, floor: $('#ip_floor', d.d).value.trim() || null, band: curBand() || null, ip: curIp(), kind: $('#ip_kind', d.d).value, status: $('#ip_status', d.d).value, user_name: $('#ip_user', d.d).value.trim() || null, title: $('#ip_title', d.d).value.trim() || null, dept1: $('#ip_d1', d.d).value.trim() || null, dept2: $('#ip_d2', d.d).value.trim() || null, emp_no: $('#ip_emp', d.d).value.trim() || null, seat: $('#ip_seat', d.d).value.trim() || null, note: $('#ip_note', d.d).value.trim() || null, changed_at: ymd(new Date()) };
+      if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(patch.ip || '')) { toast('IP를 올바르게 입력하세요 (예: 192.168.63.33).'); return; }
+      this.disabled = true;
+      try { await dbIpSave(row, patch); d.close(); toast('저장했습니다.'); pageIpList(); } catch (e) { this.disabled = false; fail(e); }
+    };
+    refreshWarn();
   }
   // ---------- v1.9.11: 자동 로그아웃 (v1.9.12: 10/30/60분 중 선택, S.idleMinutes) ----------
   var idleWarnT = null, idleOutT = null, idleToastEl = null, idleLast = 0;
