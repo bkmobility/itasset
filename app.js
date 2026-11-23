@@ -1,6 +1,6 @@
-/* IT 자산관리시스템 v1.9.15 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.16 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
-            RPA PC 탭과 엑셀 내보내기는 2차에서 추가 예정. */
+   v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트. */
 (function () {
   'use strict';
   var $app = document.getElementById('app');
@@ -11,7 +11,7 @@
   if (!DEMO) sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
   var PC_CATS = ['PC', '노트북', 'PC 본체'];
-  var S = { assets: [], employees: [], devices: [], history: [], support: [], supportErr: false, imports: [], impErr: false, ips: [], ipErr: false, user: null };
+  var S = { assets: [], employees: [], devices: [], history: [], support: [], supportErr: false, imports: [], impErr: false, ips: [], ipErr: false, rpas: [], rpaErr: false, user: null };
   var CO = ['A+에셋', '파인랩', '원수사'];   // v1.9.6: 자산의 회사 (대시보드·회사별 자산)
   var F = { q: '', dept: '', cat: '', catg: '', status: '', company: '', collect: '', linkst: '', page: 1, sel: {} };
   var HOLD_KEY = 'itam_hold_v1';
@@ -151,7 +151,11 @@
     // 데모용 중복 1건, 직책 미확인 1건
     ips.push({ id: ipId++, org: 'A+에셋(미림타워)', floor: '14', band: '101', ip: ips[0].ip, kind: 'PC', user_name: '데모중복', title: '프로', dept1: '전사', dept2: '', emp_no: '', seat: null, status: '사용', note: null, changed_at: ymd(new Date()) });
     ips.push({ id: ipId++, org: '강북사업본부', floor: '-', band: '63', ip: '192.168.63.90', kind: 'PC', user_name: '데모미확인', title: '직책 미확인', dept1: '', dept2: '', emp_no: '', seat: null, status: '사용', note: null, changed_at: ymd(new Date()) });
-    return { assets: assets, employees: emps, devices: devices, history: hist, support: sup, monitors: monitors, ips: ips };
+    var rpas = [
+      { id: 1, owner_co: 'A+에셋', vendor: '파인랩', task: '보유계약 이메일 포워딩', ip: '192.168.1.126', license: 'rpa02', equipment: '보유계약 이메일' },
+      { id: 2, owner_co: 'KB손보', vendor: '파인랩', task: 'KB보유계약1\nKB보유계약2', ip: '192.168.1.140\n192.168.1.160', license: 'bou01\nbou02', equipment: 'KB보유계약' }
+    ];
+    return { assets: assets, employees: emps, devices: devices, history: hist, support: sup, monitors: monitors, ips: ips, rpas: rpas };
   }
   async function fetchAll(table, order) {
     var out = [], from = 0, step = 1000;
@@ -170,7 +174,7 @@
     var q = S.employees[S.employees.length - 1]; if (q && !q.__d) { q.__d = 1; q.active = false; q.left_at = dstr(new Date(y, m, 2)); q.left_est = true; }
   }
   async function loadAll() {
-    if (DEMO) { var d = demoData(); S.assets = d.assets.map(function (a) { return a; }); S.employees = d.employees; S.devices = d.devices; S.history = d.history; S.support = d.support; S.monitors = d.monitors; S.ips = d.ips; S.imports = S.imports || []; S.dates = true; S.est = true; demoDates(); rebuildAssets(); return; }
+    if (DEMO) { var d = demoData(); S.assets = d.assets.map(function (a) { return a; }); S.employees = d.employees; S.devices = d.devices; S.history = d.history; S.support = d.support; S.monitors = d.monitors; S.ips = d.ips; S.rpas = d.rpas; S.imports = S.imports || []; S.dates = true; S.est = true; demoDates(); rebuildAssets(); return; }
     var res = await Promise.all([fetchAll('assets', 'asset_no'), fetchAll('employees', 'emp_no'), fetchAll('devices', 'mac'),
       sb.from('asset_history').select('*').order('created_at', { ascending: false }).limit(50)]);
     S.assets = res[0]; S.employees = res[1]; S.devices = res[2]; S.history = res[3].data || [];
@@ -183,6 +187,7 @@
     var mr = await sb.from('device_monitors').select('*').eq('gone', false).limit(5000);
     S.monErr = !!mr.error; S.monitors = mr.error ? [] : mr.data;   // v1.9.4 SQL 실행 전에도 나머지 화면은 동작
     try { S.ips = await fetchAll('ip_ledger', 'id'); S.ipErr = false; } catch (e) { S.ips = []; S.ipErr = true; }   // v1.9.15 SQL 실행 전에도 나머지 화면은 동작
+    try { S.rpas = await fetchAll('ip_rpa_pc', 'id'); S.rpaErr = false; } catch (e) { S.rpas = []; S.rpaErr = true; }   // v1.9.16 SQL 실행 전에도 나머지 화면은 동작
     rebuildAssets(); snapDaily();
   }
   // 자산 + 연결된 PC + 사용자 불일치를 클라이언트에서 계산 (v_assets 와 같은 규칙)
@@ -394,7 +399,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.15</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><div class="brand">IT Asset<span>v1.9.16</span></div><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><input type="search" id="gs" class="gs" placeholder="통합 검색 (관리번호·사용자·위치·메모 등 모든 항목) (Enter)" value="' + esc(F.q) + '"><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'); if (gs) gs.onkeydown = function (e) { if (e.key !== 'Enter') return; F.q = gs.value; F.dept = ''; F.cat = ''; F.catg = ''; F.status = ''; F.company = ''; F.collect = ''; F.page = 1; if (location.hash === '#/assets') pageAssets(); else location.hash = '#/assets'; };
@@ -1824,7 +1829,7 @@
     ];
     return L;
   }
-  var AUDL = { assets: '자산', employees: '인사 명단', devices: '수집 PC', support_requests: '지원 요청', admin_users: '관리자', device_monitors: '모니터 연결', inventories: '실사', ip_ledger: 'IP 대장' };
+  var AUDL = { assets: '자산', employees: '인사 명단', devices: '수집 PC', support_requests: '지원 요청', admin_users: '관리자', device_monitors: '모니터 연결', inventories: '실사', ip_ledger: 'IP 대장', ip_rpa_pc: 'RPA PC' };
   var AC = null;   // 다음 쓰기에 붙일 이력 내용 (무엇을·어떻게·왜)
   function audCtx(c) { c.t = Date.now(); if (DEMO) auditPost(c); else AC = c; }
   function auditPost(r) {
@@ -2993,7 +2998,7 @@
   }
   // =====================================================================
   // v1.9.15: IP 관리 (IP 대장) — 1차: 요약 · IP 대장 · 대역 현황
-  // RPA PC 탭 · 엑셀 내보내기는 2차에서 추가 예정
+  // v1.9.16: RPA PC 탭 · 엑셀 내보내기(10개 시트) 추가
   // =====================================================================
   var IPS_PS = 50;
   var IPF = { q: '', org: '', floor: '', band: '', kind: '', status: '', chk: '', page: 1, sel: {} };
@@ -3058,12 +3063,13 @@
       '<a href="#/ip/summary" class="' + (active === 'summary' ? 'on' : '') + '">요약</a>' +
       '<a href="#/ip/list" class="' + (active === 'list' ? 'on' : '') + '">IP 대장<span class="c">' + S.ips.length.toLocaleString() + '</span></a>' +
       '<a href="#/ip/band" class="' + (active === 'band' ? 'on' : '') + '">대역 현황</a>' +
+      '<a href="#/ip/rpa" class="' + (active === 'rpa' ? 'on' : '') + '">RPA PC<span class="c">' + S.rpas.length.toLocaleString() + '</span></a>' +
       '</div>';
   }
   function pageIp(arg) {
     if (S.ipErr) { shell('ip', '<h1>IP 관리</h1><div class="note" style="color:#c42b1c;margin-top:8px">IP 대장 표가 아직 없습니다. db/update_v1.9.15.sql(과 필요하면 db/seed_ip_ledger_768.sql)을 Supabase에서 실행한 뒤 새로고침하세요.</div>'); return; }
     var tab = (arg || 'summary').split('/')[0] || 'summary';
-    if (tab === 'list') pageIpList(); else if (tab === 'band') pageIpBand(); else pageIpSummary();
+    if (tab === 'list') pageIpList(); else if (tab === 'band') pageIpBand(); else if (tab === 'rpa') pageIpRpa(); else pageIpSummary();
   }
   function pageIpSummary() {
     var n = ipStats();
@@ -3079,12 +3085,12 @@
       '</div>';
     var byOrg = groupCount(S.ips, function (r) { return r.org; }).slice(0, 5);
     var orgCard = '<div class="card"><h3>소속별 등록 IP <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + bars(byOrg, null, 'org') + '</div>';
-    // 소속별 대역 범례 표 (브라우저에서 그래프 대신 — 기존 "자산 유형" 범례와 같은 방식)
+    // 소속별 대역 도넛+범례 (그래프 대신 — 기존 "자산 유형" 위젯과 같은 방식: 상위 4개 + 기타)
     var orgsForLegend = byOrg.map(function (x) { return x[0]; });
     var legendCards = orgsForLegend.map(function (org) {
       var rows = S.ips.filter(function (r) { return r.org === org; });
-      var parts = groupCount(rows, function (r) { return r.band || '미기재'; }).map(function (x) { return [x[0], x[1], ipBandColor(org, x[0])]; });
-      return '<div class="card"><h3>' + esc(org) + ' <span class="note" style="font-weight:400">대역별 ' + rows.length.toLocaleString() + '건</span></h3>' + legend(parts) + '</div>';
+      var parts = top4(rows, function (r) { return r.band || '미기재'; }, function (band) { return ipBandColor(org, band); });
+      return '<div class="card"><h3>' + esc(org) + ' <span class="note" style="font-weight:400">대역별 ' + rows.length.toLocaleString() + '건</span></h3><div class="dn">' + donut(parts, rows.length.toLocaleString()) + '<div class="lgs">' + legend(parts) + '</div></div></div>';
     }).join('');
     shell('ip', '<h1>IP 관리</h1>' + ipTabs('summary') + cards + '<div class="dgrid">' + orgCard + '</div><div class="dgrid">' + legendCards + '</div>');
     $$('.dk[data-go]', $('#view')).forEach(function (el) {
@@ -3143,7 +3149,7 @@
       '<div id="iplist">' + inner + '</div>');
     $('#ipq').oninput = function () { IPF.q = this.value; IPF.page = 1; pageIpList(true); };
     ['iporg', 'ipkind', 'ipstatus', 'ipchk'].forEach(function (id, i) { var key = ['org', 'kind', 'status', 'chk'][i]; $('#' + id).onchange = function () { IPF[key] = this.value; IPF.page = 1; pageIpList(); }; });
-    $('#ipxl').onclick = function () { toast('엑셀 내보내기는 2차에서 제공됩니다.'); };
+    $('#ipxl').onclick = function () { ipExportExcel(this); };
     $('#ipnew').onclick = function () { ipDialog(null); };
     bindIpList();
     function bindIpList() {
@@ -3266,6 +3272,351 @@
       try { await dbIpSave(row, patch); d.close(); toast('저장했습니다.'); pageIpList(); } catch (e) { this.disabled = false; fail(e); }
     };
     refreshWarn();
+  }
+  // =====================================================================
+  // v1.9.16: RPA PC 탭 — '익성 4층 RPA PC' 시트 보존용 (점검 자동계산 대상 아님)
+  // =====================================================================
+  function ipExtractIps(s) { var m = String(s || '').match(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/g); return m || []; }
+  function pageIpRpa() {
+    var ledgerIps = {}; S.ips.forEach(function (r) { ledgerIps[r.ip] = 1; });
+    var vw = isViewer();
+    var rows = S.rpas.map(function (r) {
+      var ips = ipExtractIps(r.ip), overlap = ips.filter(function (x) { return ledgerIps[x]; });
+      return '<tr class="clk" data-id="' + r.id + '"><td>' + esc(r.owner_co || '') + '</td><td>' + esc(r.vendor || '') + '</td><td style="white-space:pre-line;max-width:260px">' + esc(r.task || '') + '</td>' +
+        '<td class="mono" style="white-space:pre-line">' + esc(vw ? ips.map(mkIp).join('\n') : (r.ip || '')) + '</td><td>' + esc((r.license || '').replace(/\n/g, ', ')) + '</td><td style="white-space:pre-line">' + esc(r.equipment || '') + '</td>' +
+        '<td>' + (overlap.length ? badge('IP 대장과 겹침 ' + overlap.length + '건', 'warn') : '<span class="note">—</span>') + '</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="note" style="padding:24px;text-align:center">등록된 RPA PC가 없습니다.</td></tr>';
+    shell('ip', '<h1>IP 관리</h1>' + ipTabs('rpa') +
+      '<div class="row wrap" style="margin-top:10px"><span class="note">익성 4층 RPA PC 시트를 그대로 옮긴 목록입니다. 점검(자동) 계산 대상이 아니며, IP 대장과 겹치는 IP는 "겹침"으로 표시됩니다.</span><div class="grow"></div><button class="btn pri wonly" id="rpanew" type="button">＋ RPA PC 추가</button></div>' +
+      '<div style="overflow:auto;margin-top:10px"><table class="tbl"><thead><tr><th>원수사</th><th>담당회사</th><th>주요내용</th><th>IP</th><th>라이센스</th><th>장비정보</th><th>대조</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
+    $('#rpanew').onclick = function () { ipRpaDialog(null); };
+    $$('tr.clk', $('#view')).forEach(function (tr) { tr.onclick = function () { var r = S.rpas.filter(function (x) { return String(x.id) === tr.dataset.id; })[0]; if (r) ipRpaDialog(r); }; });
+  }
+  var RPAFLBL = { owner_co: '원수사', vendor: '담당회사', task: '주요내용', ip: 'IP', license: '라이센스', equipment: '장비정보' };
+  async function dbRpaSave(row, patch) {
+    needWrite();
+    if (row) {
+      var ch = []; Object.keys(patch).forEach(function (k) { if (!RPAFLBL[k]) return; var a = row[k] != null ? String(row[k]) : '', b = patch[k] != null ? String(patch[k]) : ''; if (a !== b) ch.push({ k: RPAFLBL[k], from: a || '없음', to: b || '없음' }); });
+      if (ch.length) audCtx({ table: 'ip_rpa_pc', target: 'RPA PC ' + (row.task || row.owner_co || ''), summary: 'RPA PC ' + (row.owner_co || '') + ' 수정 (' + ch.length + '개 항목): ' + chgText(ch), detail: { changes: ch } });
+      patch.updated_at = new Date().toISOString();
+      if (!DEMO) { var r = await sb.from('ip_rpa_pc').update(patch).eq('id', row.id); if (r.error) throw r.error; }
+      Object.assign(row, patch);
+    } else {
+      audCtx({ table: 'ip_rpa_pc', target: 'RPA PC ' + (patch.owner_co || ''), summary: 'RPA PC ' + (patch.owner_co || '') + ' 등록' });
+      if (!DEMO) { var r2 = await sb.from('ip_rpa_pc').insert(patch).select().single(); if (r2.error) throw r2.error; S.rpas.push(r2.data); }
+      else { patch.id = (S.rpas.reduce(function (m, x) { return Math.max(m, x.id); }, 0) || 0) + 1; S.rpas.push(patch); }
+    }
+  }
+  async function dbRpaDelete(row) {
+    needWrite();
+    audCtx({ table: 'ip_rpa_pc', action: 'delete', target: 'RPA PC ' + (row.owner_co || ''), summary: 'RPA PC ' + (row.owner_co || '') + ' 삭제' });
+    if (!DEMO) { var r = await sb.from('ip_rpa_pc').delete().eq('id', row.id); if (r.error) throw r.error; }
+    S.rpas = S.rpas.filter(function (x) { return x.id !== row.id; });
+  }
+  function ipRpaDialog(row) {
+    if (isViewer()) { toast('조회 전용 계정은 사용할 수 없습니다.'); return; }
+    var v = row || {};
+    var d = openModal('<div class="mh"><b>' + (row ? 'RPA PC 수정' : 'RPA PC 추가') + '</b><button class="mx" type="button">✕</button></div>' +
+      '<div class="row wrap"><div style="flex:1"><div class="ms">원수사</div><input type="text" id="rp_owner" value="' + esc(v.owner_co || '') + '" style="width:100%"></div><div style="flex:1"><div class="ms">담당회사</div><input type="text" id="rp_vendor" value="' + esc(v.vendor || '') + '" style="width:100%"></div></div>' +
+      '<div class="ms">주요내용</div><textarea id="rp_task" rows="2" style="width:100%;box-sizing:border-box">' + esc(v.task || '') + '</textarea>' +
+      '<div class="ms">IP (여러 개면 줄바꿈으로 구분)</div><textarea id="rp_ip" rows="2" style="width:100%;box-sizing:border-box">' + esc(v.ip || '') + '</textarea>' +
+      '<div class="row wrap"><div style="flex:1"><div class="ms">라이센스</div><input type="text" id="rp_lic" value="' + esc(v.license || '') + '" style="width:100%"></div><div style="flex:1"><div class="ms">장비정보</div><input type="text" id="rp_equip" value="' + esc(v.equipment || '') + '" style="width:100%"></div></div>' +
+      '<div class="mf">' + (row ? '<button class="btn dng" id="rp_del" type="button" style="margin-right:auto">삭제</button>' : '') + '<button class="btn" id="rp_cancel" type="button">취소</button><button class="btn pri" id="rp_ok" type="button">저장</button></div>', 460);
+    $('#rp_cancel', d.d).onclick = d.close;
+    var delB = $('#rp_del', d.d); if (delB) delB.onclick = function () { if (!confirm('이 RPA PC 항목을 삭제할까요?')) return; dbRpaDelete(row).then(function () { d.close(); toast('삭제했습니다.'); pageIpRpa(); }).catch(fail); };
+    $('#rp_ok', d.d).onclick = async function () {
+      var patch = { owner_co: $('#rp_owner', d.d).value.trim() || null, vendor: $('#rp_vendor', d.d).value.trim() || null, task: $('#rp_task', d.d).value.trim() || null, ip: $('#rp_ip', d.d).value.trim() || null, license: $('#rp_lic', d.d).value.trim() || null, equipment: $('#rp_equip', d.d).value.trim() || null };
+      this.disabled = true;
+      try { await dbRpaSave(row, patch); d.close(); toast('저장했습니다.'); pageIpRpa(); } catch (e) { this.disabled = false; fail(e); }
+    };
+  }
+  // =====================================================================
+  // v1.9.16: IP 관리 — 엑셀 내보내기 (ExcelJS, 10개 시트)
+  // v1.7 엑셀(수식/드롭다운/조건서식/시트보호)과 같은 구성이지만, 값만 담습니다.
+  // (입력은 이 웹 화면에서만 하고, 엑셀은 내보낸 시점의 스냅샷입니다.)
+  // =====================================================================
+  var FN = '맑은 고딕', XGREEN = '1D6F42';
+  function xArgb(hex) { return 'FF' + hex; }
+  function xFill(hex) { return { type: 'pattern', pattern: 'solid', fgColor: { argb: xArgb(hex) } }; }
+  function xBorder() { var t = { style: 'thin', color: { argb: 'FFB9C5BE' } }; return { top: t, left: t, right: t, bottom: t }; }
+  function xHdrCell(ws, r, c, text) { var x = ws.getCell(r, c); x.value = text; x.font = { name: FN, bold: true, color: { argb: 'FFFFFFFF' } }; x.fill = xFill(XGREEN); x.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; x.border = xBorder(); return x; }
+  function colNum(letter) { var n = 0; for (var i = 0; i < letter.length; i++) n = n * 26 + (letter.charCodeAt(i) - 64); return n; }
+  function xTitle(ws, addr, text, size) { var c = ws.getCell(addr); c.value = text; c.font = { name: FN, size: size || 18, bold: true, color: { argb: xArgb(XGREEN) } }; return c; }
+  function xSub(ws, addr, text) { var c = ws.getCell(addr); c.value = text; c.font = { name: FN, size: 10, color: { argb: xArgb('55635B') } }; return c; }
+
+  function xSheetSummary(wb, flags, n) {
+    var ws = wb.addWorksheet('요약', { views: [{ showGridLines: false }] });
+    ws.getColumn(1).width = 2;
+    [36, 10, 14, 14, 14, 16, 14, 36, 10, 12, 14, 12, 12, 12].forEach(function (w, i) { ws.getColumn(i + 2).width = w; });
+    xTitle(ws, 'B1', '요약');
+    xSub(ws, 'B2', '모든 숫자는 내보낸 시점의 [IP관리대장] 값을 기준으로 계산되었습니다 (엑셀 안에서는 자동으로 갱신되지 않습니다).');
+    var tiles = [['등록 IP 총계', n.total, 'CFE8D8', '14532D'], ['중복 확정', n.dup, 'F6C3BC', '7A1409'], ['중복 의심', n.dupSusp, 'FFE9A8', '5E3F00'],
+      ['대역 미기재', n.band, 'FFE9A8', '5E3F00'], ['회수 예정', n.recall, 'FFD2A6', '5A2600'], ['정보 확인', n.info, 'FFE9A8', '5E3F00'], ['동명 확인', n.name, 'E4E9E6', '33403A']];
+    var c = 2;
+    tiles.forEach(function (t) {
+      ws.mergeCells(4, c, 4, c + 1); ws.mergeCells(5, c, 5, c + 1);
+      var a = ws.getCell(4, c); a.value = t[0]; a.font = { name: FN, size: 10, bold: true, color: { argb: xArgb(t[3]) } };
+      var v = ws.getCell(5, c); v.value = t[1]; v.font = { name: FN, size: 22, bold: true, color: { argb: xArgb(t[3]) } };
+      [4, 5].forEach(function (rr) { [c, c + 1].forEach(function (cc) { var cell = ws.getCell(rr, cc); cell.fill = xFill(t[2]); cell.alignment = { horizontal: 'center', vertical: 'middle' }; }); });
+      c += 2;
+    });
+    ws.getRow(5).height = 40;
+    var r = 7;
+    function tbl(title, headers, rows) {
+      ws.getCell(r, 2).value = title; ws.getCell(r, 2).font = { name: FN, size: 13, bold: true }; r++;
+      headers.forEach(function (h, i) { xHdrCell(ws, r, 2 + i, h); }); r++;
+      (rows.length ? rows : [['(데이터 없음)']]).forEach(function (row) {
+        row.forEach(function (v, i) { var cc = ws.getCell(r, 2 + i); cc.value = v == null ? '' : v; cc.font = { name: FN, size: 10 }; cc.border = xBorder(); cc.alignment = { horizontal: 'center' }; });
+        r++;
+      });
+      r += 2;
+    }
+    var orgs = ipOrgs();
+    tbl('소속별 현황', ['소속(건물명)', '등록 IP'], orgs.map(function (o) { return [o, S.ips.filter(function (x) { return x.org === o; }).length]; }));
+    var flRows = []; orgs.forEach(function (o) { groupCount(S.ips.filter(function (x) { return x.org === o && x.floor; }), function (x) { return x.floor; }).forEach(function (f) { flRows.push([o, f[0], f[1]]); }); });
+    tbl('층별 현황', ['소속(건물명)', '층', '등록 IP'], flRows);
+    var bandRows = []; orgs.forEach(function (o) { groupCount(S.ips.filter(function (x) { return x.org === o; }), function (x) { return x.band || '미기재'; }).forEach(function (b) { bandRows.push([o, b[0], b[1]]); }); });
+    tbl('대역별 현황', ['소속(건물명)', '대역', '등록 IP'], bandRows);
+    var mr = S.ips.filter(function (x) { return x.org === 'A+에셋(미림타워)'; });
+    tbl('본부/부문별 IP 수 (A+에셋(미림타워))', ['본부/부문', 'IP 수'], groupCount(mr.filter(function (x) { return x.dept1; }), function (x) { return x.dept1; }));
+    tbl('A+에셋(미림타워) 14층 파트별 현황', ['파트', 'IP 수'], groupCount(mr.filter(function (x) { return String(x.floor) === '14'; }), function (x) { return x.dept2 || '(팀 미기재)'; }));
+    var vwTodo = isViewer();
+    var todo = S.ips.filter(function (x) { return flags[x.id]; }).slice(0, 40).map(function (x) { return [x.org, x.floor, x.seat || '', flags[x.id], x.user_name, vwTodo ? mkIp(x.ip) : x.ip, x.note || '']; });
+    tbl('조치 필요 목록 (점검 표시가 있는 행, 최대 40건)', ['소속(건물명)', '층', '자리', '점검', '사용자', 'IP(전체)', '비고'], todo);
+  }
+
+  function xSheetCheckList(wb, flags) {
+    var ws = wb.addWorksheet('점검목록', { views: [{ showGridLines: false }] });
+    [2, 36, 6, 10, 18, 16, 14].forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+    xTitle(ws, 'B1', '점검목록');
+    xSub(ws, 'B2', '구역마다 최대 120건을 표시합니다. 전체 목록은 [IP관리대장]의 점검(자동) 열로 확인하세요.');
+    var blocks = [['중복 확정', '중복', 'F6C3BC', '7A1409'], ['중복 의심', '중복 의심', 'FFE9A8', '5E3F00'], ['대역 미기재', '대역 확인', 'FFE9A8', '5E3F00'],
+      ['회수 예정', '__recall__', 'FFD2A6', '5A2600'], ['정보 확인(기한·사용자·직책)', '__info__', 'FFE9A8', '5E3F00'], ['동명 확인', '동명 확인', 'E4E9E6', '33403A']];
+    var r = 4;
+    blocks.forEach(function (blk) {
+      var nm = blk[0], key = blk[1], bg = blk[2], fg = blk[3];
+      var list = S.ips.filter(function (x) {
+        var f = flags[x.id];
+        if (key === '__recall__') return x.status === '회수 예정';
+        if (key === '__info__') return f === '사용자 확인' || f === '기한 확인' || f === '직책 확인';
+        return f === key;
+      });
+      ws.mergeCells(r, 2, r, 7); var c0 = ws.getCell(r, 2); c0.value = nm + ' · ' + list.length.toLocaleString() + '건'; c0.font = { name: FN, size: 12, bold: true, color: { argb: xArgb(fg) } };
+      for (var cc = 2; cc <= 7; cc++) ws.getCell(r, cc).fill = xFill(bg);
+      r++;
+      ['소속(건물명)', '층', '자리', 'IP', '사용자', '점검/상태'].forEach(function (h, i) { xHdrCell(ws, r, 2 + i, h); }); r++;
+      list.slice(0, 120).forEach(function (x) {
+        [x.org, x.floor, x.seat, x.ip, x.user_name, flags[x.id] || x.status].forEach(function (v, i) { var c = ws.getCell(r, 2 + i); c.value = v || ''; c.font = { name: FN, size: 10 }; c.border = xBorder(); c.alignment = { horizontal: 'center' }; });
+        r++;
+      });
+      if (list.length > 120) { var note = ws.getCell(r, 2); note.value = '※ ' + (list.length - 120) + '건은 표시되지 않았습니다. [IP관리대장]의 점검 열로 확인하세요.'; note.font = { name: FN, size: 10, color: { argb: xArgb('C00000') } }; r++; }
+      r += 2;
+    });
+  }
+
+  function xSheetLedger(wb, flags) {
+    var ws = wb.addWorksheet('IP관리대장', { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }] });
+    var H = ['소속(건물명)', '층', '대역', 'IP(전체)', '구분', '사용자', '직책', '본부/부문', '팀/파트', '사번', '자리', '상태', '점검(자동)', '변경일', '비고'];
+    var W = [36, 6, 8, 20, 12, 16, 10, 14, 18, 11, 8, 10, 12, 12, 48];
+    H.forEach(function (h, i) { ws.getColumn(i + 1).width = W[i]; xHdrCell(ws, 1, i + 1, h); });
+    ws.getRow(1).height = 30;
+    var vwLed = isViewer();
+    S.ips.forEach(function (r, ri) {
+      var f = flags[r.id];
+      var fillHex = (f === '중복' || f === '중복 의심') ? 'FDECEB' : (f && f !== '회수 예정') ? 'FFF4CC' : (r.status === '회수 예정') ? 'FFE3C7' : (r.status === '예약') ? 'E3ECFA' : (r.status === '공석') ? 'ECEFEE' : null;
+      [r.org, r.floor, r.band, vwLed ? mkIp(r.ip) : r.ip, r.kind, r.user_name, r.title, r.dept1, r.dept2, r.emp_no, r.seat, r.status, f || '정상', r.changed_at, r.note].forEach(function (v, ci) {
+        var c = ws.getCell(ri + 2, ci + 1); c.value = v == null ? '' : v; c.font = { name: FN, size: 10, bold: ci === 12 };
+        c.border = xBorder();
+        if ([0, 1, 2, 3, 4, 5, 10, 11, 12, 13].indexOf(ci) >= 0) c.alignment = { horizontal: 'center' };
+        if (fillHex) c.fill = xFill(fillHex);
+      });
+    });
+    if (S.ips.length) ws.autoFilter = { from: 'A1', to: 'O' + (S.ips.length + 1) };
+  }
+
+  function xSheetBandMaster(wb) {
+    var ws = wb.addWorksheet('대역마스터', { views: [{ showGridLines: false }] });
+    xTitle(ws, 'B1', '대역 마스터');
+    xSub(ws, 'B2', '소속·대역별 등록 현황입니다 (엑셀에서는 값만 제공 — 웹의 "대역 현황" 탭과 같은 계산 기준).');
+    var H = ['소속(건물명)', '대역', '등록 IP', '여유(254 기준)', '사용률'], W = [36, 10, 12, 16, 12];
+    H.forEach(function (h, i) { ws.getColumn(i + 2).width = W[i]; xHdrCell(ws, 4, i + 2, h); });
+    var r = 5;
+    ipOrgs().forEach(function (org) {
+      var bands = {}; S.ips.filter(function (x) { return x.org === org; }).forEach(function (x) { var b = x.band || '미기재'; bands[b] = (bands[b] || 0) + 1; });
+      Object.keys(bands).sort(function (a, b) { var an = parseInt(a, 10), bn = parseInt(b, 10); if (isNaN(an) && isNaN(bn)) return a < b ? -1 : 1; if (isNaN(an)) return 1; if (isNaN(bn)) return -1; return an - bn; }).forEach(function (band) {
+        var cnt = bands[band];
+        var vals = band === '미기재' ? [org, band, cnt, '-', '-'] : [org, band, cnt, 254 - cnt, (cnt / 254 * 100).toFixed(1) + '%'];
+        vals.forEach(function (v, ci) { var c = ws.getCell(r, 2 + ci); c.value = v; c.font = { name: FN, size: 10 }; c.border = xBorder(); c.alignment = { horizontal: 'center' }; });
+        r++;
+      });
+    });
+  }
+
+  var ROOMKINDS = ['회의실', '프린터', '복합기', '기타', '서버'];
+  function seatCellText(list, vw) {
+    var n = list.length, first = list[0], lines = [first.user_name || ''];
+    if (first.title) lines.push(first.title);
+    for (var k = 1; k < Math.min(n, 3); k++) {
+      var r = list[k], nm = (r.user_name !== first.user_name) ? (r.user_name + ' ') : '';
+      var p = String(r.ip || '').split('.'), oct = (!vw && p.length === 4) ? p[3] : null;
+      var bandTxt = vw ? '' : (r.band === '미기재' ? ' (대역?)' : (r.band ? '(' + r.band + '번)' : ''));
+      lines.push(nm + (oct != null ? '.' + oct : '') + bandTxt);
+    }
+    if (n > 3) lines.push('외 ' + (n - 3) + '개');
+    return lines.join('\n');
+  }
+  function seatCellColor(list, flags) {
+    if (!list.length) return null;
+    if (list.some(function (r) { return flags[r.id] === '중복'; })) return 'F6C3BC';
+    if (list.some(function (r) { return flags[r.id] && flags[r.id] !== '회수 예정'; })) return 'FFE9A8';
+    if (list.some(function (r) { return ROOMKINDS.indexOf(r.kind) >= 0; })) return 'E4E9E6';
+    if (list.some(function (r) { return r.status === '공석'; })) return 'ECEFEE';
+    return 'E8F4EC';
+  }
+  function xSheetSeat(wb, flags, floor, title, staticDict, maxcolLetter) {
+    var ws = wb.addWorksheet('자리_익성' + floor + '층', { views: [{ showGridLines: false }] });
+    var rows = S.ips.filter(function (r) { return r.org === '파인랩(익성빌딩)' && String(r.floor) === String(floor) && r.seat; });
+    var bySeat = {}; rows.forEach(function (r) { (bySeat[r.seat] = bySeat[r.seat] || []).push(r); });
+    var seats = Object.keys(bySeat);
+    var maxRow = 1; seats.concat(Object.keys(staticDict)).forEach(function (a) { var m = a.match(/\d+/); if (m) maxRow = Math.max(maxRow, parseInt(m[0], 10)); });
+    var maxColN = colNum(maxcolLetter);
+    ws.getColumn(1).width = 3;
+    for (var c = 2; c <= maxColN; c++) ws.getColumn(c).width = 14;
+    xTitle(ws, 'B1', title, 14); ws.getRow(1).height = 24;
+    var vwSeat = isViewer();
+    seats.forEach(function (addr) {
+      var list = bySeat[addr], cell = ws.getCell(addr);
+      cell.value = seatCellText(list, vwSeat); cell.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' }; cell.font = { name: FN, size: 9 }; cell.border = xBorder();
+      var hex = seatCellColor(list, flags); if (hex) cell.fill = xFill(hex);
+      var rn = parseInt(addr.match(/\d+/)[0], 10); ws.getRow(rn).height = Math.max(ws.getRow(rn).height || 0, 60);
+    });
+    Object.keys(staticDict).forEach(function (addr) {
+      var cell = ws.getCell(addr); cell.value = staticDict[addr]; cell.font = { name: FN, size: 9, bold: true, color: { argb: xArgb(XGREEN) } }; cell.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' };
+      var rn = parseInt(addr.match(/\d+/)[0], 10); ws.getRow(rn).height = Math.max(ws.getRow(rn).height || 0, 60);
+    });
+    var note = ws.getCell(maxRow + 2, 2); note.value = '색: 초록=정상 · 빨강=중복 · 노랑=확인 필요 · 회색=회의실/장비 · 연회색=공석 · 칸 위치(예: B5)가 IP관리대장의 "자리" 값과 같습니다.'; note.font = { name: FN, size: 9, color: { argb: xArgb('55635B') } };
+  }
+
+  function xSheetRpa(wb) {
+    var ws = wb.addWorksheet('익성 4층 RPA PC', { views: [{ showGridLines: false, state: 'frozen', ySplit: 1 }] });
+    var H = ['원수사', '담당회사', '주요내용', 'IP', '라이센스', '장비정보'], W = [12, 12, 40, 26, 12, 44];
+    H.forEach(function (h, i) { ws.getColumn(i + 1).width = W[i]; xHdrCell(ws, 1, i + 1, h); });
+    ws.getRow(1).height = 24;
+    var vwRpa = isViewer();
+    S.rpas.forEach(function (r, ri) {
+      var ipOut = vwRpa ? ipExtractIps(r.ip).map(mkIp).join('\n') : r.ip;
+      [r.owner_co, r.vendor, r.task, ipOut, r.license, r.equipment].forEach(function (v, ci) {
+        var c = ws.getCell(ri + 2, ci + 1); c.value = v || ''; c.font = { name: FN, size: 10 }; c.border = xBorder(); c.alignment = { horizontal: (ci === 0 || ci === 1 || ci === 3 || ci === 4) ? 'center' : 'left', vertical: 'middle', wrapText: true };
+      });
+    });
+  }
+
+  async function xSheetHistory(wb) {
+    var ws = wb.addWorksheet('변경이력', { views: [{ showGridLines: false }] });
+    [12, 18, 20, 14, 38, 38, 10, 36].forEach(function (w, i) { ws.getColumn(i + 2).width = w; });
+    xTitle(ws, 'B1', '변경 이력');
+    xSub(ws, 'B2', 'IP 대장·RPA PC의 최근 변경(이력 관리) 기록입니다. 메인 관리자만 조회할 수 있습니다.');
+    var H = ['일자', '구분', '대상', '사용자', '변경 전', '변경 후', '변경자', '비고'];
+    H.forEach(function (h, i) { xHdrCell(ws, 4, i + 2, h); });
+    var rows = [];
+    if (isMain()) {
+      try { var r = await sb.from('audit_log').select('*').or('target.ilike.IP 대장%,target.ilike.RPA PC%').order('at', { ascending: false }).limit(500); if (!r.error) rows = r.data || []; } catch (e) { }
+    }
+    var r2 = 5;
+    if (!rows.length) { ws.getCell(r2, 2).value = isMain() ? '해당 기간에 변경 내역이 없습니다.' : '메인 관리자만 조회할 수 있는 내용입니다.'; ws.getCell(r2, 2).font = { name: FN, size: 10, color: { argb: xArgb('55635B') } }; return; }
+    rows.forEach(function (a) {
+      var ch = (a.detail && a.detail.changes) || [];
+      var before = ch.map(function (c) { return c.k + ': ' + c.from; }).join(', ');
+      var after = ch.map(function (c) { return c.k + ': ' + c.to; }).join(', ');
+      [String(a.at || '').slice(0, 10), a.action || '', a.target || '', a.actor_name || '', before, after, a.actor_name || '', a.summary || ''].forEach(function (v, i) {
+        var c = ws.getCell(r2, 2 + i); c.value = v; c.font = { name: FN, size: 10 }; c.border = xBorder(); c.alignment = { horizontal: (i === 4 || i === 5 || i === 7) ? 'left' : 'center', wrapText: true };
+      });
+      r2++;
+    });
+  }
+
+  function xSheetGuide(wb) {
+    var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
+    ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.16', 20);
+    xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
+    var guide = [
+      ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
+      ['자리·층이 바뀔 때', '웹의 [IP 대장]에서 해당 행의 "층"·"자리"만 고치면 바로 반영됩니다. 변경 내용은 자동으로 [이력 관리]에 한 줄 남습니다.'],
+      ['새 IP를 부여할 때', '[대역 현황] 탭에서 소속·대역별 사용 현황을 확인한 뒤, [IP 대장]에서 "＋ IP 추가"로 등록합니다.'],
+      ['IP를 회수할 때', '상태를 "회수 예정"으로 바꾸고, 회수가 끝나면 "반납"으로 바꾸거나 해당 행을 삭제합니다.'],
+      ['자동 점검', '중복 / 중복 의심 / 대역 확인 / 사용자 확인 / 기한 확인 / 직책 확인 / 동명 확인 / 회수 예정을 웹이 매번 새로 계산합니다. 이 엑셀의 "점검(자동)" 열은 내보낸 시점의 값입니다.'],
+      ['RPA PC', '[RPA PC] 탭은 점검 자동계산 대상이 아닙니다. IP 대장과 겹치는 IP는 목록에서 "대조" 표시로 안내합니다.'],
+      ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
+      ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
+      ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공)'],
+      ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
+    ];
+    var r = 5;
+    guide.forEach(function (g) {
+      var a = ws.getCell(r, 2); a.value = g[0]; a.font = { name: FN, bold: true }; a.alignment = { vertical: 'top', wrapText: true };
+      var b = ws.getCell(r, 3); b.value = g[1]; b.font = { name: FN }; b.alignment = { vertical: 'top', wrapText: true };
+      ws.getRow(r).height = Math.max(24, 18 * (Math.ceil(g[1].length / 62)));
+      r++;
+    });
+  }
+
+  function xSheetRules(wb) {
+    var ws = wb.addWorksheet('운영규칙', { views: [{ showGridLines: false }] });
+    ws.getColumn(1).width = 3; ws.getColumn(2).width = 24; ws.getColumn(3).width = 44; ws.getColumn(4).width = 44;
+    xTitle(ws, 'B1', '운영 규칙');
+    xSub(ws, 'B2', '여러 명이 하나의 시스템을 안전하게 쓰기 위한 간단한 약속입니다.');
+    var SEC = [
+      ['1. 기본 원칙', [['원본', '입력은 관리자 웹 하나로만 합니다. 이 엑셀은 보고·백업용 스냅샷입니다.'], ['권한', '역할(main/admin/viewer)에 따라 쓰기·조회 범위가 다릅니다. 뷰어는 IP가 일부 가려져 보입니다.']]],
+      ['2. 수정할 때', [['1단계', '[IP 대장]에서 해당 행만 고칩니다. 새 IP는 [대역 현황]에서 여유를 확인합니다.'], ['2단계', '저장하면 [이력 관리]에 자동으로 한 줄 기록됩니다(누가·언제·무엇을).'], ['3단계', '[요약] 탭에서 중복 0건인지, 새로 생긴 점검 항목이 없는지 확인합니다.']]],
+      ['3. RPA PC', [['관리', '[RPA PC] 탭에서 등록·수정·삭제합니다. IP 대장과 겹치는 IP는 화면에서 "대조"로 표시됩니다.']]],
+      ['4. 백업', [['원칙', 'Supabase DB 자체 백업을 따릅니다. 월말 등 필요한 시점에 이 [엑셀 내보내기]로 스냅샷을 추가로 보관할 수 있습니다.']]],
+      ['5. 이런 일이 생기면', [['실수로 잘못 고침', '[이력 관리]에서 변경 전/후 값을 확인하고 같은 화면에서 다시 고칩니다.'], ['권한이 부족함', '메인 관리자에게 역할 변경을 요청하세요.']]]
+    ];
+    var r = 4;
+    SEC.forEach(function (sec) {
+      ws.getCell(r, 2).value = sec[0]; ['B', 'C', 'D'].forEach(function (col) { ws.getCell(col + r).fill = xFill(XGREEN); }); ws.getCell(r, 2).font = { name: FN, bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      ws.getRow(r).height = 22; r++;
+      sec[1].forEach(function (item) {
+        var a = ws.getCell(r, 2); a.value = item[0]; a.font = { name: FN, bold: true, size: 10 }; a.alignment = { vertical: 'top', wrapText: true }; a.border = xBorder();
+        ws.mergeCells(r, 3, r, 4);
+        var b = ws.getCell(r, 3); b.value = item[1]; b.font = { name: FN, size: 10 }; b.alignment = { vertical: 'top', wrapText: true };
+        ws.getCell(r, 3).border = xBorder(); ws.getCell(r, 4).border = xBorder();
+        ws.getRow(r).height = Math.max(22, 15 * Math.ceil(item[1].length / 42));
+        r++;
+      });
+      r++;
+    });
+  }
+
+  async function ipExportExcel(btn) {
+    if (typeof ExcelJS === 'undefined') { toast('엑셀 기능을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.'); return; }
+    if (btn) btn.disabled = true;
+    toast('엑셀 생성 중입니다 (데이터가 많으면 몇 초 걸릴 수 있어요)...');
+    try {
+      var flags = ipCalc(), n = ipStats();
+      var wb = new ExcelJS.Workbook();
+      wb.creator = 'IT자산관리시스템'; wb.created = new Date();
+      xSheetSummary(wb, flags, n);
+      xSheetCheckList(wb, flags);
+      xSheetLedger(wb, flags);
+      xSheetBandMaster(wb);
+      xSheetSeat(wb, flags, 3, '익성빌딩 3층 자리배치도 (엑셀 전용 보기)', { 'B3': '자동차보험지원파트\n192.168.45.1', 'K3': '프론트파트', 'N3': '전산지원파트\nIP 11 ~ 20', 'Q3': '창고', 'Q13': '자동차보험지원파트 (45번)\n전산지원/기획운영 (1번)', 'B18': '휴게실', 'H18': '서버실', 'K18': '탕비실' }, 'Q');
+      xSheetSeat(wb, flags, 4, '익성빌딩 4층 자리배치도 (1번 대역 · 엑셀 전용 보기)', { 'I17': '탕비실' }, 'R');
+      xSheetSeat(wb, flags, 5, '익성빌딩 5층 자리배치도 (102번 대역 · 엑셀 전용 보기)', { 'B15': '출입구' }, 'H');
+      xSheetRpa(wb);
+      await xSheetHistory(wb);
+      xSheetGuide(wb);
+      xSheetRules(wb);
+      var buf = await wb.xlsx.writeBuffer();
+      var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = 'IP관리시스템_' + ymd(new Date()) + '.xlsx'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      logExport('IP 대장(10개 시트)', S.ips.length, '엑셀 내보내기');
+      toast('엑셀 파일을 내보냈습니다.');
+    } catch (e) { fail(e); } finally { if (btn) btn.disabled = false; }
   }
   // ---------- v1.9.11: 자동 로그아웃 (v1.9.12: 10/30/60분 중 선택, S.idleMinutes) ----------
   var idleWarnT = null, idleOutT = null, idleToastEl = null, idleLast = 0;
