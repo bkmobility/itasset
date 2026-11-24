@@ -100,6 +100,11 @@ textarea{height:70px;padding:8px 10px;width:100%}
 .gsitem{padding:7px 12px;font-size:12px;border-top:1px solid #f3f4f6;cursor:pointer}
 .gsitem:hover{background:#e7f1fb}
 .gsempty{padding:12px;font-size:12px;color:#8a8f98;text-align:center}
+/* v1.9.33: VPN 대역 핑 모니터링 상태 배지 */
+.pbx{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:9px}
+.pbx.pb-ok{background:#e3f6e9;color:#1e8e3e}
+.pbx.pb-fail{background:#fdeaea;color:#c0392b}
+.pbx.pb-unk{background:#f1f2f4;color:#8a8f98}
 .dks{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap}
 .dk{flex:1;min-width:170px;background:#fff;border:1px solid #e5e8ee;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;color:inherit}
 .dk:hover{border-color:#bcd7f2;box-shadow:0 2px 8px rgba(15,108,189,.08)}
@@ -261,7 +266,8 @@ body.viewer #qrtop,body.viewer #b-qr,body.viewer #b-status,body.viewer #supremot
 .invlist .invrow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid #e5e8ee;border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;font-size:12.5px}
 .scanfab{position:sticky;bottom:10px;text-align:center;margin-top:10px}.btn.big{height:42px;padding:0 22px;font-size:14px}.scbtns{display:flex;gap:8px;flex-wrap:wrap}
 body.viewer .wonly{display:none!important}
-@media (max-width:760px){.layout{flex-direction:column;height:auto!important}.side{width:100%;padding:0;flex-direction:row;align-items:center;overflow-x:auto}.side .brand{padding:0 12px;white-space:nowrap}.nav{display:flex;flex-direction:row}.nav a{white-space:nowrap;height:40px;border-left:0}.nav .sep,.nav .soon{display:none}.top .gswrap{display:none}.kpis{flex-wrap:wrap}.kpi{min-width:44%}.cards{flex-direction:column}table.tbl{display:block;overflow-x:auto}}
+@media (max-width:600px){.layout{flex-direction:column;height:auto!important}.side{width:100%;padding:0;flex-direction:row;align-items:center;overflow-x:auto}.side .brand{padding:0 12px;white-space:nowrap}.nav{display:flex;flex-direction:row}.nav a{white-space:nowrap;height:40px;border-left:0}.nav .sep,.nav .soon{display:none}.top .gswrap{display:none}.kpis{flex-wrap:wrap}.kpi{min-width:44%}.cards{flex-direction:column}table.tbl{display:block;overflow-x:auto}}
+/* v1.9.32: Frame 29 — 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 위 모바일 전용 스타일을 적용하지 않고 PC와 동일한 사이드바·통합검색·그리드 레이아웃을 그대로 사용 */
 
 .login{max-width:380px;padding:32px 30px}
 .login.otpsetup{max-width:460px}
@@ -308,7 +314,7 @@ body.viewer .wonly{display:none!important}
 /* v1.9.5 대시보드: 윗줄 자산 유형 | 자산 상태, 아랫줄 부서별 자산 수 | PC 수집 현황 (반/반) */
 .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch}
 .dgrid .card{min-width:0;margin:0}
-@media (max-width:760px){.dgrid{grid-template-columns:1fr}}
+@media (max-width:600px){.dgrid{grid-template-columns:1fr}}
 /* v1.9.17 대시보드 하단 3등분 (부서별 자산 수 | PC 수집 현황 | 소속별 등록 IP) */
 .dgrid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px;align-items:stretch}
 .dgrid3 .card{min-width:0;margin:0}
