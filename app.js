@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.35 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.36 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -409,7 +409,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.35</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.36</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><div class="gswrap"><input type="search" id="gs" class="gs" autocomplete="off" placeholder="통합 검색 (자산·IP·인사 전체) (Enter)" value="' + esc(F.q) + '"><div class="gsdrop" id="gsdrop" style="display:none"></div></div><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'), gsdrop = $('#gsdrop');   // v1.9.31: Frame 28 — 통합 검색(자산·IP·인사 동시 검색) 드롭다운
@@ -3203,13 +3203,19 @@
   var IPS_PS = 50;
   var IPF = { q: '', org: '', dept2: '', floor: '', band: '', kind: '', status: '', chk: '', page: 1, sel: {} };
   // v1.9.33: VPN 대역 핑 모니터링 — 요약 화면 순환 카드(5개씩, N분마다 자동 전환)
-  var PING_ROT = { idx: 0 };
+  var PING_ROT = { idx: 0, paused: false };   // v1.9.36: paused — ◀/▶/■로 수동 조작 중이면 자동 순환 건너뜀
   var PING_ROT_KEY = 'itasset_pingRotMin';
   function pingRotMin() { var v = parseInt(localStorage.getItem(PING_ROT_KEY) || '10', 10); return (v >= 1 && v <= 60) ? v : 10; }
   function pingRotSave(v) { try { localStorage.setItem(PING_ROT_KEY, String(v)); } catch (e) { } }
   function pingTargets() {
+    // v1.9.36: 소속 우선이 아니라 대역 번호 오름차순(숫자)으로 정렬 — 소속이 달라도 0,1,11,45,102… 순서로 보이게
     return (S.bandPing || []).filter(function (r) { return r.ping_ip; })
-      .sort(function (a, b) { return (a.org + ' ' + a.band).localeCompare(b.org + ' ' + b.band, 'ko', { numeric: true }); });
+      .sort(function (a, b) {
+        var na = parseFloat(a.band), nb = parseFloat(b.band), aNum = !isNaN(na), bNum = !isNaN(nb);
+        if (aNum && bNum && na !== nb) return na - nb;
+        if (aNum !== bNum) return aNum ? -1 : 1;
+        return (a.band + ' ' + a.org).localeCompare(b.band + ' ' + b.org, 'ko', { numeric: true });
+      });
   }
   function pingCardHtml() {
     var all = pingTargets();
@@ -3219,17 +3225,25 @@
     var slice = all.slice(PING_ROT.idx * per, PING_ROT.idx * per + per);
     var rows = slice.map(function (r) { return '<tr><td>' + esc(r.band) + '</td><td>' + esc(r.org) + '</td><td class="mono">' + esc(r.ping_ip) + '</td><td>' + pingStatusInline(r) + '</td></tr>'; }).join('');
     var dots = ''; for (var i = 0; i < pages; i++) dots += '<span style="display:inline-block;width:16px;height:4px;border-radius:2px;margin-right:4px;background:' + (i === PING_ROT.idx ? '#0f6cbd' : '#dbe1e8') + '"></span>';
+    // v1.9.36: 전환 주기 왼쪽에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가
+    var navHtml = '<span class="row" style="gap:4px">' +
+      '<button class="btn sm" id="pingPrevBtn" type="button" title="이전 페이지">◀</button>' +
+      '<button class="btn sm' + (PING_ROT.paused ? '' : ' pri') + '" id="pingPauseBtn" type="button" title="' + (PING_ROT.paused ? '재생(자동 순환 다시 시작)' : '일시정지(이 페이지 고정)') + '">' + (PING_ROT.paused ? '▶' : '■') + '</button>' +
+      '<button class="btn sm" id="pingNextBtn" type="button" title="다음 페이지">▶</button>' +
+      '</span>';
     return '<div class="card"><h3>VPN 대역 핑 모니터링 <span class="note" style="font-weight:400">전체 ' + all.length.toLocaleString() + '개 대역 중 ' + (PING_ROT.idx * per + 1) + '~' + Math.min(all.length, PING_ROT.idx * per + per) + '번째</span></h3>' +
       '<table class="tbl" style="font-size:12px"><thead><tr><th>대역</th><th>소속</th><th>핑 대상 IP</th><th>상태</th></tr></thead><tbody>' + rows + '</tbody></table>' +
       '<div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">' + dots +
-      '<span class="note">전환 주기 <input type="number" id="pingRotInp" min="1" max="60" value="' + pingRotMin() + '" style="width:44px;height:22px;font-size:11px;text-align:center">분마다</span></div></div>';
+      '<span class="row" style="gap:10px;align-items:center">' + navHtml +
+      '<span class="note">전환 주기 <input type="number" id="pingRotInp" min="1" max="60" value="' + pingRotMin() + '" style="width:44px;height:22px;font-size:11px;text-align:center">분마다</span></span></div></div>';
   }
   function pingRotTick() {
     var wrap = $('#pingCardWrap');
     if (!wrap) { if (window.__pingRotTimer) clearInterval(window.__pingRotTimer); return; }
+    if (PING_ROT.paused) return;   // v1.9.36: 일시정지 중엔 자동 순환 건너뜀
     var pages = Math.max(1, Math.ceil(pingTargets().length / 5));
     PING_ROT.idx = (PING_ROT.idx + 1) % pages;
-    wrap.innerHTML = pingCardHtml(); bindPingRotInp();
+    wrap.innerHTML = pingCardHtml(); bindPingRotInp(); bindPingNav();
   }
   function bindPingRotInp() {
     var i = $('#pingRotInp');
@@ -3238,6 +3252,15 @@
       if (window.__pingRotTimer) clearInterval(window.__pingRotTimer);
       window.__pingRotTimer = setInterval(pingRotTick, v * 60000);
     };
+  }
+  function bindPingNav() {   // v1.9.36: ◀(이전)·■/▶(일시정지/재생)·▶(다음) 버튼 동작
+    var wrap = $('#pingCardWrap');
+    function rerender() { if (wrap) { wrap.innerHTML = pingCardHtml(); bindPingRotInp(); bindPingNav(); } }
+    var pages = Math.max(1, Math.ceil(pingTargets().length / 5));
+    var prev = $('#pingPrevBtn'), pause = $('#pingPauseBtn'), next = $('#pingNextBtn');
+    if (prev) prev.onclick = function () { PING_ROT.idx = (PING_ROT.idx - 1 + pages) % pages; PING_ROT.paused = true; rerender(); };
+    if (next) next.onclick = function () { PING_ROT.idx = (PING_ROT.idx + 1) % pages; PING_ROT.paused = true; rerender(); };
+    if (pause) pause.onclick = function () { PING_ROT.paused = !PING_ROT.paused; rerender(); };
   }
   function ipDept2List() {   // v1.9.25: IP 대장에 실제로 쓰인 조직명(dept2) 목록 (검색형 콤보박스용)
     var set = {}; S.ips.forEach(function (r) { if (r.dept2) set[r.dept2] = 1; });
@@ -3265,6 +3288,13 @@
     var set = {}; S.ips.forEach(function (r) { if (r.org === org && r.band) set[r.band] = 1; });
     if (org === '파인랩(익성빌딩)') set['미기재'] = 1;
     return Object.keys(set).sort(function (a, b) { var na = parseFloat(a), nb = parseFloat(b); if (!isNaN(na) && !isNaN(nb)) return na - nb; return String(a).localeCompare(String(b)); });
+  }
+  function orgUnsetNumBands(o) {   // v1.9.36: 전체 소속 일괄 등록용 — 이 소속의 "숫자 대역"이면서 VPN 핑 대상 미설정인 대역만
+    return ipBandsOf(o).filter(function (b) {
+      if (!/^\d+$/.test(b)) return false;
+      var bp = (S.bandPing || []).filter(function (r) { return r.org === o && r.band === b; })[0];
+      return !(bp && bp.ping_ip);
+    });
   }
   function ipBandColor(org, band) {
     var key = org + '|' + band, h = 0; for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
@@ -3356,7 +3386,7 @@
     // v1.9.33: VPN 대역 핑 카드 자동 순환 시작(화면을 벗어나면 pingRotTick 안에서 스스로 멈춤)
     if (window.__pingRotTimer) clearInterval(window.__pingRotTimer);
     window.__pingRotTimer = setInterval(pingRotTick, pingRotMin() * 60000);
-    bindPingRotInp();
+    bindPingRotInp(); bindPingNav();
   }
   function goIpOrgBand(org, band) {
     IPF.q = ''; IPF.org = org || ''; IPF.dept2 = ''; IPF.floor = ''; IPF.band = (band === '미기재' ? '' : band); IPF.kind = ''; IPF.status = ''; IPF.chk = ''; IPF.page = 1; IPF.sel = {};
@@ -3503,9 +3533,13 @@
         '<div class="grow"></div><button class="toggle" type="button" data-i="' + bi + '" data-n="' + used + '"><span class="tglabel">사용 중 IP 보기 (' + used + ')</span> <span class="toparrow">▾</span></button></div>' +
         '<div class="chipgrid" id="ipgrid' + bi + '">' + ipUseChips(rs, numeric, vw) + '</div></div>';
     }).join('') || '<div class="note">이 소속의 IP가 없습니다.</div>';
+    // v1.9.36: 전체 소속 일괄 등록 — 19개 소속 전부를 순회하며 각 소속의 미설정 숫자 대역을 한 번에 채움
+    var allOrgsUnset = ipOrgsVisible().map(function (o) { return { org: o, bands: orgUnsetNumBands(o) }; }).filter(function (p) { return p.bands.length; });
+    var allOrgsUnsetTotal = allOrgsUnset.reduce(function (s, p) { return s + p.bands.length; }, 0);
     shell('ip', '<h1>IP 관리</h1>' + ipTabs('band') +
       '<div class="row wrap" style="margin-top:10px"><select id="bandorg">' + ipOrgsVisible().map(function (o) { return '<option' + (o === org ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select><span class="note">총 ' + rows.length.toLocaleString() + '건</span>' +
-      '<div class="grow"></div><button class="btn sm wonly" id="bandautoreg" type="button"' + (unsetNumBands.length ? '' : ' disabled') + '>전체 대역 자동 등록' + (unsetNumBands.length ? ' (' + unsetNumBands.length + ')' : '') + '</button></div>' +
+      '<div class="grow"></div><button class="btn sm wonly" id="bandautoregall" type="button"' + (allOrgsUnsetTotal ? '' : ' disabled') + '>전체 소속 일괄 등록' + (allOrgsUnsetTotal ? ' (' + allOrgsUnsetTotal + ')' : '') + '</button>' +
+      '<button class="btn sm wonly" id="bandautoreg" type="button"' + (unsetNumBands.length ? '' : ' disabled') + '>전체 대역 자동 등록' + (unsetNumBands.length ? ' (' + unsetNumBands.length + ')' : '') + '</button></div>' +
       '<div class="dgrid3" style="margin-top:10px">' + body + '</div>');
     $('#bandorg').onchange = function () { IPF.bandOrg = this.value; pageIpBand(); };
     // v1.9.35: 전체 대역 자동 등록 — 숫자 대역 중 미설정인 것만 192.168.<대역>.1 로 일괄 등록(이미 설정된 대역·특수 대역은 그대로 둠), 수동 추가/해제는 기존대로 가능
@@ -3517,6 +3551,22 @@
       try {
         for (var i = 0; i < unsetNumBands.length; i++) { await dbBandPingSave(org, unsetNumBands[i], '192.168.' + unsetNumBands[i] + '.1'); }
         toast(unsetNumBands.length + '개 대역에 VPN 핑 대상을 등록했습니다.');
+      } catch (e) { fail(e); }
+      pageIpBand();
+    };
+    // v1.9.36: 전체 소속 일괄 등록 — 모든 소속을 순회하며 미설정 숫자 대역에 각 대역의 .1 IP를 일괄 등록
+    var autoAllBtn = $('#bandautoregall');
+    if (autoAllBtn) autoAllBtn.onclick = async function () {
+      if (!allOrgsUnset.length) return;
+      if (!confirm('전체 ' + ipOrgsVisible().length + '개 소속 중 ' + allOrgsUnset.length + '개 소속의 미설정 숫자 대역 ' + allOrgsUnsetTotal + '개에 각 대역의 .1 IP(예: 192.168.<대역>.1)를 VPN 핑 대상으로 일괄 등록합니다.\n이미 설정된 대역은 바뀌지 않고, 특수 대역(미기재 등)은 제외됩니다.\n계속할까요?')) return;
+      autoAllBtn.disabled = true; autoAllBtn.textContent = '등록 중…';
+      try {
+        var done = 0;
+        for (var i = 0; i < allOrgsUnset.length; i++) {
+          var p = allOrgsUnset[i];
+          for (var j = 0; j < p.bands.length; j++) { await dbBandPingSave(p.org, p.bands[j], '192.168.' + p.bands[j] + '.1'); done++; }
+        }
+        toast(allOrgsUnset.length + '개 소속에서 ' + done + '개 대역을 등록했습니다.');
       } catch (e) { fail(e); }
       pageIpBand();
     };
@@ -3925,7 +3975,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.35', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.36', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -3937,7 +3987,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;
