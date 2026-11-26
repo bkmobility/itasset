@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.38 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.39 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -409,7 +409,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.38</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.39</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><div class="gswrap"><input type="search" id="gs" class="gs" autocomplete="off" placeholder="통합 검색 (자산·IP·인사 전체) (Enter)" value="' + esc(F.q) + '"><div class="gsdrop" id="gsdrop" style="display:none"></div></div><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'), gsdrop = $('#gsdrop');   // v1.9.31: Frame 28 — 통합 검색(자산·IP·인사 동시 검색) 드롭다운
@@ -1076,6 +1076,26 @@
 
   // ---------- 지원 요청 (원격 지원 접수) ----------
   var SUP_ST = { received: ['접수', 'warn'], working: ['진행중', 'blue'], done: ['완료', 'ok'] };
+  var SUP_SEL = {};   // v1.9.39: 목록 체크박스 선택 상태(요청 id → true)
+  function openRemoteSupport() {   // v1.9.39: "원격 지원 실행" 버튼(접수 건 선택 여부와 무관하게 언제든 실행) — IT 자산 확인.exe 가 ezHelpManager 를 실행
+    var fr = document.createElement('iframe'); fr.style.display = 'none'; fr.src = 'itasset-remote://open'; document.body.appendChild(fr);
+    setTimeout(function () { fr.remove(); }, 3000);
+    toast('원격 접속을 실행합니다. 아무 반응이 없으면 이 PC에서 "IT 자산 확인" 프로그램을 한 번 실행한 뒤 다시 눌러 주세요.');
+  }
+  async function dbSupportDeleteMany(list, reason) {   // v1.9.39: 원격 지원 요청 선택/전체 삭제
+    needWrite();
+    var ids = list.map(function (x) { return x.id; }), n = ids.length;
+    if (!DEMO) {
+      var CH = 150;
+      for (var i = 0; i < ids.length; i += CH) {
+        var part = ids.slice(i, i + CH);
+        var r = await sb.from('support_requests').delete().in('id', part); if (r.error) throw r.error;
+      }
+    }
+    var set = {}; ids.forEach(function (x) { set[x] = 1; });
+    S.support = S.support.filter(function (x) { return !set[x.id]; });
+    await auditPost({ action: 'delete', target: '원격 지원 요청 (' + n.toLocaleString() + '건)', summary: '원격 지원 요청 ' + n.toLocaleString() + '건 삭제 · ' + list.map(function (x) { return x.req_no; }).slice(0, 3).join(', ') + (n > 3 ? ' 외' : ''), reason: reason, detail: { via: '원격 지원 · 목록 삭제' } });
+  }
   async function dbSupport(id, patch) {
     needWrite();
     var sq = S.support.filter(function (q) { return q.id === id; })[0] || {}, SL = { received: '접수 대기', working: '진행중', done: '완료' }, sch = [];
@@ -1106,10 +1126,15 @@
     function tabA(id, t, n) { return '<a href="#/support/' + id + '" class="' + (tab === id ? 'on' : '') + '">' + t + '<span class="c">' + n + '</span></a>'; }
     function kc(id, cls, t, n) { return '<a class="kpi go ' + cls + (tab === id ? ' on' : '') + '" href="#/support/' + id + '" title="누르면 ' + t + ' 목록으로 이동"><div class="t">' + t + '<span class="go-a">›</span></div><div class="n">' + n + '</div></a>'; }
     var kpi = '<div class="kpis">' + kc('received', 'warn', '접수 대기', rec) + kc('working', '', '진행중', wk) + kc('done', 'ok', '완료', done.length) + kc('today', '', '오늘 접수', today) + '</div>';
+    // v1.9.39: 목록 행 앞에 체크박스 추가(선택 삭제·전체 삭제용)
+    var selN = list.filter(function (x) { return SUP_SEL[x.id]; }).length;
+    var toolbar = '<div class="row" style="align-items:center;margin:6px 0;gap:10px;flex-wrap:wrap"><label style="font-size:11.5px;color:#5c5c5c"><input type="checkbox" id="supSelAll"' + (list.length && selN === list.length ? ' checked' : '') + '> 전체 선택</label><span class="grow"></span>' +
+      '<button class="btn sm dng" id="supSelDel" type="button"' + (selN ? '' : ' disabled') + '>선택 삭제 (' + selN + ')</button>' +
+      '<button class="btn sm" id="supAllDel" type="button"' + (list.length ? '' : ' disabled') + '>전체 삭제</button></div>';
     var rows = list.map(function (x) {
       var e = S.empBy[x.emp_no], st = SUP_ST[x.status] || SUP_ST.received;
-      return '<tr class="' + (cur && cur.id === x.id ? 'sel' : '') + '" data-id="' + esc(x.id) + '" style="cursor:pointer"><td class="mono">' + esc(x.req_no) + '</td><td>' + esc(ymd(x.created_at).slice(5) + ' ' + hm(x.created_at)) + '</td><td>' + esc(e ? e.name + ' / ' + e.dept : x.emp_no) + '</td><td>' + esc(x.computer_name) + '</td><td>' + esc(x.symptom || '—') + '</td><td>' + badge(st[0], st[1]) + '</td></tr>';
-    }).join('') || '<tr><td colspan="6" class="note" style="padding:20px;text-align:center">해당 요청이 없습니다.</td></tr>';
+      return '<tr class="' + (cur && cur.id === x.id ? 'sel' : '') + '" data-id="' + esc(x.id) + '"><td style="cursor:default" onclick="event.stopPropagation()"><input type="checkbox" class="supChk" data-id="' + esc(x.id) + '"' + (SUP_SEL[x.id] ? ' checked' : '') + '></td><td class="mono" style="cursor:pointer">' + esc(x.req_no) + '</td><td style="cursor:pointer">' + esc(ymd(x.created_at).slice(5) + ' ' + hm(x.created_at)) + '</td><td style="cursor:pointer">' + esc(e ? e.name + ' / ' + e.dept : x.emp_no) + '</td><td style="cursor:pointer">' + esc(x.computer_name) + '</td><td style="cursor:pointer">' + esc(x.symptom || '—') + '</td><td style="cursor:pointer">' + badge(st[0], st[1]) + '</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="note" style="padding:20px;text-align:center">해당 요청이 없습니다.</td></tr>';
     var side = '';
     if (cur) {
       var e = S.empBy[cur.emp_no], a = S.assets.filter(function (z) { return z.asset_no === cur.asset_no; })[0], dv = S.devices.filter(function (z) { return z.computer_name === cur.computer_name; })[0] || (a && a._dev);
@@ -1117,24 +1142,44 @@
         (dv ? esc(osShort(dv.os)) + ' · ' + esc(cpuShort(dv.cpu)) + (dv.ram_gb ? ' · ' + esc(dv.ram_gb) + 'GB' : '') + '<br>' : '') +
         '연결 자산: ' + (cur.asset_no ? '<b><a href="#/asset/' + encodeURIComponent(cur.asset_no) + '">' + esc(cur.asset_no) + '</a></b>' : '미연결') + '<br>증상: ' + esc(cur.symptom || '—') + (cur.note ? '<br>처리 메모: ' + esc(cur.note) : '') + (cur.handler ? '<br>담당: ' + esc(cur.handler) : '') + '</div>' +
         '<textarea id="supnote" class="ln" rows="2" placeholder="처리 메모 (완료 시 자산 이력에 기록)" style="width:100%;margin-top:8px;box-sizing:border-box">' + esc(cur.note || '') + '</textarea>' +
-        '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm pri" id="supremote">원격 접속 열기</button>' +
+        '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm pri" id="supremote">원격 지원 실행</button>' +
         (cur.status === 'received' ? '<button class="btn sm" id="supwork">처리 시작</button>' : '') + (cur.status !== 'done' ? '<button class="btn sm" id="supdone">완료 처리</button>' : '<button class="btn sm" id="supreopen">다시 열기</button>') + '</div></div>' +
-        '<div class="card" style="margin-top:10px"><h3 style="margin:0 0 6px;font-size:13px">접속 방법</h3><div class="note" style="line-height:1.7">1. [원격 접속 열기] → 원격 접속 매니저(ezHelpManager)가 실행됨<br>2. 로그인 후 대기 목록의 접속코드 6자리를 확인<br>3. 접속코드를 직원에게 전화·메신저로 안내 → 직원이 입력하면 연결<br>4. 처리 후 [완료 처리] + 메모 → 자산 이력에 기록<br><span style="color:#8a8a8a">※ 이 PC에 \"IT 자산 확인\" 프로그램이 한 번 실행된 적이 있어야 합니다. 별도 프로그램은 필요 없습니다.</span></div></div>';
+        '<div class="card" style="margin-top:10px"><h3 style="margin:0 0 6px;font-size:13px">접속 방법</h3><div class="note" style="line-height:1.7">1. [원격 지원 실행] → 원격 접속 매니저(ezHelpManager)가 실행됨<br>2. 로그인 후 대기 목록의 접속코드 6자리를 확인<br>3. 접속코드를 직원에게 전화·메신저로 안내 → 직원이 입력하면 연결<br>4. 처리 후 [완료 처리] + 메모 → 자산 이력에 기록<br><span style="color:#8a8a8a">※ 이 PC에 \"IT 자산 확인\" 프로그램이 한 번 실행된 적이 있어야 합니다. 별도 프로그램은 필요 없습니다.</span></div></div>';
     }
     var warn = S.supportErr ? '<div class="note" style="color:#c42b1c;margin-bottom:8px">지원 요청 표를 읽지 못했습니다. db/update_v1.1.sql 을 SQL Editor에서 실행했는지 확인하세요.</div>' : '';
-    shell('support', '<h1>원격 지원</h1>' + warn + kpi + '<div class="tabs">' + tabA('received', '접수 대기', rec) + tabA('working', '진행중', wk) + tabA('done', '완료', done.length) + tabA('today', '오늘 접수', today) + tabA('all', '전체', S.support.length) + '</div>' +
-      sortBar('sup', SUPC, list.length) + '<div style="display:flex;gap:14px;align-items:flex-start"><div style="flex:1;min-width:0"><table class="tbl"><thead><tr>' + thS('sup', 'req_no', '접수번호') + thS('sup', 'created', '접수 시각') + thS('sup', 'user', '사용자') + thS('sup', 'pc', '컴퓨터 이름') + thS('sup', 'symptom', '증상') + thS('sup', 'status', '상태') + '</tr></thead><tbody>' + rows + '</tbody></table></div><div style="width:320px;flex:none">' + side + '</div></div>');
+    // v1.9.39: 제목 옆에 "원격 지원 실행" 알약 버튼 추가 — 완료된 건만 있어도(접수 대기 없이도) 바로 원격 접속을 실행할 수 있음
+    shell('support', '<div class="row" style="align-items:center;gap:8px;margin-bottom:2px"><h1 style="margin:0">원격 지원</h1><button class="btn sm pri" id="supRemoteTop" type="button" style="border-radius:14px;padding:4px 12px;font-size:11px">● 원격 지원 실행</button></div>' + warn + kpi + '<div class="tabs">' + tabA('received', '접수 대기', rec) + tabA('working', '진행중', wk) + tabA('done', '완료', done.length) + tabA('today', '오늘 접수', today) + tabA('all', '전체', S.support.length) + '</div>' +
+      sortBar('sup', SUPC, list.length) + toolbar + '<div style="display:flex;gap:14px;align-items:flex-start"><div style="flex:1;min-width:0"><table class="tbl"><thead><tr><th style="width:28px"></th>' + thS('sup', 'req_no', '접수번호') + thS('sup', 'created', '접수 시각') + thS('sup', 'user', '사용자') + thS('sup', 'pc', '컴퓨터 이름') + thS('sup', 'symptom', '증상') + thS('sup', 'status', '상태') + '</tr></thead><tbody>' + rows + '</tbody></table></div><div style="width:320px;flex:none">' + side + '</div></div>');
     bindSort('sup', function () { pageSupport(arg); });
     $$('tr[data-id]').forEach(function (tr) { tr.onclick = function () { location.hash = '#/support/' + tab + '/' + tr.dataset.id; }; });
+    var rt = $('#supRemoteTop'); if (rt) rt.onclick = openRemoteSupport;
+    function refreshSupToolbar() {
+      var sc = list.filter(function (x) { return SUP_SEL[x.id]; }).length;
+      var b = $('#supSelDel'); if (b) { b.textContent = '선택 삭제 (' + sc + ')'; b.disabled = !sc; }
+      var sa = $('#supSelAll'); if (sa) sa.checked = list.length > 0 && sc === list.length;
+    }
+    $$('.supChk').forEach(function (c) { c.onchange = function () { if (this.checked) SUP_SEL[this.dataset.id] = true; else delete SUP_SEL[this.dataset.id]; refreshSupToolbar(); }; });
+    var saAll = $('#supSelAll'); if (saAll) saAll.onchange = function () {
+      var on = this.checked; list.forEach(function (x) { if (on) SUP_SEL[x.id] = true; else delete SUP_SEL[x.id]; });
+      $$('.supChk').forEach(function (c) { c.checked = on; }); refreshSupToolbar();
+    };
+    var supSelDel = $('#supSelDel'); if (supSelDel) supSelDel.onclick = async function () {
+      var sel = list.filter(function (x) { return SUP_SEL[x.id]; }); if (!sel.length) return;
+      var rs = await askReason('선택한 요청 ' + sel.length.toLocaleString() + '건 삭제', '선택한 원격 지원 요청 <b>' + sel.length.toLocaleString() + '건</b>을 완전히 삭제합니다.<br><b>삭제하면 되돌릴 수 없습니다.</b>', sel.length.toLocaleString() + '건 삭제');
+      if (!rs) return;
+      try { await dbSupportDeleteMany(sel, rs); sel.forEach(function (x) { delete SUP_SEL[x.id]; }); toast('삭제했습니다. (' + sel.length.toLocaleString() + '건)'); location.hash = '#/support/' + tab; } catch (er) { fail(er); }
+    };
+    var supAllDel = $('#supAllDel'); if (supAllDel) supAllDel.onclick = async function () {
+      if (!list.length) return;
+      var tabLbl = { received: '접수 대기', working: '진행중', done: '완료', today: '오늘 접수', all: '전체' }[tab] || tab;
+      var rs = await askReason('조회된 ' + list.length.toLocaleString() + '건 전체 삭제', '현재 "' + esc(tabLbl) + '" 탭에 보이는 요청 <b>' + list.length.toLocaleString() + '건 전체</b>를 삭제합니다.<br><b>삭제하면 되돌릴 수 없습니다.</b>', list.length.toLocaleString() + '건 삭제');
+      if (!rs) return;
+      try { await dbSupportDeleteMany(list, rs); list.forEach(function (x) { delete SUP_SEL[x.id]; }); toast('삭제했습니다. (' + list.length.toLocaleString() + '건)'); location.hash = '#/support/' + tab; } catch (er) { fail(er); }
+    };
     if (!cur) return;
     var note = function () { var n = $('#supnote'); return n ? n.value.trim() : ''; };
     var who = adminLabel;
-    var rm = $('#supremote'); if (rm) rm.onclick = function () {
-      // v1.9.2: IT 자산 확인.exe 가 ezHelpManager 를 실행 (설치되어 있지 않으면 내장 설치 파일로 설치 후 실행)
-      var fr = document.createElement('iframe'); fr.style.display = 'none'; fr.src = 'itasset-remote://open'; document.body.appendChild(fr);
-      setTimeout(function () { fr.remove(); }, 3000);
-      toast('원격 접속을 실행합니다. 아무 반응이 없으면 이 PC에서 "IT 자산 확인" 프로그램을 한 번 실행한 뒤 다시 눌러 주세요.');
-    };
+    var rm = $('#supremote'); if (rm) rm.onclick = openRemoteSupport;
     var w = $('#supwork'); if (w) w.onclick = async function () { try { await dbSupport(cur.id, { status: 'working', handler: who() }); pageSupport(arg); } catch (er) { fail(er); } };
     var dn = $('#supdone'); if (dn) dn.onclick = async function () {
       try {
@@ -2897,6 +2942,10 @@
       if (DEMO || isViewer()) return; var td = ymd(new Date());
       var r = await sb.from('asset_snapshots').select('snap_date').eq('snap_date', td).maybeSingle(); if (r.error || r.data) return;
       var c = catCounts(liveAssets()); var byCo = {}; CO.forEach(function (co) { byCo[co] = catCounts(liveAssets().filter(function (a) { return a.company === co; })); }); c._co = byCo;   // v1.9.9: 회사별 보고서 필터용 (이 저장 시점부터)
+      // v1.9.39: 월별 자산 현황에 부서 필터를 추가 — 부서별, 회사+부서 조합별 분해도 함께 저장(이 저장 시점부터 적용)
+      var deptSet = {}; liveAssets().forEach(function (a) { if (a.dept) deptSet[a.dept] = 1; });
+      var byDept = {}; Object.keys(deptSet).forEach(function (d) { byDept[d] = catCounts(liveAssets().filter(function (a) { return a.dept === d; })); }); c._dept = byDept;
+      var byCoDept = {}; CO.forEach(function (co) { Object.keys(deptSet).forEach(function (d) { var list = liveAssets().filter(function (a) { return a.company === co && a.dept === d; }); if (list.length) byCoDept[co + '\u0001' + d] = catCounts(list); }); }); c._co_dept = byCoDept;
       await sb.from('asset_snapshots').insert({ snap_date: td, total: liveAssets().length, counts: c, pc: pcStats() });
     } catch (e) { }
   }
@@ -2915,18 +2964,24 @@
     return r.data;
   }
   function monthEnd(y, m) { return ymd(new Date(y, m, 0)); }
-  function monthRows(snaps, year, co) {   // 달별 월말 수량 (스냅샷이 없는 달은 대장 등록일 기준 추정); co 지정 시 그 회사만 (v1.9.9)
+  function monthRows(snaps, year, co, dept) {   // 달별 월말 수량 (스냅샷이 없는 달은 대장 등록일 기준 추정); co 지정 시 그 회사만(v1.9.9), dept 지정 시 그 부서(소속)만(v1.9.39, 둘 다 지정하면 회사+부서 조합)
     var now = new Date(), last = year === now.getFullYear() ? now.getMonth() + 1 : 12, rows = [];
     for (var m = 1; m <= last; m++) {
       var end = monthEnd(year, m), ms = snaps.filter(function (s0) { return s0.snap_date.slice(0, 7) === year + '-' + ('0' + m).slice(-2); }), hit = ms.length ? ms[ms.length - 1] : null, est = false, c = null, pc = null, noData = false;
       if (hit) {
-        if (co) { if (hit.counts && hit.counts._co && hit.counts._co[co]) c = hit.counts._co[co]; else noData = true; }
+        if (co && dept) { var key = co + '\u0001' + dept; if (hit.counts && hit.counts._co_dept && hit.counts._co_dept[key]) c = hit.counts._co_dept[key]; else noData = true; }
+        else if (co) { if (hit.counts && hit.counts._co && hit.counts._co[co]) c = hit.counts._co[co]; else noData = true; }
+        else if (dept) { if (hit.counts && hit.counts._dept && hit.counts._dept[dept]) c = hit.counts._dept[dept]; else noData = true; }
         else { c = hit.counts; pc = hit.pc; }
-      } else { est = true; c = catCounts(S.assets.filter(function (a) { return a.status !== '폐기' && (!a.created_at || ymd(a.created_at) <= end) && (!co || a.company === co); })); }
+      } else { est = true; c = catCounts(S.assets.filter(function (a) { return a.status !== '폐기' && (!a.created_at || ymd(a.created_at) <= end) && (!co || a.company === co) && (!dept || a.dept === dept); })); }
       var tot = null; if (c) { tot = 0; CGRP.forEach(function (g) { c[g] = c[g] || 0; tot += c[g]; }); }
       rows.push({ m: m, label: year + '-' + ('0' + m).slice(-2), c: c, total: tot, est: est, pc: pc, day: hit ? hit.snap_date : end, noData: noData });
     }
     return rows;
+  }
+  function deptsForCo(co) {   // v1.9.39: 월별 자산 현황 — 회사를 고르면 그 회사 소속 부서만으로 부서 목록을 좁힘
+    var set = {}; S.assets.forEach(function (a) { if (a.dept && (!co || a.company === co)) set[a.dept] = 1; });
+    return Object.keys(set).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
   }
   function repXlsx(fname, sheets, title) {
     var wb = XLSX.utils.book_new(), n = 0;
@@ -2964,10 +3019,11 @@
     $('#r_co').onchange = function () { REP_CO = this.value; pageReports(arg); };
   }
   // ---- 월별 자산 현황
-  var RV = { year: new Date().getFullYear() };
+  var RV = { year: new Date().getFullYear(), dept: '' };
   async function repMonthly() {
     var snaps; try { snaps = await repSnaps(); } catch (e) { shell('reports', repHead('월별 자산 현황') + '<div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message) + '</div>'); return; }
-    var yrs = [new Date().getFullYear(), new Date().getFullYear() - 1], rowsAll = monthRows(snaps, RV.year, REP_CO), rows = rowsAll.filter(function (r) { return r.c; });
+    var deptOpts = deptsForCo(REP_CO); if (RV.dept && deptOpts.indexOf(RV.dept) < 0) RV.dept = '';   // v1.9.39: 회사가 바뀌어 부서 목록에서 빠지면 선택 해제
+    var yrs = [new Date().getFullYear(), new Date().getFullYear() - 1], rowsAll = monthRows(snaps, RV.year, REP_CO, RV.dept), rows = rowsAll.filter(function (r) { return r.c; });
     var lastR = rows[rows.length - 1], prev = rows.length > 1 ? rows[rows.length - 2] : null, first = rows[0];
     var series = [['PC', '#0f6cbd'], ['노트북', '#1e8e3e'], ['모니터', '#e08a00']], W = 560, H = 230, all = [];
     series.forEach(function (s0) { rows.forEach(function (r) { all.push(r.c[s0[0]]); }); });
@@ -2980,15 +3036,20 @@
     var legend = series.map(function (s0) { return '<span style="margin-right:14px"><i style="display:inline-block;width:10px;height:3px;background:' + s0[1] + ';vertical-align:middle;margin-right:4px"></i>' + s0[0] + '</span>'; }).join('');
     var trs = rowsAll.slice().reverse().map(function (r) {
       var i = rowsAll.indexOf(r), p = i > 0 ? rowsAll[i - 1] : null;
-      if (!r.c) return '<tr><td>' + r.label + '</td><td colspan="9" class="note">회사별 자산 현황이 저장되지 않은 달입니다 (이 회사 필터는 ' + ymd(new Date()) + ' 이후 저장분부터 적용됩니다)</td></tr>';
+      if (!r.c) return '<tr><td>' + r.label + '</td><td colspan="9" class="note">회사·부서별 자산 현황이 저장되지 않은 달입니다 (이 필터는 ' + ymd(new Date()) + ' 이후 저장분부터 적용됩니다)</td></tr>';
       return '<tr><td>' + r.label + (r.est ? ' <span class="note">추정</span>' : '') + '</td>' + CGRP.map(function (g) { return '<td>' + r.c[g].toLocaleString() + '</td><td>' + (p && p.c ? dlt(r.c[g] - p.c[g]) : '—') + '</td>'; }).join('') + '<td><b>' + r.total.toLocaleString() + '</b></td><td>' + (p && p.c ? dlt(r.total - p.total) : '—') + '</td></tr>';
     }).join('');
-    shell('reports', repHead('월별 자산 현황', '<select id="r_y" class="noprint">' + yrs.map(function (y) { return '<option' + (y === RV.year ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>', '월말 기준 · 자산 대장 수량(폐기 제외)' + (REP_CO ? ' · 회사: ' + esc(REP_CO) : '')) +
+    // v1.9.39: 제목 오른쪽에 회사·부서 드롭다운 추가(대시보드의 회사별 선택과 같은 개념) — 고르면 상단 숫자·그래프·표가 모두 다시 계산됨
+    var coSel = '<select id="r_co2" class="noprint"><option value="">회사: 전체</option>' + CO.map(function (c) { return '<option' + (REP_CO === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
+    var deptSel = '<select id="r_dept2" class="noprint"><option value="">부서: 전체</option>' + deptOpts.map(function (d) { return '<option' + (RV.dept === d ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('') + '</select>';
+    shell('reports', repHead('월별 자산 현황', coSel + deptSel + '<select id="r_y" class="noprint">' + yrs.map(function (y) { return '<option' + (y === RV.year ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>', '월말 기준 · 자산 대장 수량(폐기 제외)' + (REP_CO ? ' · 회사: ' + esc(REP_CO) : '') + (RV.dept ? ' · 부서: ' + esc(RV.dept) : '')) +
       '<div class="kpis">' + series.map(function (s0) { var v = lastR ? lastR.c[s0[0]] : 0; return kp(s0[0], v.toLocaleString(), prev ? '전월 ' + (v - prev.c[s0[0]] >= 0 ? '+' : '') + (v - prev.c[s0[0]]) : '', s0[1]); }).join('') + kp('합계', (lastR ? lastR.total : 0).toLocaleString(), (prev ? '전월 ' + (lastR.total - prev.total >= 0 ? '+' : '') + (lastR.total - prev.total) : '') + (first && lastR ? ' · ' + RV.year + '년 초 대비 ' + (lastR.total - first.total >= 0 ? '+' : '') + (lastR.total - first.total) : '')) + '</div>' +
       '<div class="rcols"><div class="card"><div style="font-size:11.5px;margin-bottom:2px">' + legend + '</div>' + (svg || '<div class="note">표시할 달이 없습니다.</div>') + '</div><div class="rtb"><table class="tbl ctr"><thead><tr><th>월말 기준</th>' + CGRP.map(function (g) { return '<th>' + g + '</th><th>증감</th>'; }).join('') + '<th>합계</th><th>증감</th></tr></thead><tbody>' + trs + '</tbody></table></div></div>' +
-      '<div class="note" style="margin-top:8px;line-height:1.8">· 월말(마지막 날) 기준 수량입니다. 그 달에 저장된 마지막 수량을 쓰고, 저장이 없던 달은 대장 등록일 기준 <b>추정</b>입니다.' + (REP_CO ? '<br>· 회사별 분해는 이번 업데이트부터 매일 저장에 함께 기록되므로, 이전 달은 회사별 수치가 없을 수 있습니다.' : '') + '</div>');
+      '<div class="note" style="margin-top:8px;line-height:1.8">· 월말(마지막 날) 기준 수량입니다. 그 달에 저장된 마지막 수량을 쓰고, 저장이 없던 달은 대장 등록일 기준 <b>추정</b>입니다.' + (REP_CO || RV.dept ? '<br>· 회사·부서별 분해는 이번 업데이트부터 매일 저장에 함께 기록되므로, 이전 달은 수치가 없을 수 있습니다.' : '') + '</div>');
     $('#r_y').onchange = function () { RV.year = Number(this.value); repMonthly(); };
-    repBind('월별 자산 현황', function () { repXlsx('월별자산현황_' + RV.year + (REP_CO ? '_' + REP_CO : ''), [{ name: RV.year + '년 월별', rows: rowsAll.map(function (r) { if (!r.c) return { '월말 기준': r.label, '구분': '회사별 미저장' }; var o = { '월말 기준': r.label, '구분': r.est ? '추정' : '저장값' }; CGRP.forEach(function (g) { o[g] = r.c[g]; }); o['합계'] = r.total; return o; }) }], '월별 자산 현황'); });
+    $('#r_co2').onchange = function () { REP_CO = this.value; repMonthly(); };
+    $('#r_dept2').onchange = function () { RV.dept = this.value; repMonthly(); };
+    repBind('월별 자산 현황', function () { repXlsx('월별자산현황_' + RV.year + (REP_CO ? '_' + REP_CO : '') + (RV.dept ? '_' + RV.dept : ''), [{ name: RV.year + '년 월별', rows: rowsAll.map(function (r) { if (!r.c) return { '월말 기준': r.label, '구분': '미저장' }; var o = { '월말 기준': r.label, '구분': r.est ? '추정' : '저장값' }; CGRP.forEach(function (g) { o[g] = r.c[g]; }); o['합계'] = r.total; return o; }) }], '월별 자산 현황'); });
   }
   // ---- 기간별 자산 변동
   var RP = { from: '', to: '', cat: '', dept: '', q: 'month' };
@@ -3028,14 +3089,17 @@
     var cats = groupCount(S.assets, function (a) { return a.category; }).map(function (x) { return x[0]; }), depts = groupCount(S.assets, function (a) { return a.dept; }).map(function (x) { return x[0]; });
     var QL = [['today', '오늘'], ['week', '이번 주'], ['month', '이번 달'], ['last', '지난 달'], ['quarter', '분기'], ['year', '올해']];
     shell('reports', repHead('기간별 자산 변동', '', '이력 관리의 자산 변경 기록을 집계합니다' + (REP_CO ? ' · 회사: ' + esc(REP_CO) : '')) +
+      // v1.9.39: 필터 순서를 "회사 → 부서 → 분류"로 배치 + 회사 드롭다운 신규 추가(보고서 메인의 회사 선택과 같은 값을 공유)
       '<div class="card noprint" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="note">기간</span>' + QL.map(function (q) { return '<button type="button" class="achip' + (RP.q === q[0] ? ' on' : '') + '" data-q="' + q[0] + '">' + q[1] + '</button>'; }).join('') + '<input type="date" id="r_f" value="' + RP.from + '"> ~ <input type="date" id="r_t" value="' + RP.to + '">' +
-      '<select id="r_c"><option value="">분류: 전체</option>' + cats.map(function (c) { return '<option' + (RP.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select><select id="r_d"><option value="">부서: 전체</option>' + depts.map(function (c) { return '<option' + (RP.dept === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select><button class="btn pri" id="r_go" type="button">조회</button></div>' +
+      '<select id="r_co3"><option value="">회사: 전체</option>' + CO.map(function (c) { return '<option' + (REP_CO === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' +
+      '<select id="r_d"><option value="">부서: 전체</option>' + depts.map(function (c) { return '<option' + (RP.dept === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' +
+      '<select id="r_c"><option value="">분류: 전체</option>' + cats.map(function (c) { return '<option' + (RP.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select><button class="btn pri" id="r_go" type="button">조회</button></div>' +
       (err ? '<div class="note" style="color:#c42b1c;margin:8px 0">' + esc(err) + '</div>' : '') +
       '<div class="rcols"><div class="card" style="min-width:300px"><b>변동 유형별 건수</b> <span class="note">' + RP.from + ' ~ ' + RP.to + ' · 총 ' + lines.length + '건</span>' + bars + '</div><div class="rtb"><div style="font-weight:600;margin-bottom:4px">변동 내역 (최근순 · 최대 200건 표시)</div><table class="tbl"><thead><tr><th>일시</th><th>관리번호</th><th>구분</th><th>내용</th><th>처리자</th></tr></thead><tbody>' +
       (lines.slice(0, 200).map(function (l) { return '<tr><td>' + esc(ymd(l.at).slice(5)) + ' ' + esc(hm(l.at)) + '</td><td class="mono">' + (l.no ? '<a href="#/asset/' + encodeURIComponent(l.no) + '">' + esc(l.no) + '</a>' : '') + '</td><td>' + esc(l.type) + '</td><td>' + esc(l.text) + '</td><td>' + esc(l.who) + '</td></tr>'; }).join('') || '<tr><td colspan="5" class="note" style="text-align:center;padding:16px">해당 기간에 변동이 없습니다.</td></tr>') + '</tbody></table></div></div>');
     $$('[data-q]').forEach(function (b) { b.onclick = function () { periodSet(b.dataset.q); repPeriod(); }; });
-    $('#r_go').onclick = function () { RP.from = $('#r_f').value || RP.from; RP.to = $('#r_t').value || RP.to; RP.q = 'custom'; RP.cat = $('#r_c').value; RP.dept = $('#r_d').value; repPeriod(); };
-    $('#r_c').onchange = $('#r_go').onclick; $('#r_d').onchange = $('#r_go').onclick;
+    $('#r_go').onclick = function () { RP.from = $('#r_f').value || RP.from; RP.to = $('#r_t').value || RP.to; RP.q = 'custom'; REP_CO = $('#r_co3').value; RP.cat = $('#r_c').value; RP.dept = $('#r_d').value; repPeriod(); };
+    $('#r_co3').onchange = $('#r_go').onclick; $('#r_c').onchange = $('#r_go').onclick; $('#r_d').onchange = $('#r_go').onclick;
     repBind('기간별 자산 변동', function () { repXlsx('기간별자산변동_' + RP.from + '_' + RP.to, [{ name: '요약', rows: TYPES.map(function (t) { return { '구분': t[0], '건수': cnt[t[0]] || 0 }; }) }, { name: '변동 내역', rows: lines.map(function (l) { return { '일시': ymd(l.at) + ' ' + hm(l.at), '관리번호': l.no, '구분': l.type, '내용': l.text, '처리자': l.who }; }) }], '기간별 자산 변동'); });
   }
   // ---- 부서별 자산 보유
@@ -3208,7 +3272,7 @@
   var IPS_PS = 50;
   var IPF = { q: '', org: '', dept2: '', floor: '', band: '', kind: '', status: '', chk: '', page: 1, sel: {} };
   // v1.9.33: VPN 대역 핑 모니터링 — 요약 화면 순환 카드(5개씩, N분마다 자동 전환)
-  var PING_ROT = { idx: 0, paused: false };   // v1.9.36: paused — ◀/▶/■로 수동 조작 중이면 자동 순환 건너뜀
+  var PING_ROT = { idx: 0, paused: false, filterFail: false };   // v1.9.36: paused — ◀/▶/■로 수동 조작 중이면 자동 순환 건너뜀 · v1.9.39: filterFail — "장애(응답없음)" 알약을 눌러 장애만 모아보기
   var PING_ROT_KEY = 'itasset_pingRotMin';
   function pingRotMin() { var v = parseInt(localStorage.getItem(PING_ROT_KEY) || '10', 10); return (v >= 1 && v <= 60) ? v : 10; }
   function pingRotSave(v) { try { localStorage.setItem(PING_ROT_KEY, String(v)); } catch (e) { } }
@@ -3222,27 +3286,44 @@
         return (a.band + ' ' + a.org).localeCompare(b.band + ' ' + b.org, 'ko', { numeric: true });
       });
   }
-  function pingCardHtml() {
+  function pingDisplayTargets() {   // v1.9.39: "장애(응답없음)" 알약을 누르면 장애만 모아보기
     var all = pingTargets();
-    if (!all.length) return '<div class="card"><h3>VPN 대역 모니터링</h3><div class="note">설정된 핑 대상이 없습니다 — <a href="#/ip/band">대역 현황</a>에서 대역별 "VPN 핑 대상" IP를 지정하세요.</div></div>';
+    return PING_ROT.filterFail ? all.filter(function (r) { return r.status === 'fail'; }) : all;
+  }
+  function pingCardHtml() {
+    var full = pingTargets();
+    if (!full.length) return '<div class="card"><h3>VPN 모니터링</h3><div class="note">설정된 핑 대상이 없습니다 — <a href="#/ip/band">대역 현황</a>에서 대역별 "VPN 핑 대상" IP를 지정하세요.</div></div>';
+    var all = pingDisplayTargets();
     var per = 5, pages = Math.max(1, Math.ceil(all.length / per));
     if (PING_ROT.idx >= pages) PING_ROT.idx = 0;
     var slice = all.slice(PING_ROT.idx * per, PING_ROT.idx * per + per);
     // v1.9.38: 대역 수(5개) 미달분은 빈 행으로 채워 테이블 높이를 항상 고정(카드 틀이 페이지마다 흔들리지 않도록)
-    var rows = slice.map(function (r) { return '<tr><td>' + esc(r.band) + '</td><td>' + esc(r.org) + '</td><td class="mono">' + esc(r.ping_ip) + '</td><td style="white-space:normal;line-height:1.4">' + pingStatusInline(r) + '</td></tr>'; }).join('');
+    var rows = slice.map(function (r) { return '<tr><td>' + esc(r.band) + '</td><td>' + esc(r.org) + '</td><td class="mono">' + esc(r.ping_ip) + '</td><td style="white-space:nowrap">' + pingStatusInline(r) + '</td></tr>'; }).join('');
     for (var pad = slice.length; pad < per; pad++) rows += '<tr><td>&nbsp;</td><td></td><td></td><td></td></tr>';
-    // v1.9.38: 좌우 대칭이 되도록 다시 그린 이전·일시정지/재생·다음 아이콘(정사각 중앙정렬), 페이지 점(dot) 표시는 제거
-    var icPrev = '<svg width="11" height="11" viewBox="0 0 11 11"><path d="M7.5 1 7.5 10 1.5 5.5Z" fill="currentColor"/></svg>';
-    var icPlay = '<svg width="11" height="11" viewBox="0 0 11 11"><path d="M3.5 1 3.5 10 9.5 5.5Z" fill="currentColor"/></svg>';
-    var icPause = '<svg width="11" height="11" viewBox="0 0 11 11"><rect x="3" y="1" width="1.8" height="9" fill="currentColor"/><rect x="6.2" y="1" width="1.8" height="9" fill="currentColor"/></svg>';
-    var icNext = '<svg width="11" height="11" viewBox="0 0 11 11"><path d="M3.5 1 3.5 10 9.5 5.5Z" fill="currentColor"/></svg>';
+    if (!all.length) rows = '<tr><td colspan="4" class="note" style="text-align:center;padding:14px">장애(응답없음)인 대역이 없습니다.</td></tr>';
+    // v1.9.39: "막대+삼각형"(이전·다음)과 "삼각형만"(재생) 모양을 서로 다르게 해, 단색 삼각형보다 뚜렷이 구별되는 아이콘으로 교체
+    var icPrev = '<svg width="14" height="14" viewBox="0 0 16 16"><rect x="2.6" y="2" width="1.8" height="12" fill="currentColor"/><path d="M12.5 2 12.5 14 3.8 8Z" fill="currentColor"/></svg>';
+    var icPlay = '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M4.5 2 4.5 14 12.5 8Z" fill="currentColor"/></svg>';
+    var icPause = '<svg width="14" height="14" viewBox="0 0 16 16"><rect x="4.5" y="2" width="2.6" height="12" rx="1" fill="currentColor"/><rect x="9" y="2" width="2.6" height="12" rx="1" fill="currentColor"/></svg>';
+    var icNext = '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M3.5 2 3.5 14 12.2 8Z" fill="currentColor"/><rect x="11.6" y="2" width="1.8" height="12" fill="currentColor"/></svg>';
     var navHtml = '<span class="row" style="gap:4px;flex-shrink:0">' +
       '<button class="btn sm ic" id="pingPrevBtn" type="button" title="이전 페이지">' + icPrev + '</button>' +
       '<button class="btn sm ic' + (PING_ROT.paused ? '' : ' pri') + '" id="pingPauseBtn" type="button" title="' + (PING_ROT.paused ? '재생(자동 순환 다시 시작)' : '일시정지(이 페이지 고정)') + '">' + (PING_ROT.paused ? icPlay : icPause) + '</button>' +
       '<button class="btn sm ic" id="pingNextBtn" type="button" title="다음 페이지">' + icNext + '</button>' +
       '</span>';
-    return '<div class="card"><h3>VPN 대역 모니터링 <span class="note" style="font-weight:400">전체 ' + all.length.toLocaleString() + '개 대역 중 ' + (PING_ROT.idx * per + 1) + '~' + Math.min(all.length, PING_ROT.idx * per + per) + '번째</span></h3>' +
-      '<table class="tbl" style="font-size:12px;table-layout:fixed;width:100%"><colgroup><col style="width:42px"><col><col style="width:96px"><col style="width:128px"></colgroup><thead><tr><th>대역</th><th>소속</th><th>핑 대상 IP</th><th>상태</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    var cOk = 0, cFail = 0;
+    full.forEach(function (r) { if (r.status === 'ok') cOk++; else if (r.status === 'fail') cFail++; });
+    // v1.9.39: 정상/장애(응답없음) 집계 알약 — 장애 알약을 누르면 장애만 모아보기로 전환
+    var pillsHtml = '<div class="row" style="gap:6px;margin:2px 0 8px;align-items:center;flex-wrap:wrap">' +
+      '<span class="badge b-ok">정상 ' + cOk.toLocaleString() + '개</span>' +
+      '<span class="badge b-bad" id="pingFailPill" style="cursor:pointer' + (PING_ROT.filterFail ? ';box-shadow:0 0 0 2px #c42b1c' : '') + '" title="눌러서 장애(응답없음)만 모아보기">장애(응답없음) ' + cFail.toLocaleString() + '개</span>' +
+      (PING_ROT.filterFail ? '<a href="#" id="pingFailClr" class="note">전체 보기 ✕</a>' : '') +
+      '</div>';
+    var rangeTxt = all.length ? ((PING_ROT.idx * per + 1) + '~' + Math.min(all.length, PING_ROT.idx * per + per) + '번째') : '0건';
+    var headNote = PING_ROT.filterFail ? ('장애(응답없음) ' + all.length.toLocaleString() + '개 중 ' + rangeTxt) : ('전체 ' + full.length.toLocaleString() + '개 대역 중 ' + rangeTxt);
+    // v1.9.39: "핑 대상 IP"→"대상 IP", 소속·대상 IP·상태 열 너비를 재배분(대상 IP는 고정폭, 소속·상태는 남는 공간을 균등 분배)해 상태가 한 줄로 보이게 함
+    return '<div class="card"><h3>VPN 모니터링 <span class="note" style="font-weight:400">' + headNote + '</span></h3>' + pillsHtml +
+      '<table class="tbl" style="font-size:12px;table-layout:fixed;width:100%"><colgroup><col style="width:36px"><col><col style="width:100px"><col></colgroup><thead><tr><th>대역</th><th>소속</th><th>대상 IP</th><th>상태</th></tr></thead><tbody>' + rows + '</tbody></table>' +
       '<div class="row" style="align-items:center;margin-top:6px;gap:10px">' + navHtml +
       '<span class="note" style="white-space:nowrap">전환 주기 <input type="number" id="pingRotInp" min="1" max="60" value="' + pingRotMin() + '" style="width:44px;height:22px;font-size:11px;text-align:center">분마다</span></div></div>';
   }
@@ -3251,7 +3332,7 @@
     var wrap = pingWrapEl();
     if (!wrap) { if (window.__pingRotTimer) clearInterval(window.__pingRotTimer); return; }
     if (PING_ROT.paused) return;   // v1.9.36: 일시정지 중엔 자동 순환 건너뜀
-    var pages = Math.max(1, Math.ceil(pingTargets().length / 5));
+    var pages = Math.max(1, Math.ceil(pingDisplayTargets().length / 5));
     PING_ROT.idx = (PING_ROT.idx + 1) % pages;
     wrap.innerHTML = pingCardHtml(); bindPingRotInp(); bindPingNav();
   }
@@ -3263,14 +3344,16 @@
       window.__pingRotTimer = setInterval(pingRotTick, v * 60000);
     };
   }
-  function bindPingNav() {   // v1.9.36: ◀(이전)·■/▶(일시정지/재생)·▶(다음) 버튼 동작
+  function bindPingNav() {   // v1.9.36: ◀(이전)·■/▶(일시정지/재생)·▶(다음) 버튼 동작 · v1.9.39: 장애(응답없음) 알약 필터 토글
     var wrap = pingWrapEl();
     function rerender() { if (wrap) { wrap.innerHTML = pingCardHtml(); bindPingRotInp(); bindPingNav(); } }
-    var pages = Math.max(1, Math.ceil(pingTargets().length / 5));
-    var prev = $('#pingPrevBtn'), pause = $('#pingPauseBtn'), next = $('#pingNextBtn');
+    var pages = Math.max(1, Math.ceil(pingDisplayTargets().length / 5));
+    var prev = $('#pingPrevBtn'), pause = $('#pingPauseBtn'), next = $('#pingNextBtn'), failPill = $('#pingFailPill'), failClr = $('#pingFailClr');
     if (prev) prev.onclick = function () { PING_ROT.idx = (PING_ROT.idx - 1 + pages) % pages; PING_ROT.paused = true; rerender(); };
     if (next) next.onclick = function () { PING_ROT.idx = (PING_ROT.idx + 1) % pages; PING_ROT.paused = true; rerender(); };
     if (pause) pause.onclick = function () { PING_ROT.paused = !PING_ROT.paused; rerender(); };
+    if (failPill) failPill.onclick = function () { PING_ROT.filterFail = !PING_ROT.filterFail; PING_ROT.idx = 0; PING_ROT.paused = true; rerender(); };
+    if (failClr) failClr.onclick = function (e) { e.preventDefault(); PING_ROT.filterFail = false; PING_ROT.idx = 0; rerender(); };
   }
   function ipDept2List() {   // v1.9.25: IP 대장에 실제로 쓰인 조직명(dept2) 목록 (검색형 콤보박스용)
     var set = {}; S.ips.forEach(function (r) { if (r.dept2) set[r.dept2] = 1; });
@@ -3985,7 +4068,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.38', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.39', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -3997,7 +4080,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경 · v1.9.37 대시보드 하단 "PC 수집 현황" 카드를 "소속별 등록 IP"·"VPN 대역 모니터링"(요약 탭과 동일한 순환 카드)로 교체, "VPN 대역 핑 모니터링" 카드명을 "VPN 대역 모니터링"으로 간소화, 전환 주기 입력이 줄바꿈되던 문제 수정 및 이전·일시정지/재생·다음 아이콘을 정사각 중앙정렬 SVG로 교체 · v1.9.38 VPN 대역 모니터링 카드의 페이지 점(dot) 표시 제거, 표를 고정 폭(소속이 길어도 카드 틀이 흔들리지 않도록)으로 변경, 이전·일시정지/재생·다음 아이콘을 좌우 대칭으로 다시 그려 중앙정렬 개선'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경 · v1.9.37 대시보드 하단 "PC 수집 현황" 카드를 "소속별 등록 IP"·"VPN 대역 모니터링"(요약 탭과 동일한 순환 카드)로 교체, "VPN 대역 핑 모니터링" 카드명을 "VPN 대역 모니터링"으로 간소화, 전환 주기 입력이 줄바꿈되던 문제 수정 및 이전·일시정지/재생·다음 아이콘을 정사각 중앙정렬 SVG로 교체 · v1.9.38 VPN 대역 모니터링 카드의 페이지 점(dot) 표시 제거, 표를 고정 폭(소속이 길어도 카드 틀이 흔들리지 않도록)으로 변경, 이전·일시정지/재생·다음 아이콘을 좌우 대칭으로 다시 그려 중앙정렬 개선 · v1.9.39 "VPN 대역 모니터링"을 "VPN 모니터링"으로 명칭 축약, 카드 열 너비 재배분 및 "핑 대상 IP"→"대상 IP"로 한 줄 표시, 정상/장애(응답없음) 집계 알약 추가(장애 알약을 누르면 장애만 모아보기), 이전·일시정지/재생·다음 아이콘을 더 뚜렷하게 구별되도록 교체, 원격 지원 "원격 접속 열기"를 "원격 지원 실행"으로 변경하고 제목 옆에 상시 실행 버튼 추가, 원격 지원 목록에 체크박스·선택 삭제·전체 삭제 추가, 월별 자산 현황에 회사·부서 드롭다운 추가(선택 기준으로 수량·그래프·표 재계산), 기간별 자산 변동 필터 순서를 회사→부서→분류로 재배치하고 회사 드롭다운 신규 추가'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;
