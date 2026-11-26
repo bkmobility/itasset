@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.33 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.34 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -409,7 +409,7 @@
     var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.33</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.34</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><div class="gswrap"><input type="search" id="gs" class="gs" autocomplete="off" placeholder="통합 검색 (자산·IP·인사 전체) (Enter)" value="' + esc(F.q) + '"><div class="gsdrop" id="gsdrop" style="display:none"></div></div><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'), gsdrop = $('#gsdrop');   // v1.9.31: Frame 28 — 통합 검색(자산·IP·인사 동시 검색) 드롭다운
@@ -419,11 +419,11 @@
       else if (kind === 'ip') { IPF.q = q; IPF.page = 1; if (location.hash.indexOf('#/ip') === 0) pageIpList(); else location.hash = '#/ip/list'; }
       else if (kind === 'emp') { EMPV.q = q; EMPV.page = 1; if (location.hash.indexOf('#/employees') === 0) pageEmployees('act'); else location.hash = '#/employees/act'; }
     }
-    function gsGoItem(kind, id) {
-      if (gsdrop) gsdrop.style.display = 'none'; gs.value = '';
-      if (kind === 'asset') location.hash = '#/asset/' + encodeURIComponent(id);
-      else if (kind === 'ip') { location.hash = '#/ip/list'; setTimeout(function () { var r = S.ips.filter(function (x) { return String(x.id) === id; })[0]; if (r) ipDialog(r); }, 60); }
-      else if (kind === 'emp') { location.hash = '#/employees/act'; setTimeout(function () { empForm(id, 'act'); }, 60); }
+    function gsGoItem(kind, q) {   // v1.9.34: 개별 결과 클릭 시 수정화면으로 바로 가지 않고, 해당 화면의 "목록"으로 이동(검색어 자동 채움)
+      gs.value = '';
+      if (kind === 'asset') gsGoAll('assets', q);
+      else if (kind === 'ip') gsGoAll('ip', q);
+      else if (kind === 'emp') gsGoAll('emp', q);
     }
     function gsRender(qraw) {
       if (!gsdrop) return;
@@ -438,7 +438,7 @@
       if (qe.length) out += '<div class="gssec">인사 정보 (' + qe.length.toLocaleString() + '건) <a href="#" data-gsall="emp">모두 보기</a></div>' + qe.slice(0, 3).map(function (e) { return '<div class="gsitem" data-gskind="emp" data-gsid="' + esc(e.emp_no) + '">' + esc(e.name) + ' <span class="note">· ' + esc(e.dept || '') + ' · ' + esc(e.emp_no) + '</span></div>'; }).join('');
       if (!out) out = '<div class="gsempty">일치하는 결과가 없습니다</div>';
       gsdrop.innerHTML = out; gsdrop.style.display = 'block';
-      $$('[data-gskind]', gsdrop).forEach(function (d) { d.onclick = function () { gsGoItem(d.dataset.gskind, d.dataset.gsid); }; });
+      $$('[data-gskind]', gsdrop).forEach(function (d) { d.onclick = function () { gsGoItem(d.dataset.gskind, qraw); }; });
       $$('[data-gsall]', gsdrop).forEach(function (a) { a.onclick = function (e) { e.preventDefault(); gsGoAll(a.dataset.gsall, q); }; });
     }
     if (gs) {
@@ -3858,7 +3858,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.33', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.34', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -3870,7 +3870,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회)'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;
