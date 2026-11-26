@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.40 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.41 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -440,7 +440,7 @@
     }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.40</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.41</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><div class="gswrap"><input type="search" id="gs" class="gs" autocomplete="off" placeholder="통합 검색 (자산·IP·인사 전체) (Enter)" value="' + esc(F.q) + '"><div class="gsdrop" id="gsdrop" style="display:none"></div></div><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'), gsdrop = $('#gsdrop');   // v1.9.31: Frame 28 — 통합 검색(자산·IP·인사 동시 검색) 드롭다운
@@ -539,7 +539,6 @@
     var ctot = coll.reduce(function (t, p) { return t + p[1]; }, 0) || 1;
     var cbar = '<div class="sbar">' + coll.map(function (p) { return p[1] ? '<i style="flex:' + p[1] + ';background:' + p[2] + '" title="' + esc(p[0]) + ' ' + p[1] + '"></i>' : ''; }).join('') + '</div>';
     var typ = top4(A, function (a) { return a.category; }), sts = top4(A, function (a) { return a.status; }, function (n, i) { return ST_COL[n] || PAL[Math.min(i, 5)]; });
-    var wrows = wr.slice(0, 6).map(function (w) { return '<tr><td class="mono"><a href="#/asset/' + encodeURIComponent(w.no) + '">' + esc(w.no) + '</a></td><td>' + esc(w.cat || '') + '</td><td>' + esc(w.who) + '</td><td>' + esc(w.date) + '</td><td style="color:' + w.col + ';font-weight:600">' + w.st + '</td></tr>'; }).join('') || '<tr><td colspan="5" class="note" style="text-align:center;padding:12px">알림이 없습니다.</td></tr>';
     var arows = act.map(function (h) { return '<div class="ar' + (isMain() ? ' clk' : '') + '" data-at="' + esc(ymd(h.t)) + '" data-tg="' + esc(h.a === '(미등록 PC)' ? '미등록 PC' : h.a.indexOf('인사 명단') === 0 ? '인사 명단' : h.a) + '" title="' + (isMain() ? '누르면 이력 관리에서 확인' : '') + '"><span class="at">' + esc(ymd(h.t).slice(5) + ' ' + hm(h.t)) + '</span><span class="ab">' + esc(h.a) + '</span><span class="ad">' + esc(h.d) + '</span></div>'; }).join('') || '<div class="note">활동 이력이 없습니다.</div>';
     // v1.9.6: 회사별 자산 | 자산 유형 | 자산 상태 (회사를 고르면 오른쪽 두 카드가 그 회사 기준으로 바뀜, 기본 A+에셋)
     var co = DASH_CO, cA = co === '전체' ? A : A.filter(function (a) { return (a.company || '') === co; });
@@ -557,12 +556,13 @@
       '<div class="card"><h3>회사별 자산</h3>' + coRows + '<div class="note codet">회사를 누르면 오른쪽 두 카드가 바뀝니다<a href="#/company/' + encodeURIComponent(co) + '">회사별 상세 보기 ›</a></div></div>' +
       '<div class="card"><h3>자산 유형 · ' + esc(co) + '</h3><div class="dn">' + donut(typC, cA.length.toLocaleString(), 'catg', co, true) + '<div class="lgs">' + legend(typC, 'catg', co, true) + '</div></div></div>' +
       '<div class="card"><h3>자산 상태 · ' + esc(co) + '</h3><div class="dn">' + donut(stsC, cA.length.toLocaleString(), 'status', co) + '<div class="lgs">' + legend(stsC, 'status', co) + '</div></div></div></div>' +
-      '<div class="dgrid4">' +
+      '<div class="dgrid3">' +
       '<div class="card"><h3>부서별 자산 수 <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + bars(groupCount(A, function (a) { return a.dept; }).slice(0, 5), null, 'dept') + '</div>' +
       '<div class="card"><h3>소속별 등록 IP <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + (S.ipErr ? '<div class="note">IP 관리 데이터가 아직 없습니다.</div>' : bars(groupCount(S.ips, function (r) { return r.org; }).slice(0, 5), null, 'ipOrg')) + '</div>' +
+      warrCardHtml(wr) + '</div>' +
+      '<div class="dgrid">' +
       '<div id="dashPingCardWrap">' + (S.ipErr ? '<div class="card"><h3>VPN 대역 모니터링</h3><div class="note">IP 관리 데이터가 아직 없습니다.</div></div>' : pingCardHtml()) + '</div>' +
       faultCardHtml() + '</div>' +
-      '<div class="card dwide"><div class="row"><h3 style="flex:1;margin:0">보증 만료·교체 알림</h3>' + (wr.length > 6 ? '<span class="note">외 ' + (wr.length - 6) + '건</span>' : '') + '<a href="#/assets" style="font-size:11.5px">자산 목록 ›</a></div><table class="tbl dtbl"><thead><tr><th>자산번호</th><th>유형</th><th>사용자</th><th>만료일/기준</th><th>상태</th></tr></thead><tbody>' + wrows + '</tbody></table><div class="note" style="margin-top:6px">보증 만료 30일 전~만료 후 90일, 그리고 구매일(없으면 제조년월) 기준 5년 이상 사용한 PC·노트북을 표시합니다.</div></div>' +
       '<div class="card dwide"><h3>최근 활동</h3>' + arows + '</div>');
     if (isMain()) $$('.ar.clk').forEach(function (el) { el.onclick = function () { AUDV = { from: el.dataset.at, to: el.dataset.at, actor: '', target: el.dataset.tg, q: '', chip: 'all', page: 0 }; location.hash = '#/audit'; }; });
     $$('.corow').forEach(function (el) { el.onclick = function () { DASH_CO = el.getAttribute('data-co'); pageDashboard(); }; });
@@ -1236,6 +1236,14 @@
   var FAULT_CAT_MAJORS = Object.keys(FAULT_CAT);
   var FAULT_ST = { pending: ['접수대기', 'warn'], progress: ['진행중', 'blue'], done: ['완료', 'ok'], rejected: ['반려', 'gray'] };
   var FAULT_SEL = {};   // 목록 체크박스 선택 상태(요청 id → true)
+  function warrCardHtml(wr) {   // v1.9.41 (Frame 57): 대시보드 "보증 만료·교체 알림" 압축 카드 — 기존 하단 전체 폭 표를 대체
+    var top2 = wr.slice(0, 2).map(function (w) { return '<div style="margin-top:4px;color:#5c5c5c;font-size:10.5px;line-height:1.6"><a class="mono" href="#/asset/' + encodeURIComponent(w.no) + '" style="color:inherit">' + esc(w.no) + '</a> · ' + esc(w.who || '') + '</div>'; }).join('');
+    return '<div class="card" style="position:relative">' +
+      '<h3>보증 만료·교체 알림</h3>' +
+      (wr.length ? '<div><span style="font-size:19px;font-weight:800;color:#c42b1c">' + wr.length.toLocaleString() + '</span><span class="note"> 건 만료·임박</span></div>' + top2 : '<div class="note" style="padding:8px 0">알림이 없습니다.</div>') +
+      '<div style="margin-top:6px"><a href="#/assets" style="font-size:10.5px">자산 목록 보기 ›</a></div>' +
+      '</div>';
+  }
   function faultCardHtml() {   // Frame 52: 대시보드 "장애 처리 현황" 알약 카드 — VPN 모니터링 카드와 동일한 디자인
     var pend = (S.faults || []).filter(function (x) { return x.status === 'pending'; }).length;
     var prog = (S.faults || []).filter(function (x) { return x.status === 'progress'; }).length;
@@ -4393,7 +4401,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.40', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.41', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -4405,7 +4413,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경 · v1.9.37 대시보드 하단 "PC 수집 현황" 카드를 "소속별 등록 IP"·"VPN 대역 모니터링"(요약 탭과 동일한 순환 카드)로 교체, "VPN 대역 핑 모니터링" 카드명을 "VPN 대역 모니터링"으로 간소화, 전환 주기 입력이 줄바꿈되던 문제 수정 및 이전·일시정지/재생·다음 아이콘을 정사각 중앙정렬 SVG로 교체 · v1.9.38 VPN 대역 모니터링 카드의 페이지 점(dot) 표시 제거, 표를 고정 폭(소속이 길어도 카드 틀이 흔들리지 않도록)으로 변경, 이전·일시정지/재생·다음 아이콘을 좌우 대칭으로 다시 그려 중앙정렬 개선 · v1.9.39 "VPN 대역 모니터링"을 "VPN 모니터링"으로 명칭 축약, 카드 열 너비 재배분 및 "핑 대상 IP"→"대상 IP"로 한 줄 표시, 정상/장애(응답없음) 집계 알약 추가(장애 알약을 누르면 장애만 모아보기), 이전·일시정지/재생·다음 아이콘을 더 뚜렷하게 구별되도록 교체, 원격 지원 "원격 접속 열기"를 "원격 지원 실행"으로 변경하고 제목 옆에 상시 실행 버튼 추가, 원격 지원 목록에 체크박스·선택 삭제·전체 삭제 추가, 월별 자산 현황에 회사·부서 드롭다운 추가(선택 기준으로 수량·그래프·표 재계산), 기간별 자산 변동 필터 순서를 회사→부서→분류로 재배치하고 회사 드롭다운 신규 추가 · v1.9.40 "장애 처리" 기능 신설(db/update_v1.9.40.sql 실행 필요) — 접수 등록 화면, 접수대기/진행중/완료/반려 탭과 상태 변경 모달(담당자 지정·처리 내용), 체크박스 선택/전체 삭제, 대시보드에 KPI·알약 카드 추가, 보고서에 "장애 처리 현황"(기간·회사·부서·분류·상태 필터) 신설, 사이드바에 신규 메뉴 배치(현황 점검 아래·원격 지원 위) 및 실사·인사 정보 순서 교체, VPN 모니터링 카드를 제목·알약·이전/재생/다음·전환주기·적용 버튼까지 한 줄로 정리("갱신 n분 적용"), 대역 현황에 VPN 핑 대상 해제 버튼과 체크박스 선택 해제·전체 소속 일괄 해제 추가, 사이드바 디자인을 체크박스형 아이콘에서 메뉴별 라인아이콘 + 둥근 액티브 하이라이트로 개선'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경 · v1.9.37 대시보드 하단 "PC 수집 현황" 카드를 "소속별 등록 IP"·"VPN 대역 모니터링"(요약 탭과 동일한 순환 카드)로 교체, "VPN 대역 핑 모니터링" 카드명을 "VPN 대역 모니터링"으로 간소화, 전환 주기 입력이 줄바꿈되던 문제 수정 및 이전·일시정지/재생·다음 아이콘을 정사각 중앙정렬 SVG로 교체 · v1.9.38 VPN 대역 모니터링 카드의 페이지 점(dot) 표시 제거, 표를 고정 폭(소속이 길어도 카드 틀이 흔들리지 않도록)으로 변경, 이전·일시정지/재생·다음 아이콘을 좌우 대칭으로 다시 그려 중앙정렬 개선 · v1.9.39 "VPN 대역 모니터링"을 "VPN 모니터링"으로 명칭 축약, 카드 열 너비 재배분 및 "핑 대상 IP"→"대상 IP"로 한 줄 표시, 정상/장애(응답없음) 집계 알약 추가(장애 알약을 누르면 장애만 모아보기), 이전·일시정지/재생·다음 아이콘을 더 뚜렷하게 구별되도록 교체, 원격 지원 "원격 접속 열기"를 "원격 지원 실행"으로 변경하고 제목 옆에 상시 실행 버튼 추가, 원격 지원 목록에 체크박스·선택 삭제·전체 삭제 추가, 월별 자산 현황에 회사·부서 드롭다운 추가(선택 기준으로 수량·그래프·표 재계산), 기간별 자산 변동 필터 순서를 회사→부서→분류로 재배치하고 회사 드롭다운 신규 추가 · v1.9.40 "장애 처리" 기능 신설(db/update_v1.9.40.sql 실행 필요) — 접수 등록 화면, 접수대기/진행중/완료/반려 탭과 상태 변경 모달(담당자 지정·처리 내용), 체크박스 선택/전체 삭제, 대시보드에 KPI·알약 카드 추가, 보고서에 "장애 처리 현황"(기간·회사·부서·분류·상태 필터) 신설, 사이드바에 신규 메뉴 배치(현황 점검 아래·원격 지원 위) 및 실사·인사 정보 순서 교체, VPN 모니터링 카드를 제목·알약·이전/재생/다음·전환주기·적용 버튼까지 한 줄로 정리("갱신 n분 적용"), 대역 현황에 VPN 핑 대상 해제 버튼과 체크박스 선택 해제·전체 소속 일괄 해제 추가, 사이드바 디자인을 체크박스형 아이콘에서 메뉴별 라인아이콘 + 둥근 액티브 하이라이트로 개선 · v1.9.41 대시보드 카드 레이아웃 재구성 — 맨 아래 "보증 만료·교체 알림" 전체 폭 표를 삭제하고 압축 카드로 전환(만료 건수·상위 2건 미리보기·자산 목록 링크), 1번째 줄을 부서별 자산 수·소속별 등록 IP·보증 만료·교체 알림 3칸으로, 2번째 줄을 VPN 모니터링·장애 처리 현황 2칸으로 재배치'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;
