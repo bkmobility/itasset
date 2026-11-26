@@ -49,6 +49,9 @@ h1{margin:0;font-size:18px;font-weight:600}
 .btn{height:30px;padding:0 12px;border:1px solid #c8c8c8;border-radius:6px;background:#fff;font-size:12px;white-space:nowrap}
 .btn.pri{background:#0f6cbd;border-color:#0f6cbd;color:#fff;font-weight:600}
 .btn.sm{height:26px;padding:0 10px}
+.btn.ic{width:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;color:#5c5c5c}
+.btn.ic.pri{color:#fff}
+.btn.ic svg{display:block}
 .btn:disabled{opacity:.45;cursor:default}
 input[type=text],input[type=password],input[type=email],input[type=date],select,textarea{height:30px;border:1px solid #c8c8c8;border-radius:6px;padding:0 10px;font-size:12px;font-family:inherit;background:#fff}
 textarea{height:70px;padding:8px 10px;width:100%}
