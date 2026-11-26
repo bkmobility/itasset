@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.39 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.40 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -137,6 +137,12 @@
       { id: 's3', req_no: 'R-20261117-003', emp_no: emps[1].emp_no, computer_name: 'SALES-NB-014', ip: '192.168.1.57', asset_no: null, symptom: '엑셀이 느려요', status: 'working', handler: '데모 관리자', note: null, created_at: new Date(now - 5400000).toISOString() },
       { id: 's2', req_no: 'R-20261117-002', emp_no: emps[2].emp_no, computer_name: 'FIN-PC-007', ip: '192.168.2.31', asset_no: null, symptom: 'VPN 연결 실패', status: 'done', handler: '데모 관리자', note: 'VPN 클라이언트 재설치', created_at: new Date(now - 21600000).toISOString() }
     ];
+    // v1.9.40: "장애 처리" 데모 데이터
+    var faults = [
+      { id: 'f3', ticket_no: 'F-20261126-003', org: '한빛사업단', user_name: '한빛사업단/박경자상무/010-2681-0946', asset_no: null, cat_major: '하드웨어(H/W)', cat_minor: 'PC 장애', detail: 'PC사용 도중 화면 안나옴', status: 'pending', assignee: null, resolve_note: null, created_at: new Date(now - 900000).toISOString(), resolved_at: null },
+      { id: 'f2', ticket_no: 'F-20261126-002', org: '센트럴사업단', user_name: '센트럴사업단/유해영TFA/010-5343-1653', asset_no: null, cat_major: 'A+ 시스템', cat_minor: 'SalesPlus', detail: '세일즈플러스 설치 요청', status: 'progress', assignee: '김동민', resolve_note: null, created_at: new Date(now - 7200000).toISOString(), resolved_at: null },
+      { id: 'f1', ticket_no: 'F-20261125-003', org: '숭례문사업단', user_name: '숭례문사업단/김태경TFA/010-5878-7337', asset_no: null, cat_major: 'A+ 시스템', cat_minor: 'VPN(SSL)', detail: 'VPN 재설치 요청', status: 'done', assignee: '안재우', resolve_note: 'VPN 클라이언트 재설치 후 정상 확인', created_at: new Date(now - 86400000).toISOString(), resolved_at: new Date(now - 82800000).toISOString() }
+    ];
     var mAs = assets.filter(function (a) { return a.category === '모니터'; }), d0 = devices[0], monitors = [];
     mAs.forEach(function (a, k) { a.serial_no = 'ZZN5H4' + ('0000' + (k * 37 + 11)).slice(-4); });
     if (d0 && mAs[0]) { mAs[0].linked_pc = d0.asset_no; monitors.push({ id: 'm1', device_id: d0.id, maker: '삼성', model: mAs[0].model, serial: mAs[0].serial_no, made_ym: '2021-08', resolution: '1920×1080', size_inch: '24', asset_no: mAs[0].asset_no, link_source: 'auto', gone: false, last_seen: new Date().toISOString() }, { id: 'm2', device_id: d0.id, maker: 'LG', model: '24MK430H', serial: '003NTAB7001', made_ym: '2020-03', resolution: '1920×1080', size_inch: '24', asset_no: null, link_source: null, gone: false, last_seen: new Date().toISOString() }); }
@@ -160,7 +166,7 @@
       { id: 1, owner_co: 'A+에셋', vendor: '파인랩', task: '보유계약 이메일 포워딩', ip: '192.168.1.126', license: 'rpa02', equipment: '보유계약 이메일' },
       { id: 2, owner_co: 'KB손보', vendor: '파인랩', task: 'KB보유계약1\nKB보유계약2', ip: '192.168.1.140\n192.168.1.160', license: 'bou01\nbou02', equipment: 'KB보유계약' }
     ];
-    return { assets: assets, employees: emps, devices: devices, history: hist, support: sup, monitors: monitors, ips: ips, rpas: rpas };
+    return { assets: assets, employees: emps, devices: devices, history: hist, support: sup, monitors: monitors, ips: ips, rpas: rpas, faults: faults };
   }
   async function fetchAll(table, order) {
     var out = [], from = 0, step = 1000;
@@ -179,7 +185,7 @@
     var q = S.employees[S.employees.length - 1]; if (q && !q.__d) { q.__d = 1; q.active = false; q.left_at = dstr(new Date(y, m, 2)); q.left_est = true; }
   }
   async function loadAll() {
-    if (DEMO) { var d = demoData(); S.assets = d.assets.map(function (a) { return a; }); S.employees = d.employees; S.devices = d.devices; S.history = d.history; S.support = d.support; S.monitors = d.monitors; S.ips = d.ips; S.rpas = d.rpas; S.imports = S.imports || []; S.dates = true; S.est = true; demoDates(); rebuildAssets(); return; }
+    if (DEMO) { var d = demoData(); S.assets = d.assets.map(function (a) { return a; }); S.employees = d.employees; S.devices = d.devices; S.history = d.history; S.support = d.support; S.monitors = d.monitors; S.ips = d.ips; S.rpas = d.rpas; S.faults = d.faults; S.imports = S.imports || []; S.dates = true; S.est = true; demoDates(); rebuildAssets(); return; }
     var res = await Promise.all([fetchAll('assets', 'asset_no'), fetchAll('employees', 'emp_no'), fetchAll('devices', 'mac'),
       sb.from('asset_history').select('*').order('created_at', { ascending: false }).limit(50)]);
     S.assets = res[0]; S.employees = res[1]; S.devices = res[2]; S.history = res[3].data || [];
@@ -194,6 +200,8 @@
     try { S.ips = await fetchAll('ip_ledger', 'id'); S.ipErr = false; } catch (e) { S.ips = []; S.ipErr = true; }   // v1.9.15 SQL 실행 전에도 나머지 화면은 동작
     try { S.rpas = await fetchAll('ip_rpa_pc', 'id'); S.rpaErr = false; } catch (e) { S.rpas = []; S.rpaErr = true; }   // v1.9.16 SQL 실행 전에도 나머지 화면은 동작
     try { S.bandPing = await fetchAll('ip_band_ping', 'id'); S.bandPingErr = false; } catch (e) { S.bandPing = []; S.bandPingErr = true; }   // v1.9.33 SQL 실행 전에도 나머지 화면은 동작
+    var fr = await sb.from('fault_tickets').select('*').order('created_at', { ascending: false }).limit(2000);
+    S.faultErr = !!fr.error; S.faults = fr.error ? [] : fr.data;   // v1.9.40 SQL(update_v1.9.40.sql) 실행 전에도 나머지 화면은 동작
     rebuildAssets(); snapDaily();
   }
   // 자산 + 연결된 PC + 사용자 불일치를 클라이언트에서 계산 (v_assets 와 같은 규칙)
@@ -402,14 +410,37 @@
   // v1.9.6: 자산 유형 묶음 (대시보드 고정 순서: 모니터 → PC → 노트북 → 스캐너 → 기타)
   var CATG = ['모니터', 'PC', '노트북', '스캐너', '기타'], CATG_COL = { '모니터': '#2f7df6', 'PC': '#1e8e3e', '노트북': '#c42b1c', '스캐너': '#e9a100', '기타': '#b0b7c3' };
   function catGrp(c) { c = String(c || ''); return c === '모니터' ? '모니터' : (c === 'PC' || c === 'PC 본체') ? 'PC' : c === '노트북' ? '노트북' : /스캐너/.test(c) ? '스캐너' : '기타'; }
-  var ROUTES = [['dashboard', '대시보드'], ['assets', '자산 관리'], ['ip', 'IP 관리'], ['check', '현황 점검'], ['support', '원격 지원'], ['employees', '인사 정보'], ['inventory', '실사 (재물조사)']];
+  // v1.9.40: 사이드바 순서 재배치 — "장애 처리"를 신설해 "현황 점검" 아래·"원격 지원" 위에 배치, "실사(재물조사)"를 "인사 정보"보다 앞으로
+  var ROUTES = [['dashboard', '대시보드'], ['assets', '자산 관리'], ['ip', 'IP 관리'], ['check', '현황 점검'], ['fault', '장애 처리'], ['support', '원격 지원'], ['inventory', '실사 (재물조사)'], ['employees', '인사 정보']];
   function navRoutes() { if (isMain()) return ROUTES.concat([['data', '데이터 관리'], ['audit', '이력 관리'], ['admins', '관리자'], ['reports', '보고서'], ['security', '보안 설정']]); if (!isViewer()) return ROUTES.concat([['myaccount', '내 계정']]); return ROUTES; }   // v1.9.5: 이력 관리·관리자·보고서는 메인 관리자 전용 / v1.9.11: 보안 설정도 메인 관리자 전용 / v1.9.12: 일반 관리자는 "내 계정"에서 본인 OTP 관리 / v1.9.18: 데이터 관리(엑셀 업로드)도 메인 관리자 전용으로 변경
+  // v1.9.40: 사이드바 전용 라인아이콘 — 메뉴마다 다른 모양으로, 체크박스형 반복 아이콘을 대체
+  var NAV_ICONS = {
+    dashboard: '<rect x="3" y="3" width="7" height="7" rx="1.3"/><rect x="14" y="3" width="7" height="7" rx="1.3"/><rect x="3" y="14" width="7" height="7" rx="1.3"/><rect x="14" y="14" width="7" height="7" rx="1.3"/>',
+    assets: '<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/>',
+    ip: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v6M12 13l-6 4M12 13l6 4"/>',
+    check: '<path d="M3 12a9 9 0 1 0 9-9"/><path d="M12 7v5l3 2"/>',
+    fault: '<path d="M10.3 3.9 2 18a1 1 0 0 0 .9 1.5h18.2A1 1 0 0 0 22 18L13.7 3.9a1 1 0 0 0-1.7 0Z"/><path d="M12 9v4"/><circle cx="12" cy="16.3" r=".4" fill="currentColor"/>',
+    support: '<path d="M3 10a9 9 0 0 1 18 0v6a2 2 0 0 1-2 2h-1v-7h3"/><path d="M3 16v-6h3v7H4a1 1 0 0 1-1-1Z"/>',
+    inventory: '<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 7h6M9 12l2 2 4-4"/>',
+    employees: '<circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/>',
+    data: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
+    audit: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/>',
+    admins: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
+    reports: '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>',
+    security: '<path d="M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6Z"/>',
+    myaccount: '<circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/>'
+  };
+  function navIcon(key) { return '<svg class="navic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (NAV_ICONS[key] || NAV_ICONS.dashboard) + '</svg>'; }
   function denyPage() { shell('dashboard', '<div class="card" style="text-align:center;padding:30px 20px;max-width:560px;margin:30px auto"><div style="font-size:30px">🔒</div><h2 style="margin:6px 0">접근 권한이 없습니다</h2><div class="note" style="line-height:1.8">이 메뉴(데이터 관리 · 이력 관리 · 관리자 · 보고서)는 <b>메인 관리자</b>만 열 수 있습니다.<br>주소를 직접 입력해 들어와도 이 화면이 표시됩니다.</div><div style="margin-top:14px"><a class="btn pri" href="#/dashboard">대시보드로 이동</a></div></div>'); }
   function shell(active, html) {
-    var nav = navRoutes().map(function (r) { var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length : 0; return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>'; }).join('');
+    var nav = navRoutes().map(function (r) {
+      var n = r[0] === 'support' ? S.support.filter(function (x) { return x.status === 'received'; }).length
+        : r[0] === 'fault' ? (S.faults || []).filter(function (x) { return x.status === 'pending'; }).length : 0;
+      return '<a href="#/' + r[0] + '" class="' + (r[0] === active ? 'on' : '') + '">' + navIcon(r[0]) + r[1] + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a>';
+    }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.39</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.40</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><div class="gswrap"><input type="search" id="gs" class="gs" autocomplete="off" placeholder="통합 검색 (자산·IP·인사 전체) (Enter)" value="' + esc(F.q) + '"><div class="gsdrop" id="gsdrop" style="display:none"></div></div><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'), gsdrop = $('#gsdrop');   // v1.9.31: Frame 28 — 통합 검색(자산·IP·인사 동시 검색) 드롭다운
@@ -478,6 +509,8 @@
     var noDev = pcs.filter(function (a) { return !a._dev; }).length;
     var recv = S.support.filter(function (x) { return x.status === 'received'; }).length;
     var todayKey = ymd(new Date()), recvToday = S.support.filter(function (x) { return ymd(x.created_at) === todayKey; }).length;
+    var faultPend = (S.faults || []).filter(function (x) { return x.status === 'pending'; }).length;
+    var faultToday = (S.faults || []).filter(function (x) { return ymd(x.created_at) === todayKey; }).length;
     var leaver = S.devices.filter(function (d) { var e = d.emp_no && S.empBy[d.emp_no]; return e && e.active === false; });
     // 보증 만료·교체 알림
     var wr = [];
@@ -518,16 +551,17 @@
       return (n === '전체' ? '<div class="cosep"></div>' : '') + '<div class="corow' + (n === co ? ' on' : '') + '" data-co="' + esc(n) + '"><span class="rd"><i></i></span><span class="nm">' + esc(n) + '</span><b>' + cnt.toLocaleString() + '</b><span class="pc">' + (n === '전체' ? '' : (A.length ? Math.round(cnt / A.length * 100) : 0) + '%') + '</span></div>';
     }).join('') + (noCo ? '<div class="note" style="margin-top:6px">회사 미지정 ' + noCo.toLocaleString() + '건 (전체에만 포함) · <a href="#/data">데이터 관리</a>에서 지정</div>' : '');
     shell('dashboard', '<div class="row"><h1>대시보드</h1><span class="note">' + esc(ymd(new Date()) + ' ' + hm(new Date())) + ' 기준</span></div>' +
-      '<div class="dks">' + k('전체 자산', A.length.toLocaleString(), '엑셀 가져오기 기준', '#2f7df6', '#/assets') + k('오늘 확인된 PC', today.toLocaleString(), '수집률 ' + (pcs.length ? Math.round(today / pcs.length * 100) : 0) + '%', '#1e8e3e', '#/assets', 'collect:today') + k('점검 필요', stale.toLocaleString(), '7일 이상 미확인', '#c42b1c', '#/check/stale') + k('보증 만료 예정', warrSoon.toLocaleString(), '30일 이내', '#e9a100', '#/assets') + k('지원 요청', recv.toLocaleString(), '미처리 · 오늘 접수 ' + recvToday, '#7a4bd6', '#/support') + '</div>' +
+      '<div class="dks">' + k('전체 자산', A.length.toLocaleString(), '엑셀 가져오기 기준', '#2f7df6', '#/assets') + k('오늘 확인된 PC', today.toLocaleString(), '수집률 ' + (pcs.length ? Math.round(today / pcs.length * 100) : 0) + '%', '#1e8e3e', '#/assets', 'collect:today') + k('점검 필요', stale.toLocaleString(), '7일 이상 미확인', '#c42b1c', '#/check/stale') + k('보증 만료 예정', warrSoon.toLocaleString(), '30일 이내', '#e9a100', '#/assets') + k('지원 요청', recv.toLocaleString(), '미처리 · 오늘 접수 ' + recvToday, '#7a4bd6', '#/support') + k('장애 처리', faultPend.toLocaleString(), '미처리 · 오늘 접수 ' + faultToday, '#c42b1c', '#/fault') + '</div>' +
       '<div class="card dwide" style="border-left:4px solid #e9a100"><h3>오늘 처리할 일 <span class="note" style="font-weight:400">— 누르면 해당 목록으로 이동</span></h3>' + todo + '</div>' +
       '<div class="dtop">' +
       '<div class="card"><h3>회사별 자산</h3>' + coRows + '<div class="note codet">회사를 누르면 오른쪽 두 카드가 바뀝니다<a href="#/company/' + encodeURIComponent(co) + '">회사별 상세 보기 ›</a></div></div>' +
       '<div class="card"><h3>자산 유형 · ' + esc(co) + '</h3><div class="dn">' + donut(typC, cA.length.toLocaleString(), 'catg', co, true) + '<div class="lgs">' + legend(typC, 'catg', co, true) + '</div></div></div>' +
       '<div class="card"><h3>자산 상태 · ' + esc(co) + '</h3><div class="dn">' + donut(stsC, cA.length.toLocaleString(), 'status', co) + '<div class="lgs">' + legend(stsC, 'status', co) + '</div></div></div></div>' +
-      '<div class="dgrid3">' +
+      '<div class="dgrid4">' +
       '<div class="card"><h3>부서별 자산 수 <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + bars(groupCount(A, function (a) { return a.dept; }).slice(0, 5), null, 'dept') + '</div>' +
       '<div class="card"><h3>소속별 등록 IP <span class="note" style="font-weight:400">상위 5개 · 누르면 해당 목록</span></h3>' + (S.ipErr ? '<div class="note">IP 관리 데이터가 아직 없습니다.</div>' : bars(groupCount(S.ips, function (r) { return r.org; }).slice(0, 5), null, 'ipOrg')) + '</div>' +
-      '<div id="dashPingCardWrap">' + (S.ipErr ? '<div class="card"><h3>VPN 대역 모니터링</h3><div class="note">IP 관리 데이터가 아직 없습니다.</div></div>' : pingCardHtml()) + '</div></div>' +
+      '<div id="dashPingCardWrap">' + (S.ipErr ? '<div class="card"><h3>VPN 대역 모니터링</h3><div class="note">IP 관리 데이터가 아직 없습니다.</div></div>' : pingCardHtml()) + '</div>' +
+      faultCardHtml() + '</div>' +
       '<div class="card dwide"><div class="row"><h3 style="flex:1;margin:0">보증 만료·교체 알림</h3>' + (wr.length > 6 ? '<span class="note">외 ' + (wr.length - 6) + '건</span>' : '') + '<a href="#/assets" style="font-size:11.5px">자산 목록 ›</a></div><table class="tbl dtbl"><thead><tr><th>자산번호</th><th>유형</th><th>사용자</th><th>만료일/기준</th><th>상태</th></tr></thead><tbody>' + wrows + '</tbody></table><div class="note" style="margin-top:6px">보증 만료 30일 전~만료 후 90일, 그리고 구매일(없으면 제조년월) 기준 5년 이상 사용한 PC·노트북을 표시합니다.</div></div>' +
       '<div class="card dwide"><h3>최근 활동</h3>' + arows + '</div>');
     if (isMain()) $$('.ar.clk').forEach(function (el) { el.onclick = function () { AUDV = { from: el.dataset.at, to: el.dataset.at, actor: '', target: el.dataset.tg, q: '', chip: 'all', page: 0 }; location.hash = '#/audit'; }; });
@@ -1189,6 +1223,191 @@
       } catch (er) { fail(er); }
     };
     var ro = $('#supreopen'); if (ro) ro.onclick = async function () { try { await dbSupport(cur.id, { status: 'working' }); pageSupport(arg); } catch (er) { fail(er); } };
+  }
+
+  // ---------- v1.9.40: 장애 처리 ----------
+  var FAULT_CAT = {
+    'A+ 시스템': ['SalesPlus', 'VPN(SSL)', '기타'],
+    '운영체제(OS)': ['소프트웨어(S/W)', '드라이버', '기타'],
+    '하드웨어(H/W)': ['모니터 장애', 'PC 장애', '주변기기(프린터 등)', '신규 설치', '교체'],
+    '네트워크 관련': ['인터넷 단절', '속도 저하', '공유기/스위치', '기타'],
+    '현장방문': ['정기점검', '설치', '기타']
+  };
+  var FAULT_CAT_MAJORS = Object.keys(FAULT_CAT);
+  var FAULT_ST = { pending: ['접수대기', 'warn'], progress: ['진행중', 'blue'], done: ['완료', 'ok'], rejected: ['반려', 'gray'] };
+  var FAULT_SEL = {};   // 목록 체크박스 선택 상태(요청 id → true)
+  function faultCardHtml() {   // Frame 52: 대시보드 "장애 처리 현황" 알약 카드 — VPN 모니터링 카드와 동일한 디자인
+    var pend = (S.faults || []).filter(function (x) { return x.status === 'pending'; }).length;
+    var prog = (S.faults || []).filter(function (x) { return x.status === 'progress'; }).length;
+    var done = (S.faults || []).filter(function (x) { return x.status === 'done'; }).length;
+    return '<div class="card"><h3>장애 처리 현황</h3><div class="row" style="gap:6px;flex-wrap:wrap">' +
+      '<a class="badge b-warn" href="#/fault/pending" style="cursor:pointer">접수대기 ' + pend.toLocaleString() + '</a>' +
+      '<a class="badge b-blue" href="#/fault/progress" style="cursor:pointer">진행중 ' + prog.toLocaleString() + '</a>' +
+      '<a class="badge b-ok" href="#/fault/done" style="cursor:pointer">완료 ' + done.toLocaleString() + '</a>' +
+      '</div></div>';
+  }
+  function faultAssigneeOptions() {
+    var set = {}; (S.faults || []).forEach(function (f) { if (f.assignee) set[f.assignee] = 1; });
+    return Object.keys(set).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+  }
+  async function dbFaultCreate(data) {
+    needWrite();
+    var row = { org: data.org || null, user_name: data.user_name || null, asset_no: data.asset_no || null, cat_major: data.cat_major, cat_minor: data.cat_minor || null, detail: data.detail || null, due_date: data.due_date || null, status: 'pending', assignee: data.assignee || null };
+    if (!DEMO) { var r = await sb.from('fault_tickets').insert(row).select().single(); if (r.error) throw r.error; S.faults.unshift(r.data); }
+    else { row.id = 'f' + Date.now(); row.ticket_no = 'F-' + ymd(new Date()).replace(/-/g, '') + '-' + ('00' + ((S.faults || []).length + 1)).slice(-3); row.created_at = new Date().toISOString(); row.resolved_at = null; S.faults = S.faults || []; S.faults.unshift(row); }
+    await auditPost({ action: 'create', target: '장애 접수' + (row.ticket_no ? ' (' + row.ticket_no + ')' : ''), summary: '장애 접수 · ' + data.cat_major + (data.cat_minor ? '/' + data.cat_minor : '') + ' · ' + (data.detail || ''), detail: { via: '장애 처리 · 접수 등록' } });
+    return row;
+  }
+  async function dbFault(id, patch) {
+    needWrite();
+    var x = S.faults.filter(function (q) { return q.id === id; })[0] || {}, SL = { pending: '접수대기', progress: '진행중', done: '완료', rejected: '반려' }, sch = [];
+    if (patch.status && patch.status !== x.status) sch.push({ k: '상태', from: SL[x.status] || '없음', to: SL[patch.status] });
+    if (patch.assignee !== undefined && (patch.assignee || '') !== (x.assignee || '')) sch.push({ k: '담당자', from: x.assignee || '없음', to: patch.assignee || '없음' });
+    if (patch.resolve_note !== undefined && (patch.resolve_note || '') !== (x.resolve_note || '')) sch.push({ k: '처리 내용', from: x.resolve_note || '없음', to: patch.resolve_note || '없음' });
+    audCtx({ table: 'fault_tickets', action: patch.status && patch.status !== x.status ? 'change' : 'update', target: '장애 ' + (x.ticket_no || '') + (x.asset_no ? ' (자산 ' + x.asset_no + ')' : ''), summary: '장애 ' + (x.ticket_no || '') + ' ' + (sch.length ? chgText(sch) : '수정'), detail: { changes: sch } });
+    patch.updated_at = new Date().toISOString();
+    if (patch.status === 'done' || patch.status === 'rejected') patch.resolved_at = new Date().toISOString();
+    if (!DEMO) { var r = await sb.from('fault_tickets').update(patch).eq('id', id); if (r.error) throw r.error; }
+    var cur = S.faults.filter(function (q) { return q.id === id; })[0]; if (cur) Object.assign(cur, patch);
+  }
+  async function dbFaultDeleteMany(list, reason) {
+    needWrite();
+    var ids = list.map(function (x) { return x.id; }), n = ids.length;
+    if (!DEMO) {
+      var CH = 150;
+      for (var i = 0; i < ids.length; i += CH) { var r = await sb.from('fault_tickets').delete().in('id', ids.slice(i, i + CH)); if (r.error) throw r.error; }
+    }
+    var set = {}; ids.forEach(function (x) { set[x] = 1; });
+    S.faults = S.faults.filter(function (x) { return !set[x.id]; });
+    await auditPost({ action: 'delete', target: '장애 접수 (' + n.toLocaleString() + '건)', summary: '장애 접수 ' + n.toLocaleString() + '건 삭제 · ' + list.map(function (x) { return x.ticket_no; }).slice(0, 3).join(', ') + (n > 3 ? ' 외' : ''), reason: reason, detail: { via: '장애 처리 · 목록 삭제' } });
+  }
+  function faultStatusModal(x, onDone) {   // Frame 51: 상태 변경 모달 — 담당자 지정 + 처리내용 입력
+    var sel = (x.status === 'rejected') ? 'pending' : x.status;
+    var chips = ['pending', 'progress', 'done'];
+    function chipHtml() {
+      return chips.map(function (st, i) {
+        var on = st === sel;
+        return '<span class="fchip" data-st="' + st + '" style="cursor:pointer;border-radius:9px;padding:4px 12px;font-size:11.5px;' + (on ? 'background:#14233a;color:#fff' : 'background:#f1f3f6;color:#5c6372') + '">' + FAULT_ST[st][0] + '</span>' + (i < chips.length - 1 ? '<span class="note" style="align-self:center">→</span>' : '');
+      }).join('');
+    }
+    var m = openModal('<div class="mh"><b>장애 처리 — 상태 변경</b><button class="mx" type="button">✕</button></div>' +
+      '<div class="note" style="margin-bottom:12px;line-height:1.6">' + esc((x.org || '') + (x.user_name ? ' · ' + x.user_name : '')) + '<br>' + esc(x.detail || '') + '</div>' +
+      '<div id="fchips" style="display:flex;gap:6px;margin-bottom:14px;align-items:center">' + chipHtml() + '</div>' +
+      '<div class="ms">담당자</div><input type="text" id="fassignee" value="' + esc(x.assignee || '') + '" list="fassigneedl" style="width:100%;box-sizing:border-box" placeholder="예: 안재우">' +
+      '<datalist id="fassigneedl">' + faultAssigneeOptions().map(function (a) { return '<option value="' + esc(a) + '">'; }).join('') + '</datalist>' +
+      '<div class="ms" style="margin-top:10px">처리 내용</div><textarea id="fnote" rows="3" style="width:100%;box-sizing:border-box" placeholder="처리 메모 (완료 시 필수)">' + esc(x.resolve_note || '') + '</textarea>' +
+      '<div class="mf"><a href="#" id="freject" class="note" style="color:#c42b1c;margin-right:auto">반려 처리</a><button class="btn" id="fcancel" type="button">취소</button><button class="btn pri" id="fsave" type="button">저장</button></div>', 420);
+    function rewire() { $$('.fchip', m.d).forEach(function (c) { c.onclick = function () { sel = c.dataset.st; $('#fchips', m.d).innerHTML = chipHtml(); rewire(); }; }); }
+    rewire();
+    $('#fcancel', m.d).onclick = m.close;
+    $('#freject', m.d).onclick = async function (e) {
+      e.preventDefault();
+      var note = $('#fnote', m.d).value.trim();
+      if (!note) { toast('반려 사유를 처리 내용에 입력하세요.'); $('#fnote', m.d).focus(); return; }
+      try { await dbFault(x.id, { status: 'rejected', assignee: $('#fassignee', m.d).value.trim() || null, resolve_note: note }); toast('반려 처리했습니다.'); m.close(); onDone(); } catch (er) { fail(er); }
+    };
+    $('#fsave', m.d).onclick = async function () {
+      var note = $('#fnote', m.d).value.trim();
+      if (sel === 'done' && !note) { toast('완료 처리는 처리 내용을 입력하세요.'); $('#fnote', m.d).focus(); return; }
+      try { await dbFault(x.id, { status: sel, assignee: $('#fassignee', m.d).value.trim() || null, resolve_note: note || null }); toast('저장했습니다.'); m.close(); onDone(); } catch (er) { fail(er); }
+    };
+  }
+  var FAULTC = {
+    no: { f: function (x) { return x.ticket_no; }, t: 's', l: '접수번호' }, created: { f: function (x) { return x.created_at; }, t: 'd', l: '접수 시각' },
+    org: { f: function (x) { return x.org; }, t: 's', l: '소속' }, cat: { f: function (x) { return x.cat_major; }, t: 's', l: '분류' },
+    status: { f: function (x) { return { pending: 0, progress: 1, done: 2, rejected: 3 }[x.status]; }, t: 'n', l: '상태' }
+  };
+  function pageFault(arg) {
+    var f = (arg || '').split('/'), sel = f[1] || '';
+    var pendL = S.faults.filter(function (x) { return x.status === 'pending'; }), progL = S.faults.filter(function (x) { return x.status === 'progress'; }), doneL = S.faults.filter(function (x) { return x.status === 'done'; });
+    var todayL = S.faults.filter(function (x) { return dayDiff(x.created_at) <= 0; }), today = todayL.length;
+    var pend = pendL.length, prog = progL.length;
+    var TABS = ['pending', 'progress', 'done', 'today', 'all'];
+    var tab = TABS.indexOf(f[0]) >= 0 ? f[0] : (pend ? 'pending' : prog ? 'progress' : S.faults.length ? 'all' : 'pending');
+    var list = sortRows(tab === 'pending' ? pendL : tab === 'progress' ? progL : tab === 'done' ? doneL : tab === 'today' ? todayL : S.faults, 'fault', FAULTC);
+    var cur = S.faults.filter(function (x) { return x.id === sel; })[0] || list[0] || null;
+    if (cur && list.indexOf(cur) < 0) cur = list[0] || null;
+    function tabA(id, t, n) { return '<a href="#/fault/' + id + '" class="' + (tab === id ? 'on' : '') + '">' + t + '<span class="c">' + n + '</span></a>'; }
+    function kc(id, cls, t, n) { return '<a class="kpi go ' + cls + (tab === id ? ' on' : '') + '" href="#/fault/' + id + '" title="누르면 ' + t + ' 목록으로 이동"><div class="t">' + t + '<span class="go-a">›</span></div><div class="n">' + n + '</div></a>'; }
+    var kpi = '<div class="kpis">' + kc('pending', 'warn', '접수대기', pend) + kc('progress', '', '진행중', prog) + kc('done', 'ok', '완료', doneL.length) + kc('today', '', '오늘 접수', today) + '</div>';
+    var selN = list.filter(function (x) { return FAULT_SEL[x.id]; }).length;
+    var toolbar = '<div class="row" style="align-items:center;margin:6px 0;gap:10px;flex-wrap:wrap"><label style="font-size:11.5px;color:#5c5c5c"><input type="checkbox" id="fltSelAll"' + (list.length && selN === list.length ? ' checked' : '') + '> 전체 선택</label><span class="grow"></span>' +
+      '<button class="btn sm dng" id="fltSelDel" type="button"' + (selN ? '' : ' disabled') + '>선택 삭제 (' + selN + ')</button>' +
+      '<button class="btn sm" id="fltAllDel" type="button"' + (list.length ? '' : ' disabled') + '>전체 삭제</button></div>';
+    var rows = list.map(function (x) {
+      var st = FAULT_ST[x.status] || FAULT_ST.pending;
+      return '<tr class="' + (cur && cur.id === x.id ? 'sel' : '') + '" data-id="' + esc(x.id) + '"><td style="cursor:default" onclick="event.stopPropagation()"><input type="checkbox" class="fltChk" data-id="' + esc(x.id) + '"' + (FAULT_SEL[x.id] ? ' checked' : '') + '></td>' +
+        '<td class="mono" style="cursor:pointer">' + esc(x.ticket_no) + '</td><td style="cursor:pointer">' + esc(ymd(x.created_at).slice(5) + ' ' + hm(x.created_at)) + '</td>' +
+        '<td style="cursor:pointer">' + esc((x.org || '') + (x.user_name ? ' · ' + x.user_name : '')) + '</td><td style="cursor:pointer">' + esc(x.cat_major + (x.cat_minor ? '/' + x.cat_minor : '')) + '</td>' +
+        '<td style="cursor:pointer">' + esc(x.detail || '—') + '</td><td style="cursor:pointer">' + esc(x.assignee || '—') + '</td><td style="cursor:pointer">' + badge(st[0], st[1]) + '</td></tr>';
+    }).join('') || '<tr><td colspan="8" class="note" style="padding:20px;text-align:center">해당 장애 접수가 없습니다.</td></tr>';
+    var side = '';
+    if (cur) {
+      var st = FAULT_ST[cur.status] || FAULT_ST.pending;
+      side = '<div class="card"><h3 style="margin:0 0 8px;font-size:13px">선택: ' + esc(cur.ticket_no) + ' ' + badge(st[0], st[1]) + '</h3><div style="font-size:12px;line-height:1.9">' +
+        esc((cur.org || '') + (cur.user_name ? ' · ' + cur.user_name : '')) + '<br>분류: ' + esc(cur.cat_major + (cur.cat_minor ? '/' + cur.cat_minor : '')) + (cur.due_date ? '<br>희망일: ' + esc(cur.due_date) : '') +
+        '<br>상세: ' + esc(cur.detail || '—') + (cur.assignee ? '<br>담당자: ' + esc(cur.assignee) : '') + (cur.resolve_note ? '<br>처리 내용: ' + esc(cur.resolve_note) : '') +
+        (cur.asset_no ? '<br>연결 자산: <a href="#/asset/' + encodeURIComponent(cur.asset_no) + '">' + esc(cur.asset_no) + '</a>' : '') + '</div>' +
+        '<div style="margin-top:10px"><button class="btn sm pri wonly" id="fltChangeSt" type="button">상태 변경</button></div></div>';
+    }
+    var warn = S.faultErr ? '<div class="note" style="color:#c42b1c;margin-bottom:8px">장애 접수 표를 읽지 못했습니다. db/update_v1.9.40.sql 을 SQL Editor에서 실행했는지 확인하세요.</div>' : '';
+    shell('fault', '<div class="row" style="align-items:center;gap:8px;margin-bottom:2px"><h1 style="margin:0">장애 처리</h1><a class="btn sm pri wonly" href="#/fault/new" style="border-radius:14px;padding:4px 12px;font-size:11px">+ 장애 접수</a></div>' + warn + kpi +
+      '<div class="tabs">' + tabA('pending', '접수대기', pend) + tabA('progress', '진행중', prog) + tabA('done', '완료', doneL.length) + tabA('today', '오늘 접수', today) + tabA('all', '전체', S.faults.length) + '</div>' +
+      sortBar('fault', FAULTC, list.length) + toolbar + '<div style="display:flex;gap:14px;align-items:flex-start"><div style="flex:1;min-width:0"><table class="tbl"><thead><tr><th style="width:28px"></th>' + thS('fault', 'no', '접수번호') + thS('fault', 'created', '접수 시각') + thS('fault', 'org', '소속·요청자') + thS('fault', 'cat', '분류') + '<th>상세내용</th><th>담당자</th>' + thS('fault', 'status', '상태') + '</tr></thead><tbody>' + rows + '</tbody></table></div><div style="width:320px;flex:none">' + side + '</div></div>');
+    bindSort('fault', function () { pageFault(arg); });
+    $$('tr[data-id]').forEach(function (tr) { tr.onclick = function () { location.hash = '#/fault/' + tab + '/' + tr.dataset.id; }; });
+    function refreshFltToolbar() {
+      var sc = list.filter(function (x) { return FAULT_SEL[x.id]; }).length;
+      var b = $('#fltSelDel'); if (b) { b.textContent = '선택 삭제 (' + sc + ')'; b.disabled = !sc; }
+      var sa = $('#fltSelAll'); if (sa) sa.checked = list.length > 0 && sc === list.length;
+    }
+    $$('.fltChk').forEach(function (c) { c.onchange = function () { if (this.checked) FAULT_SEL[this.dataset.id] = true; else delete FAULT_SEL[this.dataset.id]; refreshFltToolbar(); }; });
+    var saAll = $('#fltSelAll'); if (saAll) saAll.onchange = function () {
+      var on = this.checked; list.forEach(function (x) { if (on) FAULT_SEL[x.id] = true; else delete FAULT_SEL[x.id]; });
+      $$('.fltChk').forEach(function (c) { c.checked = on; }); refreshFltToolbar();
+    };
+    var fltSelDel = $('#fltSelDel'); if (fltSelDel) fltSelDel.onclick = async function () {
+      var ss = list.filter(function (x) { return FAULT_SEL[x.id]; }); if (!ss.length) return;
+      var rs = await askReason('선택한 장애 접수 ' + ss.length.toLocaleString() + '건 삭제', '선택한 장애 접수 <b>' + ss.length.toLocaleString() + '건</b>을 완전히 삭제합니다.<br><b>삭제하면 되돌릴 수 없습니다.</b>', ss.length.toLocaleString() + '건 삭제');
+      if (!rs) return;
+      try { await dbFaultDeleteMany(ss, rs); ss.forEach(function (x) { delete FAULT_SEL[x.id]; }); toast('삭제했습니다. (' + ss.length.toLocaleString() + '건)'); location.hash = '#/fault/' + tab; } catch (er) { fail(er); }
+    };
+    var fltAllDel = $('#fltAllDel'); if (fltAllDel) fltAllDel.onclick = async function () {
+      if (!list.length) return;
+      var tabLbl = { pending: '접수대기', progress: '진행중', done: '완료', today: '오늘 접수', all: '전체' }[tab] || tab;
+      var rs = await askReason('조회된 ' + list.length.toLocaleString() + '건 전체 삭제', '현재 "' + esc(tabLbl) + '" 탭에 보이는 장애 접수 <b>' + list.length.toLocaleString() + '건 전체</b>를 삭제합니다.<br><b>삭제하면 되돌릴 수 없습니다.</b>', list.length.toLocaleString() + '건 삭제');
+      if (!rs) return;
+      try { await dbFaultDeleteMany(list, rs); list.forEach(function (x) { delete FAULT_SEL[x.id]; }); toast('삭제했습니다. (' + list.length.toLocaleString() + '건)'); location.hash = '#/fault/' + tab; } catch (er) { fail(er); }
+    };
+    if (!cur) return;
+    var cb = $('#fltChangeSt'); if (cb) cb.onclick = function () { faultStatusModal(cur, function () { pageFault(arg); }); };
+  }
+  function pageFaultNew() {   // Frame 49: 장애 접수 등록 화면
+    var majors = FAULT_CAT_MAJORS;
+    shell('fault', '<div class="row wrap"><a href="#/fault" class="note">‹ 장애 처리</a><h1>장애 접수 등록</h1></div>' +
+      '<div class="card" style="max-width:560px;margin-top:10px">' +
+      '<div class="kv"><div class="k">자산 사용자</div><div class="v"><input type="text" id="fn_org" placeholder="소속 (예: 한빛사업단)" style="width:100%"></div></div>' +
+      '<div class="kv"><div class="k">요청자/연락처</div><div class="v"><input type="text" id="fn_user" placeholder="예: 박경자상무/010-xxxx-xxxx" style="width:100%"></div></div>' +
+      '<div class="kv"><div class="k">분류(대)</div><div class="v"><select id="fn_major" style="width:100%">' + majors.map(function (m) { return '<option>' + esc(m) + '</option>'; }).join('') + '</select></div></div>' +
+      '<div class="kv"><div class="k">분류(소)</div><div class="v"><select id="fn_minor" style="width:100%"></select></div></div>' +
+      '<div class="kv"><div class="k">희망일</div><div class="v"><input type="date" id="fn_due" value="' + esc(ymd(new Date())) + '" style="width:100%"></div></div>' +
+      '<div class="kv"><div class="k">담당자</div><div class="v"><input type="text" id="fn_assignee" list="fn_assigneedl" placeholder="미지정 (나중에 지정 가능)" style="width:100%"><datalist id="fn_assigneedl">' + faultAssigneeOptions().map(function (a) { return '<option value="' + esc(a) + '">'; }).join('') + '</datalist></div></div>' +
+      '<div class="kv"><div class="k">상세내용</div><div class="v"><textarea id="fn_detail" rows="3" placeholder="예: 한빛사업단/박경자상무/010-xxxx-xxxx PC사용 도중 화면 안나옴" style="width:100%;box-sizing:border-box"></textarea></div></div>' +
+      '<div style="margin-top:14px;text-align:right"><button class="btn pri" id="fn_save" type="button">접수 등록</button></div></div>');
+    function fillMinor() {
+      var sel = $('#fn_major'), minors = FAULT_CAT[sel.value] || [];
+      $('#fn_minor').innerHTML = minors.map(function (m) { return '<option>' + esc(m) + '</option>'; }).join('');
+    }
+    fillMinor();
+    $('#fn_major').onchange = fillMinor;
+    $('#fn_save').onclick = async function () {
+      var detail = $('#fn_detail').value.trim();
+      if (!detail) { toast('상세내용을 입력하세요.'); $('#fn_detail').focus(); return; }
+      try {
+        var row = await dbFaultCreate({ org: $('#fn_org').value.trim(), user_name: $('#fn_user').value.trim(), cat_major: $('#fn_major').value, cat_minor: $('#fn_minor').value, due_date: $('#fn_due').value || null, assignee: $('#fn_assignee').value.trim(), detail: detail });
+        toast('접수했습니다. (' + (row.ticket_no || '') + ')'); location.hash = '#/fault';
+      } catch (er) { fail(er); }
+    };
   }
 
   // ---------- v1.9.6: 회사 지정 (소속명 기준 일괄) ----------
@@ -2999,15 +3218,15 @@
   function repCoFilter(list) { return !REP_CO ? list : list.filter(function (a) { return a.company === REP_CO; }); }
   var REPS = [
     ['자산 현황', [['monthly', '📅', '월별 자산 현황', '월말 기준 PC·노트북·모니터 등 분류별 수량과 전월 대비 증감, 월별 추이 그래프', '월별'], ['period', '🔄', '기간별 자산 변동', '기간을 정해 신규 등록·폐기·상태 변경·사용자 이동·위치 변경 건수와 내역', '기간별'], ['dept', '🏢', '부서별 자산 보유', '소속별 PC·노트북·모니터 보유 수량과 1인당 장비 수', '현재']]],
-    ['점검·지원', [['warranty', '🛡️', '보증 만료 예정', '만료됨 / 1·3·6·12개월 안에 보증이 끝나는 장비 목록과 교체 예산용 수량', '기간별'], ['check', '🩺', '현황 점검 보고', 'PC 점검 수집률, 7일 이상 미확인, 사용자 불일치 현황과 월별 추이', '월별'], ['support', '🎧', '원격 지원 처리 현황', '월별 접수·완료 건수, 평균 처리 시간, 증상별·담당자별 통계', '월별']]],
+    ['점검·지원', [['warranty', '🛡️', '보증 만료 예정', '만료됨 / 1·3·6·12개월 안에 보증이 끝나는 장비 목록과 교체 예산용 수량', '기간별'], ['check', '🩺', '현황 점검 보고', 'PC 점검 수집률, 7일 이상 미확인, 사용자 불일치 현황과 월별 추이', '월별'], ['support', '🎧', '원격 지원 처리 현황', '월별 접수·완료 건수, 평균 처리 시간, 증상별·담당자별 통계', '월별'], ['fault', '🚨', '장애 처리 현황', '기간·회사·부서·분류·상태별 장애 접수 건수와 처리 이력', '기간별']]],
     ['실사·감사', [['inv', '📋', '실사 결과 보고서', '회차별 확인율, 부서·분류별 진행, 미확인·이상 목록', '회차별'], ['audit', '🔎', '이력 관리 요약 (메인 관리자)', '기간별 로그인·변경·삭제·내보내기 건수와 작업자별 요약. 감사 제출용', '기간별', 'main']]]
   ];
   function pageReports(arg) {
     if (!isMain()) { denyPage(); return; }
     var k = (arg || '').split('/')[0];
     if (k === 'monthly') return repMonthly(); if (k === 'period') return repPeriod(); if (k === 'dept') return repDept(); if (k === 'warranty') return repWarranty();
-    if (k === 'check') return repCheck(); if (k === 'support') return repSupport(); if (k === 'inv') return repInv(); if (k === 'audit') return repAudit();
-    var CO_FLT = ['monthly', 'period', 'dept'];   // 회사 필터가 적용되는 보고서
+    if (k === 'check') return repCheck(); if (k === 'support') return repSupport(); if (k === 'fault') return repFault(); if (k === 'inv') return repInv(); if (k === 'audit') return repAudit();
+    var CO_FLT = ['monthly', 'period', 'dept', 'fault'];   // 회사 필터가 적용되는 보고서
     var html = '<div class="row wrap"><h1>보고서</h1><span class="note">조건을 고르면 바로 보고서가 만들어지고, 엑셀·PDF로 내려받습니다</span><div class="grow"></div><span class="note">회사</span><select id="r_co" class="noprint"><option value="">전체</option>' + CO.map(function (c) { return '<option' + (REP_CO === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></div>' +
       (REP_CO ? '<div class="note" style="background:#fff3cd;color:#8a6d00;border-radius:6px;padding:6px 10px;margin-bottom:4px">회사를 "' + esc(REP_CO) + '"로 좁혀서 자산 현황 보고서를 다시 계산합니다 (월별 자산 현황은 이번 선택이 반영되는 달부터만 적용, 아래 참고)</div>' : '') +
       REPS.map(function (g) {
@@ -3154,6 +3373,56 @@
       '<div class="card" style="min-width:300px"><b>이번 달 상위 증상</b>' + (top.map(function (k) { return '<div class="prow"><span class="pn" style="width:150px">' + esc(k) + '</span><span class="pb"><i style="width:' + Math.round(sym[k] / sym[top[0]] * 100) + '%;background:#0f6cbd"></i></span><span class="pv">' + sym[k] + '</span></div>'; }).join('') || '<div class="note">접수가 없습니다.</div>') + '<b style="display:block;margin-top:12px">담당자별</b>' + Object.keys(hd).map(function (k) { return '<div class="note" style="line-height:1.8">' + esc(k) + ' · 접수 ' + hd[k].n + ' · 완료 ' + hd[k].d + '</div>'; }).join('') + '</div></div>');
     repBind('원격 지원 처리 현황', function () { repXlsx('원격지원처리현황', [{ name: '월별', rows: rows.map(function (r) { return { '월': r.mo, '접수': r.rec, '완료': r.done, '진행·대기': r.wk, '평균 처리(분)': r.avg == null ? '' : r.avg }; }) }, { name: '접수 내역', rows: L.map(function (x) { return { '접수번호': x.req_no, '접수 시각': ymd(x.created_at) + ' ' + hm(x.created_at), '컴퓨터 이름': x.computer_name, '자산': x.asset_no, '증상': x.symptom, '상태': { received: '접수', working: '진행중', done: '완료' }[x.status] || x.status, '담당': x.handler, '처리 메모': x.note }; }) }], '원격 지원 처리 현황'); });
   }
+  // ---- v1.9.40: 장애 처리 현황
+  var RF = { from: '', to: '', org: '', cat: '', status: '', q: 'month' };
+  function faultPeriodSet(q) {
+    var n = new Date(), y = n.getFullYear(), m = n.getMonth(), d = n.getDate(), f, t = ymd(n);
+    if (q === 'today') f = t; else if (q === 'week') f = ymd(new Date(y, m, d - ((n.getDay() + 6) % 7))); else if (q === 'month') f = ymd(new Date(y, m, 1));
+    else if (q === 'last') { f = ymd(new Date(y, m - 1, 1)); t = ymd(new Date(y, m, 0)); } else if (q === 'quarter') f = ymd(new Date(y, Math.floor(m / 3) * 3, 1)); else if (q === 'year') f = ymd(new Date(y, 0, 1));
+    if (f) { RF.from = f; RF.to = t; } RF.q = q;
+  }
+  function repFault() {
+    if (!RF.from) faultPeriodSet('month');
+    // 소속명(org)으로 회사를 역추적 — 자산 대장의 소속→회사 지정을 그대로 재사용
+    var deptCo = {}; S.assets.forEach(function (a) { if (a.dept && a.company && !deptCo[a.dept]) deptCo[a.dept] = a.company; });
+    var orgOpts = groupCount(S.faults, function (x) { return x.org; }).map(function (x) { return x[0]; }).filter(Boolean);
+    var L = (S.faults || []).filter(function (x) {
+      var d = ymd(x.created_at);
+      if (d < RF.from || d > RF.to) return false;
+      if (RF.org && x.org !== RF.org) return false;
+      if (RF.cat && x.cat_major !== RF.cat) return false;
+      if (RF.status && x.status !== RF.status) return false;
+      if (REP_CO && deptCo[x.org] !== REP_CO) return false;
+      return true;
+    });
+    var pend = L.filter(function (x) { return x.status === 'pending'; }).length, prog = L.filter(function (x) { return x.status === 'progress'; }).length;
+    var done = L.filter(function (x) { return x.status === 'done'; }).length, rej = L.filter(function (x) { return x.status === 'rejected'; }).length;
+    var QL = [['today', '오늘'], ['week', '이번 주'], ['month', '이번 달'], ['last', '지난 달'], ['quarter', '분기'], ['year', '올해']];
+    var rows = L.slice().sort(function (a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+    var trows = rows.slice(0, 300).map(function (x) {
+      var st = FAULT_ST[x.status] || FAULT_ST.pending;
+      return '<tr><td>' + esc(ymd(x.created_at)) + '</td><td>' + esc(deptCo[x.org] || '') + '</td><td>' + esc(x.org || '') + '</td><td>' + esc(x.cat_major + (x.cat_minor ? '/' + x.cat_minor : '')) + '</td><td>' + esc(x.assignee || '—') + '</td><td>' + esc(x.resolved_at ? ymd(x.resolved_at) : '—') + '</td><td>' + badge(st[0], st[1]) + '</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="note" style="text-align:center;padding:16px">해당 조건의 장애 접수가 없습니다.</td></tr>';
+    shell('reports', repHead('장애 처리 현황', '', '장애 접수·처리 이력을 집계합니다' + (REP_CO ? ' · 회사: ' + esc(REP_CO) : '')) +
+      '<div class="card noprint" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="note">기간</span>' + QL.map(function (q) { return '<button type="button" class="achip' + (RF.q === q[0] ? ' on' : '') + '" data-q="' + q[0] + '">' + q[1] + '</button>'; }).join('') + '<input type="date" id="rf_f" value="' + RF.from + '"> ~ <input type="date" id="rf_t" value="' + RF.to + '">' +
+      '<select id="rf_co"><option value="">회사: 전체</option>' + CO.map(function (c) { return '<option' + (REP_CO === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' +
+      '<select id="rf_org"><option value="">부서: 전체</option>' + orgOpts.map(function (o) { return '<option' + (RF.org === o ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>' +
+      '<select id="rf_cat"><option value="">분류: 전체</option>' + FAULT_CAT_MAJORS.map(function (c) { return '<option' + (RF.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' +
+      '<select id="rf_st"><option value="">상태: 전체</option>' + Object.keys(FAULT_ST).map(function (s) { return '<option value="' + s + '"' + (RF.status === s ? ' selected' : '') + '>' + FAULT_ST[s][0] + '</option>'; }).join('') + '</select>' +
+      '<button class="btn pri" id="rf_go" type="button">조회</button></div>' +
+      '<div class="kpis">' + [kp('접수대기', pend, '', '#c42b1c'), kp('진행중', prog, '', '#0f6cbd'), kp('완료', done, '', '#1e8e3e'), kp('반려', rej, ''), kp('합계', L.length, '')].join('') + '</div>' +
+      '<table class="tbl" style="margin-top:8px"><thead><tr><th>등록일자</th><th>회사</th><th>부서</th><th>분류(대/소)</th><th>담당자</th><th>처리일</th><th>상태</th></tr></thead><tbody>' + trows + '</tbody></table>' +
+      '<div class="note" style="margin-top:8px">· 회사는 "데이터 관리 › 회사 지정"으로 소속(부서)에 지정해 둔 값을 그대로 가져옵니다. 회사가 지정되지 않은 소속은 회사로 좁혀 조회할 수 없습니다.</div>');
+    $$('[data-q]').forEach(function (b) { b.onclick = function () { faultPeriodSet(b.dataset.q); repFault(); }; });
+    $('#rf_go').onclick = function () { RF.from = $('#rf_f').value || RF.from; RF.to = $('#rf_t').value || RF.to; RF.q = 'custom'; REP_CO = $('#rf_co').value; RF.org = $('#rf_org').value; RF.cat = $('#rf_cat').value; RF.status = $('#rf_st').value; repFault(); };
+    $('#rf_co').onchange = $('#rf_go').onclick; $('#rf_org').onchange = $('#rf_go').onclick; $('#rf_cat').onchange = $('#rf_go').onclick; $('#rf_st').onchange = $('#rf_go').onclick;
+    repBind('장애 처리 현황', function () {
+      repXlsx('장애처리현황_' + RF.from + '_' + RF.to, [
+        { name: '요약', rows: [{ '구분': '접수대기', '건수': pend }, { '구분': '진행중', '건수': prog }, { '구분': '완료', '건수': done }, { '구분': '반려', '건수': rej }, { '구분': '합계', '건수': L.length }] },
+        { name: '상세 내역', rows: rows.map(function (x) { return { '접수번호': x.ticket_no, '등록일자': ymd(x.created_at), '회사': deptCo[x.org] || '', '부서': x.org || '', '요청자': x.user_name || '', '분류(대)': x.cat_major, '분류(소)': x.cat_minor || '', '상세내용': x.detail || '', '담당자': x.assignee || '', '처리일': x.resolved_at ? ymd(x.resolved_at) : '', '처리내용': x.resolve_note || '', '상태': FAULT_ST[x.status] ? FAULT_ST[x.status][0] : x.status }; }) }
+      ], '장애 처리 현황');
+    });
+  }
   // ---- 실사 결과 보고서
   var RI = { id: '' };
   async function repInv() {
@@ -3203,6 +3472,7 @@
       else if (p === 'asset') pageDetail(decodeURIComponent(arg));
       else if (p === 'check') pageCheck(arg);
       else if (p === 'support') pageSupport(arg);
+      else if (p === 'fault') { if (arg === 'new') pageFaultNew(); else pageFault(arg); }
       else if (p === 'employees') pageEmployees(arg);
       else if (p === 'admins') pageAdmins();
       else if (p === 'reports') pageReports(arg);
@@ -3313,19 +3583,23 @@
       '</span>';
     var cOk = 0, cFail = 0;
     full.forEach(function (r) { if (r.status === 'ok') cOk++; else if (r.status === 'fail') cFail++; });
-    // v1.9.39: 정상/장애(응답없음) 집계 알약 — 장애 알약을 누르면 장애만 모아보기로 전환
-    var pillsHtml = '<div class="row" style="gap:6px;margin:2px 0 8px;align-items:center;flex-wrap:wrap">' +
-      '<span class="badge b-ok">정상 ' + cOk.toLocaleString() + '개</span>' +
-      '<span class="badge b-bad" id="pingFailPill" style="cursor:pointer' + (PING_ROT.filterFail ? ';box-shadow:0 0 0 2px #c42b1c' : '') + '" title="눌러서 장애(응답없음)만 모아보기">장애(응답없음) ' + cFail.toLocaleString() + '개</span>' +
-      (PING_ROT.filterFail ? '<a href="#" id="pingFailClr" class="note">전체 보기 ✕</a>' : '') +
-      '</div>';
+    // v1.9.40: 정상/장애(응답없음) 집계 알약 — 장애 알약을 누르면 장애만 모아보기로 전환
+    var pillsHtml =
+      '<span class="badge b-ok" style="flex:none">정상 ' + cOk.toLocaleString() + '개</span>' +
+      '<span class="badge b-bad" id="pingFailPill" style="cursor:pointer;flex:none' + (PING_ROT.filterFail ? ';box-shadow:0 0 0 2px #c42b1c' : '') + '" title="눌러서 장애(응답없음)만 모아보기">장애(응답없음) ' + cFail.toLocaleString() + '개</span>' +
+      (PING_ROT.filterFail ? '<a href="#" id="pingFailClr" class="note" style="flex:none">전체 보기 ✕</a>' : '');
     var rangeTxt = all.length ? ((PING_ROT.idx * per + 1) + '~' + Math.min(all.length, PING_ROT.idx * per + per) + '번째') : '0건';
     var headNote = PING_ROT.filterFail ? ('장애(응답없음) ' + all.length.toLocaleString() + '개 중 ' + rangeTxt) : ('전체 ' + full.length.toLocaleString() + '개 대역 중 ' + rangeTxt);
+    // v1.9.40: 제목·알약·이전/재생/다음·전환 주기·적용 버튼을 한 줄로 통합(하단 줄 제거로 카드 높이를 다른 두 카드와 비슷하게 축소)
+    var headRow = '<div class="row" style="align-items:center;gap:7px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:8px">' +
+      '<span style="font-size:12.5px;font-weight:600;white-space:nowrap">VPN 모니터링 <span class="note" style="font-weight:400">' + headNote + '</span></span>' +
+      pillsHtml + '<span style="flex:1"></span>' + navHtml +
+      '<span class="note" style="white-space:nowrap">갱신 <input type="number" id="pingRotInp" min="1" max="60" value="' + pingRotMin() + '" style="width:36px;height:22px;font-size:11px;text-align:center">분</span>' +
+      '<button class="btn sm" id="pingRotApply" type="button" style="background:#1e8e3e;color:#fff;border-color:#1e8e3e;border-radius:13px;text-align:center">적용</button>' +
+      '</div>';
     // v1.9.39: "핑 대상 IP"→"대상 IP", 소속·대상 IP·상태 열 너비를 재배분(대상 IP는 고정폭, 소속·상태는 남는 공간을 균등 분배)해 상태가 한 줄로 보이게 함
-    return '<div class="card"><h3>VPN 모니터링 <span class="note" style="font-weight:400">' + headNote + '</span></h3>' + pillsHtml +
-      '<table class="tbl" style="font-size:12px;table-layout:fixed;width:100%"><colgroup><col style="width:36px"><col><col style="width:100px"><col></colgroup><thead><tr><th>대역</th><th>소속</th><th>대상 IP</th><th>상태</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-      '<div class="row" style="align-items:center;margin-top:6px;gap:10px">' + navHtml +
-      '<span class="note" style="white-space:nowrap">전환 주기 <input type="number" id="pingRotInp" min="1" max="60" value="' + pingRotMin() + '" style="width:44px;height:22px;font-size:11px;text-align:center">분마다</span></div></div>';
+    return '<div class="card">' + headRow +
+      '<table class="tbl" style="font-size:12px;table-layout:fixed;width:100%"><colgroup><col style="width:36px"><col><col style="width:100px"><col></colgroup><thead><tr><th>대역</th><th>소속</th><th>대상 IP</th><th>상태</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
   function pingWrapEl() { return $('#pingCardWrap') || $('#dashPingCardWrap'); }   // v1.9.37: 요약 탭·대시보드 둘 다 지원
   function pingRotTick() {
@@ -3337,11 +3611,14 @@
     wrap.innerHTML = pingCardHtml(); bindPingRotInp(); bindPingNav();
   }
   function bindPingRotInp() {
-    var i = $('#pingRotInp');
-    if (i) i.onchange = function () {
-      var v = parseInt(this.value, 10); if (!(v >= 1 && v <= 60)) v = 10; this.value = v; pingRotSave(v);
+    // v1.9.40: 입력칸 변경만으로 바로 적용되지 않고, 옆의 초록 "적용" 버튼을 눌러야 반영됨
+    var btn = $('#pingRotApply');
+    if (btn) btn.onclick = function () {
+      var i = $('#pingRotInp'); if (!i) return;
+      var v = parseInt(i.value, 10); if (!(v >= 1 && v <= 60)) v = 10; i.value = v; pingRotSave(v);
       if (window.__pingRotTimer) clearInterval(window.__pingRotTimer);
       window.__pingRotTimer = setInterval(pingRotTick, v * 60000);
+      toast('전환 주기를 ' + v + '분으로 적용했습니다.');
     };
   }
   function bindPingNav() {   // v1.9.36: ◀(이전)·■/▶(일시정지/재생)·▶(다음) 버튼 동작 · v1.9.39: 장애(응답없음) 알약 필터 토글
@@ -3381,6 +3658,9 @@
     var set = {}; S.ips.forEach(function (r) { if (r.org === org && r.band) set[r.band] = 1; });
     if (org === '파인랩(익성빌딩)') set['미기재'] = 1;
     return Object.keys(set).sort(function (a, b) { var na = parseFloat(a), nb = parseFloat(b); if (!isNaN(na) && !isNaN(nb)) return na - nb; return String(a).localeCompare(String(b)); });
+  }
+  function orgSetBands(o) {   // v1.9.40: 전체 소속 일괄 해제용 — 이 소속에서 VPN 핑 대상이 설정된 대역 전부(숫자·특수 불문)
+    return (S.bandPing || []).filter(function (r) { return r.org === o && r.ping_ip; }).map(function (r) { return r.band; });
   }
   function orgUnsetNumBands(o) {   // v1.9.36: 전체 소속 일괄 등록용 — 이 소속의 "숫자 대역"이면서 VPN 핑 대상 미설정인 대역만
     return ipBandsOf(o).filter(function (b) {
@@ -3612,14 +3892,18 @@
       var next = freeList.length ? '192.168.' + b + '.' + freeList[0] : null;
       var pct = numeric ? Math.round(Object.keys(usedOct).length / cap * 100) : 0;
       var bp = (S.bandPing || []).filter(function (r) { return r.org === org && r.band === b; })[0];
-      return '<div class="card" style="margin:0"><div class="row wrap"><h3 style="flex:1;margin:0">대역 ' + esc(b) + '</h3>' +
+      var hasPing = !!(bp && bp.ping_ip);
+      return '<div class="card" style="margin:0;position:relative">' +
+        '<label class="wonly" style="position:absolute;top:10px;right:12px"><input type="checkbox" class="bandchk" data-bi="' + bi + '"' + (hasPing ? '' : ' disabled') + '></label>' +
+        '<div class="row wrap"><h3 style="flex:1;margin:0">대역 ' + esc(b) + '</h3>' +
         (numeric ? '<span class="note">사용 ' + Object.keys(usedOct).length + ' · 빈 IP ' + free + '</span>' : '<span class="note">특수 대역 · 직접 관리</span>') + '</div>' +
         (numeric ? '<div class="pb big" style="margin:8px 0"><i style="width:' + pct + '%;background:' + ipBandColor(org, b) + '"></i></div>' : '') +
         '<div class="row wrap" style="margin:6px 0;align-items:center">' +
         '<span class="note" style="width:72px;flex:none">VPN 핑 대상</span>' +
         '<input type="text" class="mono" data-pingip="' + bi + '" value="' + esc(bp ? bp.ping_ip || '' : '') + '" placeholder="예: 192.168.' + esc(b) + '.1" style="width:140px;height:26px;font-size:12px">' +
         '<button class="btn sm wonly" data-pingsave="' + bi + '" type="button">저장</button>' +
-        (bp && bp.ping_ip ? pingStatusInline(bp) : '<span class="note">미설정 — 모니터링 대상 아님</span>') +
+        '<button class="btn sm dng wonly" data-pingclear="' + bi + '" type="button"' + (hasPing ? '' : ' disabled') + '>해제</button>' +
+        (hasPing ? pingStatusInline(bp) : '<span class="note">미설정 — 모니터링 대상 아님</span>') +
         '</div>' +
         '<div class="row wrap" style="margin:6px 0">' +
         (numeric && next ? '<span class="note">다음 빈 IP 후보</span><code class="mono" id="ipnextcode' + bi + '">' + esc(next) + '</code><button class="btn sm" data-cp="' + esc(next) + '" id="ipcp' + bi + '" type="button">복사</button><button class="btn sm" data-bi="' + bi + '" type="button">다음 추천 IP</button><button class="btn sm pri wonly" data-reg="' + esc(next) + '" data-org="' + esc(org) + '" data-band="' + esc(b) + '" id="ipreg' + bi + '" type="button">이 IP로 등록</button>' : '<span class="note">사용 ' + used + '건</span>') +
@@ -3629,10 +3913,16 @@
     // v1.9.36: 전체 소속 일괄 등록 — 19개 소속 전부를 순회하며 각 소속의 미설정 숫자 대역을 한 번에 채움
     var allOrgsUnset = ipOrgsVisible().map(function (o) { return { org: o, bands: orgUnsetNumBands(o) }; }).filter(function (p) { return p.bands.length; });
     var allOrgsUnsetTotal = allOrgsUnset.reduce(function (s, p) { return s + p.bands.length; }, 0);
+    // v1.9.40: 전체 소속 일괄 해제 — 설정된 대역이 하나라도 있는 소속을 모아 해제 대상 집계
+    var allOrgsSet = ipOrgsVisible().map(function (o) { return { org: o, bands: orgSetBands(o) }; }).filter(function (p) { return p.bands.length; });
+    var allOrgsSetTotal = allOrgsSet.reduce(function (s, p) { return s + p.bands.length; }, 0);
     shell('ip', '<h1>IP 관리</h1>' + ipTabs('band') +
       '<div class="row wrap" style="margin-top:10px"><select id="bandorg">' + ipOrgsVisible().map(function (o) { return '<option' + (o === org ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select><span class="note">총 ' + rows.length.toLocaleString() + '건</span>' +
+      '<label class="row wonly" style="gap:4px;align-items:center"><input type="checkbox" id="bandselall"><span class="note">전체선택</span></label>' +
+      '<button class="btn sm dng wonly" id="bandclearsel" type="button">선택 해제</button>' +
       '<div class="grow"></div><button class="btn sm wonly" id="bandautoregall" type="button"' + (allOrgsUnsetTotal ? '' : ' disabled') + '>전체 소속 일괄 등록' + (allOrgsUnsetTotal ? ' (' + allOrgsUnsetTotal + ')' : '') + '</button>' +
-      '<button class="btn sm wonly" id="bandautoreg" type="button"' + (unsetNumBands.length ? '' : ' disabled') + '>전체 대역 자동 등록' + (unsetNumBands.length ? ' (' + unsetNumBands.length + ')' : '') + '</button></div>' +
+      '<button class="btn sm wonly" id="bandautoreg" type="button"' + (unsetNumBands.length ? '' : ' disabled') + '>전체 대역 자동 등록' + (unsetNumBands.length ? ' (' + unsetNumBands.length + ')' : '') + '</button>' +
+      '<button class="btn sm dng wonly" id="bandclearall" type="button"' + (allOrgsSetTotal ? '' : ' disabled') + '>전체 소속 일괄 해제' + (allOrgsSetTotal ? ' (' + allOrgsSetTotal + ')' : '') + '</button></div>' +
       '<div class="dgrid3" style="margin-top:10px">' + body + '</div>');
     $('#bandorg').onchange = function () { IPF.bandOrg = this.value; pageIpBand(); };
     // v1.9.35: 전체 대역 자동 등록 — 숫자 대역 중 미설정인 것만 192.168.<대역>.1 로 일괄 등록(이미 설정된 대역·특수 대역은 그대로 둠), 수동 추가/해제는 기존대로 가능
@@ -3691,6 +3981,41 @@
         try { await dbBandPingSave(org, b, inp.value); toast('저장했습니다.'); pageIpBand(); } catch (e) { fail(e); }
       };
     });
+    $$('[data-pingclear]').forEach(function (btn) {   // v1.9.40: 대역별 VPN 핑 대상 해제(모니터링 제외) — 브릿지된 대역 등 실제 게이트웨이가 없는 대역용
+      btn.onclick = async function () {
+        var bi = btn.getAttribute('data-pingclear'), b = bands[bi];
+        try { await dbBandPingSave(org, b, ''); toast('대역 ' + b + '의 VPN 핑 대상을 해제했습니다.'); pageIpBand(); } catch (e) { fail(e); }
+      };
+    });
+    var selAll = $('#bandselall');   // v1.9.40: 체크박스 전체선택/선택 해제/전체 소속 일괄 해제
+    if (selAll) selAll.onchange = function () { $$('.bandchk').forEach(function (c) { if (!c.disabled) c.checked = selAll.checked; }); };
+    var clearSelBtn = $('#bandclearsel');
+    if (clearSelBtn) clearSelBtn.onclick = async function () {
+      var checked = $$('.bandchk').filter(function (c) { return c.checked; });
+      if (!checked.length) { toast('해제할 대역을 먼저 선택하세요.'); return; }
+      if (!confirm('선택한 대역 ' + checked.length + '개의 VPN 핑 대상을 해제할까요?')) return;
+      clearSelBtn.disabled = true; clearSelBtn.textContent = '해제 중…';
+      try {
+        for (var i = 0; i < checked.length; i++) { var b = bands[checked[i].dataset.bi]; await dbBandPingSave(org, b, ''); }
+        toast(checked.length + '개 대역을 해제했습니다.');
+      } catch (e) { fail(e); }
+      pageIpBand();
+    };
+    var clearAllBtn = $('#bandclearall');
+    if (clearAllBtn) clearAllBtn.onclick = async function () {
+      if (!allOrgsSet.length) return;
+      if (!confirm('전체 ' + ipOrgsVisible().length + '개 소속 중 ' + allOrgsSet.length + '개 소속에서 설정된 VPN 핑 대상 ' + allOrgsSetTotal + '개를 전부 해제합니다.\n되돌리려면 대역마다 다시 등록해야 합니다. 계속할까요?')) return;
+      clearAllBtn.disabled = true; clearAllBtn.textContent = '해제 중…';
+      try {
+        var done = 0;
+        for (var i = 0; i < allOrgsSet.length; i++) {
+          var p = allOrgsSet[i];
+          for (var j = 0; j < p.bands.length; j++) { await dbBandPingSave(p.org, p.bands[j], ''); done++; }
+        }
+        toast(allOrgsSet.length + '개 소속에서 ' + done + '개 대역을 해제했습니다.');
+      } catch (e) { fail(e); }
+      pageIpBand();
+    };
   }
   // v1.9.33: VPN 대역 핑 — 상태 배지(대역 현황 화면용, 소형)
   function pingStatusInline(bp) {
@@ -4068,7 +4393,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.39', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.40', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -4080,7 +4405,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경 · v1.9.37 대시보드 하단 "PC 수집 현황" 카드를 "소속별 등록 IP"·"VPN 대역 모니터링"(요약 탭과 동일한 순환 카드)로 교체, "VPN 대역 핑 모니터링" 카드명을 "VPN 대역 모니터링"으로 간소화, 전환 주기 입력이 줄바꿈되던 문제 수정 및 이전·일시정지/재생·다음 아이콘을 정사각 중앙정렬 SVG로 교체 · v1.9.38 VPN 대역 모니터링 카드의 페이지 점(dot) 표시 제거, 표를 고정 폭(소속이 길어도 카드 틀이 흔들리지 않도록)으로 변경, 이전·일시정지/재생·다음 아이콘을 좌우 대칭으로 다시 그려 중앙정렬 개선 · v1.9.39 "VPN 대역 모니터링"을 "VPN 모니터링"으로 명칭 축약, 카드 열 너비 재배분 및 "핑 대상 IP"→"대상 IP"로 한 줄 표시, 정상/장애(응답없음) 집계 알약 추가(장애 알약을 누르면 장애만 모아보기), 이전·일시정지/재생·다음 아이콘을 더 뚜렷하게 구별되도록 교체, 원격 지원 "원격 접속 열기"를 "원격 지원 실행"으로 변경하고 제목 옆에 상시 실행 버튼 추가, 원격 지원 목록에 체크박스·선택 삭제·전체 삭제 추가, 월별 자산 현황에 회사·부서 드롭다운 추가(선택 기준으로 수량·그래프·표 재계산), 기간별 자산 변동 필터 순서를 회사→부서→분류로 재배치하고 회사 드롭다운 신규 추가'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경 · v1.9.37 대시보드 하단 "PC 수집 현황" 카드를 "소속별 등록 IP"·"VPN 대역 모니터링"(요약 탭과 동일한 순환 카드)로 교체, "VPN 대역 핑 모니터링" 카드명을 "VPN 대역 모니터링"으로 간소화, 전환 주기 입력이 줄바꿈되던 문제 수정 및 이전·일시정지/재생·다음 아이콘을 정사각 중앙정렬 SVG로 교체 · v1.9.38 VPN 대역 모니터링 카드의 페이지 점(dot) 표시 제거, 표를 고정 폭(소속이 길어도 카드 틀이 흔들리지 않도록)으로 변경, 이전·일시정지/재생·다음 아이콘을 좌우 대칭으로 다시 그려 중앙정렬 개선 · v1.9.39 "VPN 대역 모니터링"을 "VPN 모니터링"으로 명칭 축약, 카드 열 너비 재배분 및 "핑 대상 IP"→"대상 IP"로 한 줄 표시, 정상/장애(응답없음) 집계 알약 추가(장애 알약을 누르면 장애만 모아보기), 이전·일시정지/재생·다음 아이콘을 더 뚜렷하게 구별되도록 교체, 원격 지원 "원격 접속 열기"를 "원격 지원 실행"으로 변경하고 제목 옆에 상시 실행 버튼 추가, 원격 지원 목록에 체크박스·선택 삭제·전체 삭제 추가, 월별 자산 현황에 회사·부서 드롭다운 추가(선택 기준으로 수량·그래프·표 재계산), 기간별 자산 변동 필터 순서를 회사→부서→분류로 재배치하고 회사 드롭다운 신규 추가 · v1.9.40 "장애 처리" 기능 신설(db/update_v1.9.40.sql 실행 필요) — 접수 등록 화면, 접수대기/진행중/완료/반려 탭과 상태 변경 모달(담당자 지정·처리 내용), 체크박스 선택/전체 삭제, 대시보드에 KPI·알약 카드 추가, 보고서에 "장애 처리 현황"(기간·회사·부서·분류·상태 필터) 신설, 사이드바에 신규 메뉴 배치(현황 점검 아래·원격 지원 위) 및 실사·인사 정보 순서 교체, VPN 모니터링 카드를 제목·알약·이전/재생/다음·전환주기·적용 버튼까지 한 줄로 정리("갱신 n분 적용"), 대역 현황에 VPN 핑 대상 해제 버튼과 체크박스 선택 해제·전체 소속 일괄 해제 추가, 사이드바 디자인을 체크박스형 아이콘에서 메뉴별 라인아이콘 + 둥근 액티브 하이라이트로 개선'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;
