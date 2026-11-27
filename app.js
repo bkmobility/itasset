@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.53 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.54 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -443,7 +443,7 @@
     }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.53</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.54</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><div class="gswrap"><input type="search" id="gs" class="gs" autocomplete="off" placeholder="통합 검색 (자산·IP·인사 전체) (Enter)" value="' + esc(F.q) + '"><div class="gsdrop" id="gsdrop" style="display:none"></div></div><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'), gsdrop = $('#gsdrop');   // v1.9.31: Frame 28 — 통합 검색(자산·IP·인사 동시 검색) 드롭다운
@@ -656,6 +656,10 @@
   };
   function assetDeptList() {   // v1.9.26: 자산 관리에 실제로 쓰인 소속(dept) 목록 (검색형 콤보박스용)
     var set = {}; S.assets.forEach(function (a) { if (a.dept) set[a.dept] = 1; });
+    return Object.keys(set).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+  }
+  function assetLocationList() {   // v1.9.54: 자산 직접 등록 "위치" 검색형 콤보박스용 — 기존 자산에 쓰인 위치 목록
+    var set = {}; S.assets.forEach(function (a) { if (a.location) set[a.location] = 1; });
     return Object.keys(set).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
   }
   function assetDefaultCmp(a, b) {   // v1.9.26: 기본 정렬 — 소속 같으면 분류(자산유형)순, 다르면 소속순
@@ -3387,16 +3391,17 @@
     function inp(id, ph, type, w) { return '<input type="' + (type || 'text') + '" id="n_' + id + '" placeholder="' + (ph || '') + '" autocomplete="off"' + (w ? ' style="width:' + w + '"' : '') + '>'; }
     var form = fr('category', '자산분류', '<input type="text" id="n_category" list="n_cats" placeholder="예: 모니터" autocomplete="off"><datalist id="n_cats">' + cats.map(function (c) { return '<option value="' + esc(c) + '">'; }).join('') + '</datalist>', true, '고르거나 직접 입력합니다. 선택하면 관리번호가 자동으로 정해집니다') +
       fr('asset_no', '관리번호', '<input type="text" id="n_asset_no" class="mono" placeholder="분류를 선택하면 자동 부여" autocomplete="off" style="background:#f2f8fe;color:#0f6cbd;font-weight:700">', true, '분류·제조년도·다음 번호가 자동으로 붙습니다. 필요하면 직접 고칠 수 있고, 이미 있는 번호는 저장되지 않습니다') +
-      fr('manufacturer', '제조사', '<input type="text" id="n_manufacturer" list="n_makers" placeholder="예: DELL" autocomplete="off"><datalist id="n_makers">' + makers.map(function (m) { return '<option value="' + esc(m) + '">'; }).join('') + '</datalist>', true, '고르거나 직접 입력합니다') + fr('model', '모델명', '<select id="n_model"></select>', true, '기준정보 관리에 등록된 모델만 고를 수 있습니다(제조사를 고르면 그 제조사의 모델만 보입니다)') +
+      fr('manufacturer', '제조사', '<div class="combo" style="width:100%"><input type="text" id="n_manufacturer" placeholder="예: DELL" autocomplete="off" style="padding-right:30px"><span id="n_mk_arrow" title="목록 보기" style="position:absolute;right:6px;top:6px;width:22px;height:22px;line-height:22px;text-align:center;border-radius:4px;cursor:pointer;color:#5c6372;font-size:12px">▾</span><div class="combolist" id="n_mk_list" style="display:none"></div></div>', true, '고르거나 직접 입력합니다. 입력칸을 누르거나 ▾를 누르면 전체 목록이 다시 뜹니다') + fr('model', '모델명', '<select id="n_model"></select>', true, '기준정보 관리에 등록된 모델 + 이 제조사로 이미 등록된 자산들의 모델이 함께 보입니다(제조사를 고르면 그 제조사만)') +
       fr('mfg_ym', '제조년월', inp('mfg_ym', '예: 2025-01', 'text', '180px'), false, '입력하면 보증(제조년월+5년)이 자동 계산됩니다') +
       fr('status', '자산상태', '<select id="n_status">' + stats.map(function (t) { return '<option' + (t === '사용중' ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>', true) +
       fr('user_id', '사용자 ID', inp('user_id', '사번을 입력하면 아래가 자동으로 채워집니다', 'text', '260px'), false, '') +
-      fr('user_name', '사용자명', inp('user_name')) + fr('dept', '소속명', inp('dept')) + fr('company', '회사', '<select id="n_company" style="width:100%"><option value="" selected disabled>회사를 선택하세요</option>' + CO.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('') + '</select>', true) + fr('title', '직책', inp('title')) + fr('location', '위치', inp('location')) +
+      fr('user_name', '사용자명', inp('user_name')) + fr('dept', '소속명', inp('dept')) + fr('company', '회사', '<select id="n_company" style="width:100%"><option value="" selected disabled>회사를 선택하세요</option>' + CO.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('') + '</select>', true) + fr('title', '직책', inp('title')) +
+      fr('location', '위치', '<div class="combo" style="width:100%"><input type="text" id="n_location" placeholder="위치 (입력해서 검색)" autocomplete="off"><div class="combolist" id="n_loc_list" style="display:none"></div></div>', false, '기존 자산에 쓰인 위치에서 검색하거나, 없으면 그대로 입력해 새 위치로 등록합니다') +
       fr('serial_no', '시리얼 번호', inp('serial_no'), false, '모니터는 PC 프로그램이 읽은 시리얼과 같으면 자동 연결됩니다') +
       fr('purchase_date', '구매일', inp('purchase_date', '', 'date', '200px')) + fr('warranty_end', '보증 만료', inp('warranty_end', '', 'date', '200px'), false, '비워 두면 제조년월+5년으로 계산합니다') +
       fr('memo', '메모', '<textarea id="n_memo" rows="3" style="width:100%"></textarea>');
     shell('assets', '<div class="row wrap"><a href="#/assets" class="note">‹ 자산 관리</a><h1>자산 직접 등록</h1><div class="grow"></div><button class="btn" id="n_cancel" type="button">취소</button><button class="btn pri" id="n_save" type="button">등록</button></div>' +
-      '<div style="display:flex;align-items:flex-start;gap:14px"><div class="card" style="flex:1.6">' + form + '</div><div class="card" style="flex:1;line-height:1.85"><b>등록하면</b><br>① 관리번호가 확정되고 목록에 바로 나타납니다<br>② 상세 화면이 열리며 QR 코드를 바로 출력할 수 있습니다<br>③ 이력 관리에 "자산 직접 등록"이 남습니다<br><br><b>입력 확인</b><br>· 필수(*): 자산분류, 관리번호, 제조사, 모델명, 자산상태, 회사<br>· 같은 시리얼 번호가 이미 있으면 저장 전에 알려 드립니다<br>· 모니터는 등록 후 상세 화면의 "PC와 연결"로 수동 연결도 가능합니다<div id="n_msg" style="margin-top:10px"></div></div></div>');
+      '<div style="display:flex;align-items:flex-start;gap:14px;max-width:980px"><div class="card" style="flex:1.6">' + form + '</div><div class="card" style="flex:1;line-height:1.85"><b>등록하면</b><br>① 관리번호가 확정되고 목록에 바로 나타납니다<br>② 상세 화면이 열리며 QR 코드를 바로 출력할 수 있습니다<br>③ 이력 관리에 "자산 직접 등록"이 남습니다<br><br><b>입력 확인</b><br>· 필수(*): 자산분류, 관리번호, 제조사, 모델명, 자산상태, 회사<br>· 같은 시리얼 번호가 이미 있으면 저장 전에 알려 드립니다<br>· 모니터는 등록 후 상세 화면의 "PC와 연결"로 수동 연결도 가능합니다<div id="n_msg" style="margin-top:10px"></div></div></div>');
     var edited = false;
     function V(id) { return $('#n_' + id).value.trim(); }
     function msg(t, bad) { var m = $('#n_msg'); m.innerHTML = t ? '<div class="' + (bad ? 'warnbox' : 'note') + '" style="' + (bad ? '' : 'background:#e6f4ea;color:#1e8e3e;border-radius:6px;padding:6px 10px') + '">' + esc(t) + '</div>' : ''; }
@@ -3404,11 +3409,22 @@
     $('#n_category').oninput = autoNo; $('#n_category').onchange = autoNo; $('#n_mfg_ym').oninput = autoNo;
     $('#n_asset_no').oninput = function () { edited = true; };
     // v1.9.46: 모델명 드롭다운 — 제조사를 고르면(또는 직접 입력하면) 그 제조사에 기준정보 관리에 등록된 모델만 보여줌. 제조사를 아직 안 골랐으면 전체 모델 목록
+    // v1.9.54: 기준정보 관리에 등록된 모델뿐 아니라, 그 제조사로 이미 등록된 자산들의 실제 모델명도 "(기존 자산)" 표시로 함께 보여줌
     function modelOptionsHtml(maker) {
-      var list = maker ? modelsOf(maker) : (function () { var seen = {}, out = []; modelList().forEach(function (c) { if (!seen[c.name]) { seen[c.name] = 1; out.push(c.name); } }); return out; })();
+      var catalogModels = maker ? modelsOf(maker) : (function () { var seen = {}, out = []; modelList().forEach(function (c) { if (!seen[c.name]) { seen[c.name] = 1; out.push(c.name); } }); return out; })();
+      var catalogSet = {}; catalogModels.forEach(function (m) { catalogSet[m] = 1; });
+      var usedModels = [];
+      if (maker) {
+        var seen2 = {};
+        S.assets.forEach(function (a) { if (a.manufacturer === maker && a.model && !catalogSet[a.model] && !seen2[a.model]) { seen2[a.model] = 1; usedModels.push(a.model); } });
+        usedModels.sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+      }
       var opts = '<option value="">고르세요</option>';
-      if (maker && !list.length) opts += '<option value="__none__">등록된 모델이 없습니다 — 기준정보 관리에서 먼저 등록해주세요</option>';
-      else opts += list.map(function (m) { return '<option value="' + esc(m) + '">' + esc(m) + '</option>'; }).join('');
+      if (maker && !catalogModels.length && !usedModels.length) opts += '<option value="__none__">등록된 모델이 없습니다 — 기준정보 관리에서 먼저 등록해주세요</option>';
+      else {
+        opts += catalogModels.map(function (m) { return '<option value="' + esc(m) + '">' + esc(m) + '</option>'; }).join('');
+        opts += usedModels.map(function (m) { return '<option value="' + esc(m) + '">' + esc(m) + ' (기존 자산)</option>'; }).join('');
+      }
       return opts;
     }
     function modelMissingDialog(maker) {
@@ -3424,7 +3440,43 @@
       if (cur && $$('option', sel).some(function (o) { return o.value === cur; })) sel.value = cur;
     }
     refreshModelOptions();
-    $('#n_manufacturer').oninput = refreshModelOptions; $('#n_manufacturer').onchange = refreshModelOptions;
+    (function () {   // v1.9.54: 제조사 검색형 콤보박스 — 입력칸을 누르거나 ▾(화살표)를 누르면 항상 전체 목록 재오픈(지금까지는 값이 있으면 백스페이스로 지워야만 목록이 다시 떴음)
+      var mkInp = $('#n_manufacturer'), mkList = $('#n_mk_list'), mkArrow = $('#n_mk_arrow');
+      function render(all) {
+        var q = all ? '' : mkInp.value.trim();
+        var m = q ? makers.filter(function (o) { return o.toLowerCase().indexOf(q.toLowerCase()) >= 0; }) : makers;
+        mkList.innerHTML = (m.length ? m.map(function (o) { return '<div data-v="' + esc(o) + '">' + esc(o) + '</div>'; }).join('') : '<div class="cnt">일치하는 제조사가 없습니다</div>') + '<div class="cnt">' + (q ? m.length + '개 일치' : '전체 ' + m.length + '개') + '</div>';
+        mkList.style.display = 'block';
+        $$('div[data-v]', mkList).forEach(function (d) { d.onclick = function () { mkInp.value = d.getAttribute('data-v'); mkList.style.display = 'none'; refreshModelOptions(); }; });
+      }
+      mkInp.oninput = function () { render(false); refreshModelOptions(); };
+      mkInp.onfocus = function () { render(true); };
+      mkArrow.onclick = function () { mkInp.focus(); render(true); };
+      if (!window.__nMkClrBound) {
+        window.__nMkClrBound = 1;
+        document.addEventListener('click', function (e) {
+          var l = document.getElementById('n_mk_list'); if (l && l.style.display !== 'none' && e.target.id !== 'n_manufacturer' && e.target.id !== 'n_mk_arrow') l.style.display = 'none';
+        });
+      }
+    })();
+    (function () {   // v1.9.54: 위치 검색형 콤보박스 — 기존 자산에 쓰인 위치 전체에서 검색, 목록에 없으면 그대로 입력해 새 위치로 등록
+      var locInp = $('#n_location'), locList = $('#n_loc_list'); if (!locInp) return;
+      function render(q) {
+        var all = assetLocationList(), m = q ? all.filter(function (o) { return o.toLowerCase().indexOf(q.toLowerCase()) >= 0; }) : all;
+        if (!m.length) { locList.innerHTML = '<div class="cnt">일치하는 위치가 없습니다 — 그대로 저장하면 새 위치로 등록됩니다</div>'; locList.style.display = 'block'; return; }
+        locList.innerHTML = m.slice(0, 200).map(function (o) { return '<div data-v="' + esc(o) + '">' + esc(o) + '</div>'; }).join('') + '<div class="cnt">' + (q ? m.length + '개 일치' : '전체 ' + m.length + '개') + (m.length > 200 ? ' (상위 200개만 표시)' : '') + '</div>';
+        locList.style.display = 'block';
+        $$('div[data-v]', locList).forEach(function (d) { d.onclick = function () { locInp.value = d.getAttribute('data-v'); locList.style.display = 'none'; }; });
+      }
+      locInp.oninput = function () { render(this.value.trim()); };
+      locInp.onfocus = function () { render(''); };
+      if (!window.__nLocClrBound) {
+        window.__nLocClrBound = 1;
+        document.addEventListener('click', function (e) {
+          var l = document.getElementById('n_loc_list'); if (l && l.style.display !== 'none' && e.target.id !== 'n_location') l.style.display = 'none';
+        });
+      }
+    })();
     $('#n_model').onchange = function () { if (this.value === '__none__') { this.value = ''; modelMissingDialog(V('manufacturer')); } };
     $('#n_user_id').oninput = function () {   // 값만 채우므로 입력 중인 칸은 다시 그리지 않음 (한글 입력 안전)
       var e = S.empBy[V('user_id').toUpperCase()] || S.empBy[V('user_id')], h = $('#h_user_id');
@@ -4821,7 +4873,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.53', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.54', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -4833,7 +4885,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경 · v1.9.37 대시보드 하단 "PC 수집 현황" 카드를 "소속별 등록 IP"·"VPN 대역 모니터링"(요약 탭과 동일한 순환 카드)로 교체, "VPN 대역 핑 모니터링" 카드명을 "VPN 대역 모니터링"으로 간소화, 전환 주기 입력이 줄바꿈되던 문제 수정 및 이전·일시정지/재생·다음 아이콘을 정사각 중앙정렬 SVG로 교체 · v1.9.38 VPN 대역 모니터링 카드의 페이지 점(dot) 표시 제거, 표를 고정 폭(소속이 길어도 카드 틀이 흔들리지 않도록)으로 변경, 이전·일시정지/재생·다음 아이콘을 좌우 대칭으로 다시 그려 중앙정렬 개선 · v1.9.39 "VPN 대역 모니터링"을 "VPN 모니터링"으로 명칭 축약, 카드 열 너비 재배분 및 "핑 대상 IP"→"대상 IP"로 한 줄 표시, 정상/장애(응답없음) 집계 알약 추가(장애 알약을 누르면 장애만 모아보기), 이전·일시정지/재생·다음 아이콘을 더 뚜렷하게 구별되도록 교체, 원격 지원 "원격 접속 열기"를 "원격 지원 실행"으로 변경하고 제목 옆에 상시 실행 버튼 추가, 원격 지원 목록에 체크박스·선택 삭제·전체 삭제 추가, 월별 자산 현황에 회사·부서 드롭다운 추가(선택 기준으로 수량·그래프·표 재계산), 기간별 자산 변동 필터 순서를 회사→부서→분류로 재배치하고 회사 드롭다운 신규 추가 · v1.9.40 "장애 처리" 기능 신설(db/update_v1.9.40.sql 실행 필요) — 접수 등록 화면, 접수대기/진행중/완료/반려 탭과 상태 변경 모달(담당자 지정·처리 내용), 체크박스 선택/전체 삭제, 대시보드에 KPI·알약 카드 추가, 보고서에 "장애 처리 현황"(기간·회사·부서·분류·상태 필터) 신설, 사이드바에 신규 메뉴 배치(현황 점검 아래·원격 지원 위) 및 실사·인사 정보 순서 교체, VPN 모니터링 카드를 제목·알약·이전/재생/다음·전환주기·적용 버튼까지 한 줄로 정리("갱신 n분 적용"), 대역 현황에 VPN 핑 대상 해제 버튼과 체크박스 선택 해제·전체 소속 일괄 해제 추가, 사이드바 디자인을 체크박스형 아이콘에서 메뉴별 라인아이콘 + 둥근 액티브 하이라이트로 개선 · v1.9.41 대시보드에서 "최근 활동" 카드 삭제, 카드 레이아웃을 1번째 줄 부서별 자산 수·소속별 등록 IP·보증 만료·교체 알림(표 형태 그대로) 3칸, 2번째 줄 VPN 모니터링·장애 처리 현황 2칸으로 재배치 · v1.9.42 대시보드 "회사별 자산" 카드 하단의 "회사를 누르면 바뀝니다 · 상세 보기" 문구를 제목 오른쪽으로 이동, 옆의 자산 유형·자산 상태 카드가 "회사별 자산" 카드 높이에 맞춰 늘어나며 생기던 빈 여백을 제거(세 카드 모두 내용물 높이만큼만 차지) · v1.9.43 대시보드 "회사별 자산"·"자산 유형"·"자산 상태" 3개 카드의 세로 높이를 완전히 동일하게 정렬(내용은 각 카드 안에서 세로 중앙 정렬), 카드 줄 순서를 VPN 모니터링·장애 처리 현황(위) → 부서별 자산 수·소속별 등록 IP·보증 만료 교체 알림(아래)으로 변경 · v1.9.44 IP 추가·수정 창의 "조직명"을 검색형 콤보박스로 변경(IP 대장 필터와 동일 방식), 자산 직접 등록의 "제조사"를 자산분류처럼 고르거나 직접 입력하는 방식으로 변경, "회사"를 필수 선택(빨간 *, "선택 안 함" 제거)으로 변경, 관리자 메뉴 아래 "기준정보 관리" 신설(자산분류·제조사 추가·이름변경·삭제, db/update_v1.9.44.sql 실행 필요), IP 관리에 "VPN 장비 현황" 탭 신설(대역 현황과 RPA PC 사이 — 제조사·장비명·펌웨어·공인IP·S/N·EOL 등 관리, 노션 내보내기 274건 최초 적재, 자동 동기화는 미연결) · v1.9.45 VPN 장비 현황 표 열 순서/구성 수정 — 맨 앞에 "번호"(행 순번) 열 추가, "IP 대역"을 끝자리 숫자가 아닌 "192.168.N" 전체 형태로 표시, "장비종류·EOL날짜·출처" 열 제거, "S/N"과 "비고" 순서 교체(S/N을 비고보다 앞으로) · v1.9.46 VPN 장비 현황 검색창 입력 시 포커스가 끊기던 버그 수정(목록 부분만 갱신), VPN 대역 데이터 오류 수정(172.x 대역 8건이 192.168.N으로 잘못 저장·표시되던 문제 — 원본대로 복구 + 대역을 전체 문자열로 저장), VPN 장비 수정 화면 필드 재배치(대역·본사/제조사명·장비명/공인IP·S/N/펌웨어Ver·EOL날짜 각 1:1, 장비종류 제거) 및 대역을 "192.168.5"처럼 전체 입력하도록 변경, 사이드바 메뉴 글씨 시인성 개선(비활성 메뉴 밝게, 선택 메뉴 그라데이션+좌측 강조바), "내 계정"에 비밀번호 변경 추가 및 초기화된 비밀번호로 로그인 시 변경 전까지 다른 화면 사용 차단, 기준정보 관리에 "모델명" 탭 신설(제조사별로 구분 관리, 탭 순서 제조사→자산분류→모델명)과 자산 직접 등록의 모델명을 제조사에 맞는 드롭다운 선택으로 변경(미등록 모델은 기준정보 관리로 안내), 보안 설정 "해외 접속 차단"을 서버 환경변수 대신 화면 토글 스위치로 변경(db/update_v1.9.46.sql 실행 필요) · v1.9.47 메인 관리자도 "보안 설정" 화면에서 본인 비밀번호 변경 가능하도록 카드 추가(지금까지는 일반 관리자만 가능), 조회 전용 계정에 "내 계정" 메뉴를 신설하되 비밀번호 입력칸 없이 "메인/일반 관리자에게 재설정 요청" 안내만 표시 · v1.9.48 VPN 장비 현황 "지금 동기화" 버튼을 노션 자동 동기화와 실제로 연결(db/update_v1.9.48.sql, notion-vpn-sync 함수 배포 및 Secrets에 NOTION_API_KEY 등록 필요) — 노션 → 이 시스템 단방향, 노션 행 고유 ID로 매칭(오인식 방지), 직접 수정한 항목은 덮어쓰지 않음, 노션에서 지워진 행은 자동 삭제 대신 건수만 표시, 목록 상단에 "마지막 동기화" 시각 표시 · v1.9.49 IP 관리(VPN 장비 현황·IP 대장) 목록에서 "(미배정)" 행을 연한 분홍 배경 + 빨간 글씨로 강조 표시, "장애 접수 등록" 화면 전면 재배치(db/update_v1.9.49.sql 실행 필요) — "사용자 ID"를 입력하면 인사 정보를 자동 조회해 사용자명·소속명·직책을 자동 입력(일치하면 읽기 전용, 불일치하면 소속명(검색형 콤보박스)·직책(드롭다운)·사용자명을 직접 입력), "회사" 드롭다운 추가(자동 입력 대상 아님 — 같은 사번이 회사를 겸하는 경우가 있어 항상 직접 선택), "요청자/연락처"를 "연락처"로 분리해 전화번호만 입력, "담당자"를 자유 입력에서 인사 정보상 전산지원파트 재직자를 고르는 필수 드롭다운으로 변경(미지정 옵션 삭제) · v1.9.50 "상태 변경" 모달에 접수 정보(접수번호·접수일시·사용자 ID·사용자명·소속명·회사·직책·연락처·희망일·분류·상세내용)를 항목별로 표시, "처리 내용" 입력칸을 3줄→6줄로 확대, 장애 접수 목록에서 행을 더블클릭하면 접수부터 지금까지의 상태 변경 이력을 시간순 타임라인으로 보여주는 "처리 이력" 창 추가(새 테이블 없이 기존 이력 관리 로그 재활용) · v1.9.51 "장애 처리" 상태 변경·담당자 지정·처리 내용이 이력 관리(감사 로그)에 전혀 기록되지 않던 버그 수정(v1.9.40부터 있던 문제 — fault_tickets 테이블이 자동 기록 대상 목록에 빠져 있었음) — 접수 등록 이력은 그대로 남아있었고, 이번 수정 이후의 상태 변경·담당자 지정·처리 내용 입력부터 "처리 이력"에 정상적으로 쌓입니다(수정 전에 있었던 상태 변경 기록은 복구되지 않습니다) · v1.9.52 "장애 처리 — 처리 이력"을 일반 관리자도 볼 수 있도록 권한 추가(db/update_v1.9.52.sql 실행 필요) — 지금까지 이력 관리(감사 로그)는 메인 관리자만 열람 가능해 일반 관리자는 "처리 이력"이 항상 빈 화면으로 보였는데, "장애 ..."로 시작하는 이력만 일반 관리자도 추가로 볼 수 있게 DB 권한을 좁게 허용(다른 이력·"이력 관리" 메뉴는 기존처럼 메인 관리자 전용 유지) · v1.9.53 "IP 추가/수정" 창 필드 재배치(목업 Frame 77) — 소속(건물명)·층을 한 줄 2칸으로, 대역·IP 입력·"빈 IP 추천" 버튼을 한 줄 3칸으로 묶음(동작은 동일, 위치만 이동)'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경 · v1.9.37 대시보드 하단 "PC 수집 현황" 카드를 "소속별 등록 IP"·"VPN 대역 모니터링"(요약 탭과 동일한 순환 카드)로 교체, "VPN 대역 핑 모니터링" 카드명을 "VPN 대역 모니터링"으로 간소화, 전환 주기 입력이 줄바꿈되던 문제 수정 및 이전·일시정지/재생·다음 아이콘을 정사각 중앙정렬 SVG로 교체 · v1.9.38 VPN 대역 모니터링 카드의 페이지 점(dot) 표시 제거, 표를 고정 폭(소속이 길어도 카드 틀이 흔들리지 않도록)으로 변경, 이전·일시정지/재생·다음 아이콘을 좌우 대칭으로 다시 그려 중앙정렬 개선 · v1.9.39 "VPN 대역 모니터링"을 "VPN 모니터링"으로 명칭 축약, 카드 열 너비 재배분 및 "핑 대상 IP"→"대상 IP"로 한 줄 표시, 정상/장애(응답없음) 집계 알약 추가(장애 알약을 누르면 장애만 모아보기), 이전·일시정지/재생·다음 아이콘을 더 뚜렷하게 구별되도록 교체, 원격 지원 "원격 접속 열기"를 "원격 지원 실행"으로 변경하고 제목 옆에 상시 실행 버튼 추가, 원격 지원 목록에 체크박스·선택 삭제·전체 삭제 추가, 월별 자산 현황에 회사·부서 드롭다운 추가(선택 기준으로 수량·그래프·표 재계산), 기간별 자산 변동 필터 순서를 회사→부서→분류로 재배치하고 회사 드롭다운 신규 추가 · v1.9.40 "장애 처리" 기능 신설(db/update_v1.9.40.sql 실행 필요) — 접수 등록 화면, 접수대기/진행중/완료/반려 탭과 상태 변경 모달(담당자 지정·처리 내용), 체크박스 선택/전체 삭제, 대시보드에 KPI·알약 카드 추가, 보고서에 "장애 처리 현황"(기간·회사·부서·분류·상태 필터) 신설, 사이드바에 신규 메뉴 배치(현황 점검 아래·원격 지원 위) 및 실사·인사 정보 순서 교체, VPN 모니터링 카드를 제목·알약·이전/재생/다음·전환주기·적용 버튼까지 한 줄로 정리("갱신 n분 적용"), 대역 현황에 VPN 핑 대상 해제 버튼과 체크박스 선택 해제·전체 소속 일괄 해제 추가, 사이드바 디자인을 체크박스형 아이콘에서 메뉴별 라인아이콘 + 둥근 액티브 하이라이트로 개선 · v1.9.41 대시보드에서 "최근 활동" 카드 삭제, 카드 레이아웃을 1번째 줄 부서별 자산 수·소속별 등록 IP·보증 만료·교체 알림(표 형태 그대로) 3칸, 2번째 줄 VPN 모니터링·장애 처리 현황 2칸으로 재배치 · v1.9.42 대시보드 "회사별 자산" 카드 하단의 "회사를 누르면 바뀝니다 · 상세 보기" 문구를 제목 오른쪽으로 이동, 옆의 자산 유형·자산 상태 카드가 "회사별 자산" 카드 높이에 맞춰 늘어나며 생기던 빈 여백을 제거(세 카드 모두 내용물 높이만큼만 차지) · v1.9.43 대시보드 "회사별 자산"·"자산 유형"·"자산 상태" 3개 카드의 세로 높이를 완전히 동일하게 정렬(내용은 각 카드 안에서 세로 중앙 정렬), 카드 줄 순서를 VPN 모니터링·장애 처리 현황(위) → 부서별 자산 수·소속별 등록 IP·보증 만료 교체 알림(아래)으로 변경 · v1.9.44 IP 추가·수정 창의 "조직명"을 검색형 콤보박스로 변경(IP 대장 필터와 동일 방식), 자산 직접 등록의 "제조사"를 자산분류처럼 고르거나 직접 입력하는 방식으로 변경, "회사"를 필수 선택(빨간 *, "선택 안 함" 제거)으로 변경, 관리자 메뉴 아래 "기준정보 관리" 신설(자산분류·제조사 추가·이름변경·삭제, db/update_v1.9.44.sql 실행 필요), IP 관리에 "VPN 장비 현황" 탭 신설(대역 현황과 RPA PC 사이 — 제조사·장비명·펌웨어·공인IP·S/N·EOL 등 관리, 노션 내보내기 274건 최초 적재, 자동 동기화는 미연결) · v1.9.45 VPN 장비 현황 표 열 순서/구성 수정 — 맨 앞에 "번호"(행 순번) 열 추가, "IP 대역"을 끝자리 숫자가 아닌 "192.168.N" 전체 형태로 표시, "장비종류·EOL날짜·출처" 열 제거, "S/N"과 "비고" 순서 교체(S/N을 비고보다 앞으로) · v1.9.46 VPN 장비 현황 검색창 입력 시 포커스가 끊기던 버그 수정(목록 부분만 갱신), VPN 대역 데이터 오류 수정(172.x 대역 8건이 192.168.N으로 잘못 저장·표시되던 문제 — 원본대로 복구 + 대역을 전체 문자열로 저장), VPN 장비 수정 화면 필드 재배치(대역·본사/제조사명·장비명/공인IP·S/N/펌웨어Ver·EOL날짜 각 1:1, 장비종류 제거) 및 대역을 "192.168.5"처럼 전체 입력하도록 변경, 사이드바 메뉴 글씨 시인성 개선(비활성 메뉴 밝게, 선택 메뉴 그라데이션+좌측 강조바), "내 계정"에 비밀번호 변경 추가 및 초기화된 비밀번호로 로그인 시 변경 전까지 다른 화면 사용 차단, 기준정보 관리에 "모델명" 탭 신설(제조사별로 구분 관리, 탭 순서 제조사→자산분류→모델명)과 자산 직접 등록의 모델명을 제조사에 맞는 드롭다운 선택으로 변경(미등록 모델은 기준정보 관리로 안내), 보안 설정 "해외 접속 차단"을 서버 환경변수 대신 화면 토글 스위치로 변경(db/update_v1.9.46.sql 실행 필요) · v1.9.47 메인 관리자도 "보안 설정" 화면에서 본인 비밀번호 변경 가능하도록 카드 추가(지금까지는 일반 관리자만 가능), 조회 전용 계정에 "내 계정" 메뉴를 신설하되 비밀번호 입력칸 없이 "메인/일반 관리자에게 재설정 요청" 안내만 표시 · v1.9.48 VPN 장비 현황 "지금 동기화" 버튼을 노션 자동 동기화와 실제로 연결(db/update_v1.9.48.sql, notion-vpn-sync 함수 배포 및 Secrets에 NOTION_API_KEY 등록 필요) — 노션 → 이 시스템 단방향, 노션 행 고유 ID로 매칭(오인식 방지), 직접 수정한 항목은 덮어쓰지 않음, 노션에서 지워진 행은 자동 삭제 대신 건수만 표시, 목록 상단에 "마지막 동기화" 시각 표시 · v1.9.49 IP 관리(VPN 장비 현황·IP 대장) 목록에서 "(미배정)" 행을 연한 분홍 배경 + 빨간 글씨로 강조 표시, "장애 접수 등록" 화면 전면 재배치(db/update_v1.9.49.sql 실행 필요) — "사용자 ID"를 입력하면 인사 정보를 자동 조회해 사용자명·소속명·직책을 자동 입력(일치하면 읽기 전용, 불일치하면 소속명(검색형 콤보박스)·직책(드롭다운)·사용자명을 직접 입력), "회사" 드롭다운 추가(자동 입력 대상 아님 — 같은 사번이 회사를 겸하는 경우가 있어 항상 직접 선택), "요청자/연락처"를 "연락처"로 분리해 전화번호만 입력, "담당자"를 자유 입력에서 인사 정보상 전산지원파트 재직자를 고르는 필수 드롭다운으로 변경(미지정 옵션 삭제) · v1.9.50 "상태 변경" 모달에 접수 정보(접수번호·접수일시·사용자 ID·사용자명·소속명·회사·직책·연락처·희망일·분류·상세내용)를 항목별로 표시, "처리 내용" 입력칸을 3줄→6줄로 확대, 장애 접수 목록에서 행을 더블클릭하면 접수부터 지금까지의 상태 변경 이력을 시간순 타임라인으로 보여주는 "처리 이력" 창 추가(새 테이블 없이 기존 이력 관리 로그 재활용) · v1.9.51 "장애 처리" 상태 변경·담당자 지정·처리 내용이 이력 관리(감사 로그)에 전혀 기록되지 않던 버그 수정(v1.9.40부터 있던 문제 — fault_tickets 테이블이 자동 기록 대상 목록에 빠져 있었음) — 접수 등록 이력은 그대로 남아있었고, 이번 수정 이후의 상태 변경·담당자 지정·처리 내용 입력부터 "처리 이력"에 정상적으로 쌓입니다(수정 전에 있었던 상태 변경 기록은 복구되지 않습니다) · v1.9.52 "장애 처리 — 처리 이력"을 일반 관리자도 볼 수 있도록 권한 추가(db/update_v1.9.52.sql 실행 필요) — 지금까지 이력 관리(감사 로그)는 메인 관리자만 열람 가능해 일반 관리자는 "처리 이력"이 항상 빈 화면으로 보였는데, "장애 ..."로 시작하는 이력만 일반 관리자도 추가로 볼 수 있게 DB 권한을 좁게 허용(다른 이력·"이력 관리" 메뉴는 기존처럼 메인 관리자 전용 유지) · v1.9.53 "IP 추가/수정" 창 필드 재배치(목업 Frame 77) — 소속(건물명)·층을 한 줄 2칸으로, 대역·IP 입력·"빈 IP 추천" 버튼을 한 줄 3칸으로 묶음(동작은 동일, 위치만 이동) · v1.9.54 자산 직접 등록 화면 개선(목업 Frame 78) — "제조사"를 조직명과 같은 검색형 콤보박스로 변경(선택 후에도 입력칸 클릭·▾ 화살표로 전체 목록 다시 열림, 지금까지는 백스페이스로 지워야만 다시 열렸음), "모델명" 드롭다운에 기준정보 관리 등록 모델뿐 아니라 그 제조사로 이미 등록된 자산들의 실제 모델명도 "(기존 자산)" 표시로 함께 표시(버그 수정), "위치"를 자유 텍스트에서 기존 자산 위치 전체를 검색하는 콤보박스로 변경(목록에 없으면 그대로 입력해 새 위치 등록), 등록 화면 가로 폭을 전체 폭에서 약 2/3(최대 980px)로 축소'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;
