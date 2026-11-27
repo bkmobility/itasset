@@ -1,4 +1,4 @@
-/* IT 자산관리시스템 v1.9.45 - 관리자 웹 (정적 페이지, Supabase 연동)
+/* IT 자산관리시스템 v1.9.46 - 관리자 웹 (정적 페이지, Supabase 연동)
    v1.9.15: "IP 관리" 메뉴 1차 — IP 대장(요약/목록/대역 현황), 점검(자동) 계산, 조회 전용 마스킹.
    v1.9.16: "IP 관리" 2차 — RPA PC 탭, 엑셀 내보내기(ExcelJS, 10개 시트, 값만/서식·보호 없음), 요약 도넛차트.
    v1.9.17: IP 요약 도넛 카드 16개(속초사업단·전략채널지원파트·본사직할 제외)로 확장, 대시보드 하단 3칸(소속별 등록 IP 카드 추가),
@@ -443,7 +443,7 @@
     }).join('');
     var soon = ['소프트웨어·라이선스', '수명주기·보증', '신청·승인'].map(function (t) { return '<div class="soon">' + t + '<i>예정</i></div>'; }).join('');
     $app.innerHTML = (DEMO ? '<div class="demo">데모 모드 — 예시 데이터이며 저장되지 않습니다. config.js 에 Supabase 정보를 넣으면 실제 데이터가 표시됩니다.</div>' : '') +
-      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.45</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
+      '<div class="layout"' + (DEMO ? ' style="height:calc(100vh - 26px)"' : '') + '><div class="side"><a class="brand" href="https://bkmobility.github.io/itasset/">IT Asset<span>v1.9.46</span></a><div class="nav">' + nav + '<div class="sep">다음 버전</div>' + soon + '</div></div>' +
       '<div class="main"><div class="top"><div class="gswrap"><input type="search" id="gs" class="gs" autocomplete="off" placeholder="통합 검색 (자산·IP·인사 전체) (Enter)" value="' + esc(F.q) + '"><div class="gsdrop" id="gsdrop" style="display:none"></div></div><a class="btn sm qrtop" href="#/scan" title="자산 QR 스티커 스캔 (모든 전산장비)">▣ QR 스캔</a><div class="sp"></div><div class="who" title="' + esc(adminLabel()) + '">' + whoHtml() + '</div>' + (DEMO ? '' : '<button class="btn sm" id="logout">로그아웃</button>') + '</div><div class="content" id="view">' + (isViewer() ? '<div class="vbanner">조회 전용 계정입니다. 수정·업로드·처리·QR 출력 기능은 사용할 수 없습니다.</div>' : '') + html + '</div></div></div>';
     document.body.classList.toggle('viewer', isViewer());
     var gs = $('#gs'), gsdrop = $('#gsdrop');   // v1.9.31: Frame 28 — 통합 검색(자산·IP·인사 동시 검색) 드롭다운
@@ -1988,6 +1988,30 @@
     $('#setupgo').onclick = go3; $('#setupc').onkeydown = function (e) { if (e.key === 'Enter') go3(); };
     $('#setupc').focus();
   }
+  // v1.9.46: 메인 관리자가 비밀번호를 초기화해준 임시 비밀번호로 로그인한 직후 강제로 뜨는 화면 — 닫기 버튼 없음, 바꾸기 전까지 다른 메뉴로 못 넘어감(start()에서 매번 이 화면으로 되돌림)
+  function pageForcePasswordChange() {
+    $app.innerHTML = '<div class="login"><div class="lgh"><div class="lgt">초기 비밀번호를 변경해주세요</div><div class="lgs">관리자가 발급해준 임시 비밀번호로 로그인하셨습니다.<br>계속 사용하시려면 먼저 새 비밀번호로 바꿔주세요.</div></div>' +
+      '<label>새 비밀번호</label><input type="password" id="fpw1" autocomplete="new-password" placeholder="8자 이상">' +
+      '<label>새 비밀번호 확인</label><input type="password" id="fpw2" autocomplete="new-password" placeholder="다시 한 번">' +
+      '<div style="margin-top:16px"><button class="btn pri" id="fpwgo" style="width:100%;height:36px">비밀번호 변경하고 다시 로그인</button></div>' +
+      '<div class="err" id="fpwer"></div><div class="note" style="margin-top:12px;font-size:11px;text-align:center">변경 전까지는 다른 화면을 사용할 수 없습니다.</div></div>';
+    var busy = false;
+    async function go() {
+      if (busy) return;
+      var p1 = $('#fpw1').value, p2 = $('#fpw2').value; $('#fpwer').textContent = '';
+      if (p1.length < 8) { $('#fpwer').textContent = '새 비밀번호는 8자 이상이어야 합니다.'; return; }
+      if (p1 !== p2) { $('#fpwer').textContent = '새 비밀번호가 서로 다릅니다.'; return; }
+      busy = true; $('#fpwgo').disabled = true;
+      try {
+        await (DEMO ? demoSec('change_password', { new_password: p1 }) : secCall('change_password', { new_password: p1 }));
+        await sb.auth.signOut();
+        pageLogin('비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해주세요.');
+      } catch (e) { busy = false; $('#fpwgo').disabled = false; $('#fpwer').textContent = e.message || '변경에 실패했습니다.'; }
+    }
+    $('#fpwgo').onclick = go;
+    $('#fpw2').onkeydown = function (e) { if (e.key === 'Enter') go(); };
+    $('#fpw1').focus();
+  }
   // ---------- v1.9.4: 관리자 등록 (메인 관리자 전용) ----------
   var ADM = { list: null, demo: null };
   function roleText(r) { return r === 'main' ? '메인 관리자' : r === 'viewer' ? '조회 전용' : '일반 관리자'; }
@@ -2162,7 +2186,7 @@
   }
   var DEMO_MY_IP = '203.0.113.45';   // 데모용 "현재 접속 IP" — 실제로는 서버가 요청 IP를 내려줌
   function demoSec(action, b) {
-    if (action === 'status') return { otp_enabled: !!S.secOtp, otp_count: (S.secOtp ? 1 : 0), telegram_configured: true, geo_block: true, auto_logout_minutes: S.idleMinutes || 30, access_mode: S.accessMode || 'all', access_allowed_ips: S.accessIps || [], your_ip: DEMO_MY_IP };
+    if (action === 'status') return { otp_enabled: !!S.secOtp, otp_count: (S.secOtp ? 1 : 0), telegram_configured: true, geo_block: S.geoBlock != null ? S.geoBlock : true, auto_logout_minutes: S.idleMinutes || 30, access_mode: S.accessMode || 'all', access_allowed_ips: S.accessIps || [], your_ip: DEMO_MY_IP };
     if (action === 'my_status') return { otp_enabled: !!S.secOtp };
     if (action === 'get_logout') return { auto_logout_minutes: S.idleMinutes || 30 };
     if (action === 'set_logout') { S.idleMinutes = Number(b.minutes) || 30; return { ok: true, auto_logout_minutes: S.idleMinutes }; }
@@ -2170,6 +2194,8 @@
     if (action === 'otp_confirm') { if (String(b.code || '') !== '000000') throw new Error('인증 코드가 올바르지 않습니다. (데모에서는 000000 을 입력하세요)'); S.secOtp = true; return { ok: true }; }
     if (action === 'otp_disable') { S.secOtp = false; return { ok: true }; }
     if (action === 'test_telegram') return { ok: true };
+    if (action === 'geo_set') { S.geoBlock = !!b.enabled; return { ok: true, geo_block: S.geoBlock }; }
+    if (action === 'change_password') { if (!b.new_password || b.new_password.length < 8) throw new Error('새 비밀번호는 8자 이상이어야 합니다.'); return { ok: true }; }
     if (action === 'access_set') {
       var mode = b.mode === 'internal_only' ? 'internal_only' : 'all';
       var allowed = (b.allowed_ips || []).map(function (s) { return String(s).trim(); }).filter(Boolean).slice(0, 50);
@@ -2192,7 +2218,7 @@
       '<div class="card seccard"><div class="row"><b>텔레그램 로그인 알림</b>' + (st.telegram_configured ? badge('연결됨', 'ok') : badge('미설정', 'bad')) + '</div><div class="note" style="margin-top:4px">관리자 계정으로 로그인에 성공할 때마다 설정된 텔레그램 방으로 알림을 보냅니다. (서버 환경변수 TELEGRAM_BOT_TOKEN·TELEGRAM_CHAT_ID 설정 필요 — 설치가이드 참고)</div><div style="margin-top:10px"><button class="btn sm" id="sec_tg_test"' + (st.telegram_configured ? '' : ' disabled') + '>테스트 알림 보내기</button></div></div>' +
       '<div class="card seccard"><div class="row"><b>2단계 인증 (OTP)</b>' + (st.otp_enabled ? badge('내 계정 설정됨', 'ok') : badge('내 계정 미설정', 'gray')) + '</div><div class="note" style="margin-top:4px">v1.9.12부터 <b>메인·일반 관리자 누구나</b> 본인 계정에서 켜고 끌 수 있습니다. 일반 관리자는 "관리자" 메뉴에서, 메인 관리자(나)는 여기서 설정합니다. 켜면 로그인 시 OTP 앱의 6자리 코드를 추가로 입력해야 합니다.</div><div style="margin-top:10px;font-size:11.5px;color:#5c5c5c">현재 OTP 적용 계정 <b>' + (st.otp_count != null ? st.otp_count : '-') + '명</b></div><div style="margin-top:10px">' + (st.otp_enabled ? '<button class="btn sm" id="sec_otp_redo">다시 등록 (QR 재발급)</button> <button class="btn sm dng" id="sec_otp_off">해제</button>' : '<button class="btn sm pri" id="sec_otp_on">OTP로 등록</button>') + ' <a href="#/admins" class="btn sm">관리자 목록 보기</a></div></div>' +
       '<div class="card seccard"><div class="row"><b>자동 로그아웃</b>' + badge(st.auto_logout_minutes + '분', 'ok') + '</div><div class="note" style="margin-top:4px">모든 관리자 계정 공통으로 적용됩니다. 화면 조작 없이 선택한 시간이 지나면 자동으로 로그아웃됩니다. 다른 사이트에 갔다가 뒤로가기로 돌아와도 즉시 다시 로그인해야 합니다.</div><div style="margin-top:10px;display:flex;align-items:center;gap:8px"><label class="note">로그아웃까지</label><select id="sec_logout_sel" style="height:30px">' + logoutOpts + '</select><span class="note" id="sec_logout_saved" style="display:none;color:#1e8e3e">저장됨 ✓</span></div></div>' +
-      '<div class="card seccard"><div class="row"><b>해외 접속 차단</b>' + (st.geo_block ? badge('켜짐', 'ok') : badge('꺼짐', 'bad')) + '</div><div class="note" style="margin-top:4px">접속 IP가 대한민국이 아니면 로그인 자체가 차단됩니다. 해외 출장 등 예외가 필요하면 전산지원파트(서버 환경변수 GEO_BLOCK)에서 임시로 꺼야 합니다.</div></div>' +
+      '<div class="card seccard"><div class="row"><b>해외 접속 차단</b><div class="grow"></div><label class="swbtn"><input type="checkbox" id="sec_geo_sw"' + (st.geo_block ? ' checked' : '') + '><span class="swtrack"></span></label></div><div class="note" style="margin-top:4px">접속 IP가 대한민국이 아니면 로그인 자체가 차단됩니다. 해외 출장 등 예외가 필요하면 스위치로 바로 켜고 끌 수 있습니다(서버 재배포 불필요). <b style="color:' + (st.geo_block ? '#1e8e3e' : '#c42b1c') + '">' + (st.geo_block ? '현재 켜짐 — 해외 로그인 차단 중' : '현재 꺼짐 — 모든 국가에서 로그인 가능(주의)') + '</b></div></div>' +
       '<div class="card seccard"><div class="row"><b>접속 범위</b>' + (st.access_mode === 'internal_only' ? badge('내부 접속만 허용', 'ok') : badge('전체 허용', 'gray')) + '</div>' +
       '<div class="note" style="margin-top:4px">"내부 접속만 허용"으로 켜면 아래 허용 목록(VPN 게이트웨이 등 고정 IP·대역)에서만 로그인할 수 있습니다. 그 외 위치(스마트폰·외근 포함)에서는 VPN에 연결해야 로그인됩니다. 192.168.x.x 같은 내부 IP가 아니라 그 네트워크가 인터넷에 나가는 <b>공인 IP(또는 대역)</b>를 등록해야 합니다.</div>' +
       '<div style="margin-top:10px;display:flex;align-items:center;gap:8px"><label class="note">접속 범위</label><select id="sec_acc_mode" style="height:30px"><option value="all"' + (st.access_mode !== 'internal_only' ? ' selected' : '') + '>전체 허용</option><option value="internal_only"' + (st.access_mode === 'internal_only' ? ' selected' : '') + '>내부 접속만 허용</option></select></div>' +
@@ -2202,6 +2228,13 @@
       '</div>' +
       '</div>');
     var tgBtn = $('#sec_tg_test'); if (tgBtn) tgBtn.onclick = async function () { tgBtn.disabled = true; tgBtn.textContent = '보내는 중…'; try { await (DEMO ? demoSec('test_telegram') : secCall('test_telegram')); toast('테스트 알림을 보냈습니다. 텔레그램 방을 확인하세요.'); } catch (e) { fail(e); } tgBtn.disabled = false; tgBtn.textContent = '테스트 알림 보내기'; };
+    var geoSw = $('#sec_geo_sw'); if (geoSw) geoSw.onchange = function () {
+      var want = this.checked, sw = this;
+      if (!want && !confirm('해외 접속 차단을 끄면 전 세계 어디서나 로그인할 수 있게 됩니다. 정말 끄시겠습니까?')) { sw.checked = true; return; }
+      sw.disabled = true;
+      (DEMO ? demoSec('geo_set', { enabled: want }) : secCall('geo_set', { enabled: want })).then(function () { toast(want ? '해외 접속 차단을 켰습니다.' : '해외 접속 차단을 껐습니다.'); pageSecurity(); })
+        .catch(function (e) { sw.checked = !want; sw.disabled = false; fail(e); });
+    };
     var onBtn = $('#sec_otp_on'); if (onBtn) onBtn.onclick = function () { otpSetupDialog(pageSecurity); };
     var redoBtn = $('#sec_otp_redo'); if (redoBtn) redoBtn.onclick = function () { otpSetupDialog(pageSecurity); };
     var offBtn = $('#sec_otp_off'); if (offBtn) offBtn.onclick = async function () {
@@ -2250,13 +2283,30 @@
     if (isMain() || isViewer()) { denyPage(); return; }
     var st; try { st = DEMO ? demoSec('my_status') : await secCall('my_status'); } catch (e) { shell('myaccount', '<h1>내 계정</h1><div class="note" style="color:#c42b1c;margin-top:8px">' + esc(e.message) + '</div>'); return; }
     shell('myaccount', '<h1>내 계정 보안</h1><div class="note" style="margin:4px 0 14px">' + esc(adminLabel()) + ' · 본인 계정에만 적용됩니다</div>' +
-      '<div class="card seccard" style="max-width:520px"><div class="row"><b>2단계 인증 (OTP)</b>' + (st.otp_enabled ? badge('설정됨', 'ok') : badge('미설정', 'gray')) + '</div><div class="note" style="margin-top:4px">켜면 로그인 시 비밀번호 다음에 Google Authenticator 등 OTP 앱의 6자리 코드를 추가로 입력해야 합니다.</div><div style="margin-top:10px">' + (st.otp_enabled ? '<button class="btn sm" id="my_otp_redo">다시 등록 (QR 재발급)</button> <button class="btn sm dng" id="my_otp_off">OTP 해제</button>' : '<button class="btn sm pri" id="my_otp_on">OTP로 등록</button>') + '</div></div>');
+      '<div class="card seccard" style="max-width:520px"><div class="row"><b>2단계 인증 (OTP)</b>' + (st.otp_enabled ? badge('설정됨', 'ok') : badge('미설정', 'gray')) + '</div><div class="note" style="margin-top:4px">켜면 로그인 시 비밀번호 다음에 Google Authenticator 등 OTP 앱의 6자리 코드를 추가로 입력해야 합니다.</div><div style="margin-top:10px">' + (st.otp_enabled ? '<button class="btn sm" id="my_otp_redo">다시 등록 (QR 재발급)</button> <button class="btn sm dng" id="my_otp_off">OTP 해제</button>' : '<button class="btn sm pri" id="my_otp_on">OTP로 등록</button>') + '</div></div>' +
+      '<div class="card seccard" style="max-width:520px;margin-top:12px"><div class="row"><b>비밀번호 변경</b></div><div class="note" style="margin-top:4px">본인 계정의 로그인 비밀번호를 직접 바꿀 수 있습니다. 변경 후에는 안전을 위해 자동으로 로그아웃되며, 새 비밀번호로 다시 로그인해야 합니다.</div>' +
+      '<div style="margin-top:10px"><div class="ms">현재 비밀번호</div><input type="password" id="my_pw_cur" autocomplete="current-password" style="width:100%;margin-bottom:8px">' +
+      '<div class="ms">새 비밀번호</div><input type="password" id="my_pw_new1" autocomplete="new-password" placeholder="8자 이상" style="width:100%;margin-bottom:8px">' +
+      '<div class="ms">새 비밀번호 확인</div><input type="password" id="my_pw_new2" autocomplete="new-password" placeholder="다시 한 번" style="width:100%;margin-bottom:10px">' +
+      '<button class="btn pri sm" id="my_pw_go">비밀번호 변경</button><span class="note" id="my_pw_er" style="margin-left:8px;color:#c42b1c"></span></div></div>');
     var onBtn = $('#my_otp_on'); if (onBtn) onBtn.onclick = function () { otpSetupDialog(pageMyAccount); };
     var redoBtn = $('#my_otp_redo'); if (redoBtn) redoBtn.onclick = function () { otpSetupDialog(pageMyAccount); };
     var offBtn = $('#my_otp_off'); if (offBtn) offBtn.onclick = async function () {
       var code = await askText('2단계 인증 해제', '해제하려면 지금 OTP 앱에 표시된 6자리 코드를 입력하세요.', '', '해제');
       if (code === null) return;
       try { await (DEMO ? demoSec('otp_disable', { code: code }) : secCall('otp_disable', { code: code })); toast('2단계 인증을 해제했습니다.'); pageMyAccount(); } catch (e) { fail(e); }
+    };
+    $('#my_pw_go').onclick = async function () {
+      var cur = $('#my_pw_cur').value, p1 = $('#my_pw_new1').value, p2 = $('#my_pw_new2').value, erEl = $('#my_pw_er'), btn = this;
+      erEl.textContent = '';
+      if (!cur) { erEl.textContent = '현재 비밀번호를 입력하세요.'; return; }
+      if (p1.length < 8) { erEl.textContent = '새 비밀번호는 8자 이상이어야 합니다.'; return; }
+      if (p1 !== p2) { erEl.textContent = '새 비밀번호가 서로 다릅니다.'; return; }
+      btn.disabled = true;
+      try {
+        await (DEMO ? demoSec('change_password', { new_password: p1 }) : secCall('change_password', { current_password: cur, new_password: p1 }));
+        if (!DEMO) await sb.auth.signOut(); pageLogin('비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해주세요.');
+      } catch (e) { btn.disabled = false; erEl.textContent = e.message || '변경에 실패했습니다.'; }
     };
   }
   function otpSetupDialog(onDone) {
@@ -3083,41 +3133,50 @@
     var sm = $('#s_mon'); if (sm) sm.onclick = function () { pickPcMonitor(a, function () { pageScan(arg); }); };
   }
 
-  // ---------- v1.9.44: 기준정보 관리(자산분류·제조사) ----------
+  // ---------- v1.9.44: 기준정보 관리(자산분류·제조사) / v1.9.46: "모델명" 탭 추가(제조사별로 구분 관리) ----------
+  var KINDLBL = { category: '자산분류', manufacturer: '제조사', model: '모델명' };
   function catalogList(kind) { return (S.catalog || []).filter(function (c) { return c.kind === kind; }).map(function (c) { return c.name; }).sort(function (a, b) { return a.localeCompare(b, 'ko'); }); }
-  function catalogUsage(kind, name) {   // 이 분류/제조사를 쓰고 있는 자산 수 (삭제 가드용)
+  function modelList() {   // v1.9.46: 모델명은 제조사와 함께 저장 — 같은 이름이라도 제조사가 다르면 별도 항목
+    return (S.catalog || []).filter(function (c) { return c.kind === 'model'; }).slice().sort(function (a, b) { return (a.maker || '').localeCompare(b.maker || '', 'ko') || a.name.localeCompare(b.name, 'ko'); });
+  }
+  function modelsOf(maker) { return modelList().filter(function (c) { return c.maker === maker; }).map(function (c) { return c.name; }); }
+  function catalogUsage(kind, name, maker) {   // 이 분류/제조사/모델을 쓰고 있는 자산 수 (삭제 가드용)
     if (kind === 'category') return S.assets.filter(function (a) { return a.category === name; }).length;
+    if (kind === 'model') return S.assets.filter(function (a) { return a.model === name && a.manufacturer === maker; }).length;
     return S.assets.filter(function (a) { return a.manufacturer === name; }).length;
   }
+  function catalogTarget(row) { return KINDLBL[row.kind] + ' ' + (row.kind === 'model' ? (row.maker || '') + ' ' + row.name : row.name); }
   async function dbCatalogSave(row, patch) {
     needWrite();
     if (row) {
-      audCtx({ table: 'asset_catalog', target: (row.kind === 'category' ? '자산분류' : '제조사') + ' ' + row.name, summary: (row.kind === 'category' ? '자산분류' : '제조사') + ' "' + row.name + '" → "' + patch.name + '"로 이름 변경' });
+      audCtx({ table: 'asset_catalog', target: catalogTarget(row), summary: KINDLBL[row.kind] + ' "' + (row.kind === 'model' ? (row.maker || '') + ' ' : '') + row.name + '" → "' + patch.name + '"로 이름 변경' });
       if (!DEMO) { var r = await sb.from('asset_catalog').update(patch).eq('id', row.id); if (r.error) throw r.error; }
       Object.assign(row, patch);
     } else {
-      audCtx({ table: 'asset_catalog', target: (patch.kind === 'category' ? '자산분류' : '제조사') + ' ' + patch.name, summary: (patch.kind === 'category' ? '자산분류' : '제조사') + ' "' + patch.name + '" 추가' });
+      audCtx({ table: 'asset_catalog', target: catalogTarget(patch), summary: KINDLBL[patch.kind] + ' "' + (patch.kind === 'model' ? (patch.maker || '') + ' ' : '') + patch.name + '" 추가' });
       if (!DEMO) { var r2 = await sb.from('asset_catalog').insert(patch).select().single(); if (r2.error) throw r2.error; S.catalog.push(r2.data); }
       else { patch.id = (S.catalog.reduce(function (m, x) { return Math.max(m, x.id); }, 0) || 0) + 1; S.catalog.push(patch); }
     }
   }
   async function dbCatalogDelete(row) {
     needWrite();
-    audCtx({ table: 'asset_catalog', action: 'delete', target: (row.kind === 'category' ? '자산분류' : '제조사') + ' ' + row.name, summary: (row.kind === 'category' ? '자산분류' : '제조사') + ' "' + row.name + '" 삭제' });
+    audCtx({ table: 'asset_catalog', action: 'delete', target: catalogTarget(row), summary: KINDLBL[row.kind] + ' "' + (row.kind === 'model' ? (row.maker || '') + ' ' : '') + row.name + '" 삭제' });
     if (!DEMO) { var r = await sb.from('asset_catalog').delete().eq('id', row.id); if (r.error) throw r.error; }
     S.catalog = S.catalog.filter(function (x) { return x.id !== row.id; });
   }
+  var CATTABS = [['manufacturer', '제조사'], ['category', '자산분류'], ['model', '모델명']];   // v1.9.46: 제조사 → 자산분류 → 모델명 순서
   function pageCatalog(arg) {
     if (!isMain()) { denyPage(); return; }
-    var kind = (arg === 'manufacturer') ? 'manufacturer' : 'category';
-    var label = kind === 'category' ? '자산분류' : '제조사';
+    var kind = ['manufacturer', 'category', 'model'].indexOf(arg) >= 0 ? arg : 'manufacturer';
+    var label = KINDLBL[kind];
+    var tabsHtml = '<div class="tabs">' + CATTABS.map(function (t) { return '<a href="#/catalog/' + t[0] + '" class="' + (kind === t[0] ? 'on' : '') + '">' + t[1] + '</a>'; }).join('') + '</div>';
+    if (kind === 'model') { pageCatalogModel(tabsHtml); return; }
     var items = (S.catalog || []).filter(function (c) { return c.kind === kind; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
     var rows = items.map(function (c) {
       var n = catalogUsage(kind, c.name);
       return '<tr><td>' + esc(c.name) + '</td><td>' + (n ? n.toLocaleString() + '건 사용 중' : '<span class="note">사용 안 함</span>') + '</td><td><a href="#" data-ren="' + c.id + '">이름 변경</a> · <a href="#" data-del="' + c.id + '" style="color:#c42b1c">삭제</a></td></tr>';
     }).join('') || '<tr><td colspan="3" class="note" style="padding:20px;text-align:center">등록된 ' + label + '이(가) 없습니다.</td></tr>';
-    shell('catalog', '<h1>기준정보 관리</h1>' +
-      '<div class="tabs"><a href="#/catalog/category" class="' + (kind === 'category' ? 'on' : '') + '">자산분류</a><a href="#/catalog/manufacturer" class="' + (kind === 'manufacturer' ? 'on' : '') + '">제조사</a></div>' +
+    shell('catalog', '<h1>기준정보 관리</h1>' + tabsHtml +
       '<div class="note" style="margin:10px 0">여기서 추가·수정한 ' + label + '은 "자산 직접 등록" 화면의 자동완성 목록에 함께 뜹니다. 이미 자산에서 쓰이고 있는 항목은 삭제해도 그 자산들의 값은 그대로 남고(목록에서만 빠짐), 잘못 지웠다면 다시 추가하면 됩니다.</div>' +
       '<div class="row wrap" style="margin-bottom:10px"><input type="text" id="cat_new" placeholder="새 ' + label + ' 이름" style="width:220px"><button class="btn pri" id="cat_add" type="button">추가</button></div>' +
       '<table class="tbl"><thead><tr><th>' + label + '</th><th>사용 현황</th><th>관리</th></tr></thead><tbody>' + rows + '</tbody></table>');
@@ -3139,6 +3198,39 @@
         var n = catalogUsage(kind, row.name);
         if (!confirm((n ? '지금 ' + n + '건의 자산에서 쓰이고 있는 ' + label + '입니다.\n' : '') + '"' + row.name + '"을(를) 목록에서 삭제할까요? (이미 등록된 자산의 값은 바뀌지 않습니다)')) return;
         dbCatalogDelete(row).then(function () { toast('삭제했습니다.'); pageCatalog(kind); }).catch(fail);
+      };
+    });
+  }
+  // v1.9.46: 모델명 탭 — 제조사를 먼저 고르고 그 제조사의 모델명을 추가·관리. 같은 모델명이라도 제조사가 다르면 별도 항목으로 관리됩니다(예: DELL의 S275DS / LG전자의 S275DS).
+  function pageCatalogModel(tabsHtml) {
+    var makers = catalogList('manufacturer');
+    var items = modelList();
+    var rows = items.map(function (c) {
+      var n = catalogUsage('model', c.name, c.maker);
+      return '<tr><td>' + esc(c.name) + '</td><td><span class="badge b-gray">' + esc(c.maker || '(제조사 미지정)') + '</span></td><td>' + (n ? n.toLocaleString() + '건 사용 중' : '<span class="note">사용 안 함</span>') + '</td><td><a href="#" data-ren="' + c.id + '">이름 변경</a> · <a href="#" data-del="' + c.id + '" style="color:#c42b1c">삭제</a></td></tr>';
+    }).join('') || '<tr><td colspan="4" class="note" style="padding:20px;text-align:center">등록된 모델명이 없습니다.</td></tr>';
+    shell('catalog', '<h1>기준정보 관리</h1>' + tabsHtml +
+      '<div class="note" style="margin:10px 0">여기서 추가한 모델명은 "자산 직접 등록" 화면의 모델명 드롭다운(선택한 제조사에 맞는 것만)에 뜹니다. 모델명은 제조사와 연결되어 있어서, 같은 이름이라도 DELL의 S275DS와 LG전자의 S275DS를 구분해서 관리합니다.' + (makers.length ? '' : ' <b style="color:#c42b1c">먼저 "제조사" 탭에서 제조사를 등록해야 모델을 추가할 수 있습니다.</b>') + '</div>' +
+      '<div class="row wrap" style="margin-bottom:10px"><select id="catm_maker" style="width:180px"' + (makers.length ? '' : ' disabled') + '>' + (makers.length ? makers.map(function (m) { return '<option>' + esc(m) + '</option>'; }).join('') : '<option>제조사 없음</option>') + '</select><input type="text" id="catm_new" placeholder="새 모델명 (예: S275DS)" style="width:220px"' + (makers.length ? '' : ' disabled') + '><button class="btn pri" id="catm_add" type="button"' + (makers.length ? '' : ' disabled') + '>추가</button></div>' +
+      '<table class="tbl"><thead><tr><th>모델명</th><th>제조사</th><th>사용 현황</th><th>관리</th></tr></thead><tbody>' + rows + '</tbody></table>');
+    $('#catm_add').onclick = async function () {
+      var maker = $('#catm_maker').value, name = $('#catm_new').value.trim(); if (!name) return;
+      if (items.some(function (c) { return c.maker === maker && c.name === name; })) { toast('이미 있는 모델명입니다(' + maker + ').'); return; }
+      try { await dbCatalogSave(null, { kind: 'model', maker: maker, name: name }); toast('추가했습니다.'); pageCatalog('model'); } catch (e) { fail(e); }
+    };
+    $$('a[data-ren]').forEach(function (a) {
+      a.onclick = function (e) {
+        e.preventDefault(); var row = items.filter(function (c) { return String(c.id) === a.getAttribute('data-ren'); })[0]; if (!row) return;
+        var nv = prompt('모델명 이름 변경(' + row.maker + ')', row.name); if (!nv || !nv.trim() || nv.trim() === row.name) return;
+        dbCatalogSave(row, { name: nv.trim() }).then(function () { toast('변경했습니다.'); pageCatalog('model'); }).catch(fail);
+      };
+    });
+    $$('a[data-del]').forEach(function (a) {
+      a.onclick = function (e) {
+        e.preventDefault(); var row = items.filter(function (c) { return String(c.id) === a.getAttribute('data-del'); })[0]; if (!row) return;
+        var n = catalogUsage('model', row.name, row.maker);
+        if (!confirm((n ? '지금 ' + n + '건의 자산에서 쓰이고 있는 모델입니다.\n' : '') + '"' + row.maker + ' ' + row.name + '"을(를) 목록에서 삭제할까요? (이미 등록된 자산의 값은 바뀌지 않습니다)')) return;
+        dbCatalogDelete(row).then(function () { toast('삭제했습니다.'); pageCatalog('model'); }).catch(fail);
       };
     });
   }
@@ -3168,7 +3260,7 @@
     function inp(id, ph, type, w) { return '<input type="' + (type || 'text') + '" id="n_' + id + '" placeholder="' + (ph || '') + '" autocomplete="off"' + (w ? ' style="width:' + w + '"' : '') + '>'; }
     var form = fr('category', '자산분류', '<input type="text" id="n_category" list="n_cats" placeholder="예: 모니터" autocomplete="off"><datalist id="n_cats">' + cats.map(function (c) { return '<option value="' + esc(c) + '">'; }).join('') + '</datalist>', true, '고르거나 직접 입력합니다. 선택하면 관리번호가 자동으로 정해집니다') +
       fr('asset_no', '관리번호', '<input type="text" id="n_asset_no" class="mono" placeholder="분류를 선택하면 자동 부여" autocomplete="off" style="background:#f2f8fe;color:#0f6cbd;font-weight:700">', true, '분류·제조년도·다음 번호가 자동으로 붙습니다. 필요하면 직접 고칠 수 있고, 이미 있는 번호는 저장되지 않습니다') +
-      fr('manufacturer', '제조사', '<input type="text" id="n_manufacturer" list="n_makers" placeholder="예: DELL" autocomplete="off"><datalist id="n_makers">' + makers.map(function (m) { return '<option value="' + esc(m) + '">'; }).join('') + '</datalist>', true, '고르거나 직접 입력합니다') + fr('model', '모델명', inp('model', '예: S275DS'), true) +
+      fr('manufacturer', '제조사', '<input type="text" id="n_manufacturer" list="n_makers" placeholder="예: DELL" autocomplete="off"><datalist id="n_makers">' + makers.map(function (m) { return '<option value="' + esc(m) + '">'; }).join('') + '</datalist>', true, '고르거나 직접 입력합니다') + fr('model', '모델명', '<select id="n_model"></select>', true, '기준정보 관리에 등록된 모델만 고를 수 있습니다(제조사를 고르면 그 제조사의 모델만 보입니다)') +
       fr('mfg_ym', '제조년월', inp('mfg_ym', '예: 2025-01', 'text', '180px'), false, '입력하면 보증(제조년월+5년)이 자동 계산됩니다') +
       fr('status', '자산상태', '<select id="n_status">' + stats.map(function (t) { return '<option' + (t === '사용중' ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>', true) +
       fr('user_id', '사용자 ID', inp('user_id', '사번을 입력하면 아래가 자동으로 채워집니다', 'text', '260px'), false, '') +
@@ -3184,6 +3276,29 @@
     function autoNo() { if (edited) return; var no = nextAssetNo(V('category'), V('mfg_ym')); $('#n_asset_no').value = no; $('#h_asset_no').textContent = no ? '분류·제조년도·다음 번호가 자동으로 붙습니다. 필요하면 직접 고칠 수 있고, 이미 있는 번호는 저장되지 않습니다' : '이 분류의 관리번호 규칙을 알 수 없습니다. 관리번호를 직접 입력하세요'; }
     $('#n_category').oninput = autoNo; $('#n_category').onchange = autoNo; $('#n_mfg_ym').oninput = autoNo;
     $('#n_asset_no').oninput = function () { edited = true; };
+    // v1.9.46: 모델명 드롭다운 — 제조사를 고르면(또는 직접 입력하면) 그 제조사에 기준정보 관리에 등록된 모델만 보여줌. 제조사를 아직 안 골랐으면 전체 모델 목록
+    function modelOptionsHtml(maker) {
+      var list = maker ? modelsOf(maker) : (function () { var seen = {}, out = []; modelList().forEach(function (c) { if (!seen[c.name]) { seen[c.name] = 1; out.push(c.name); } }); return out; })();
+      var opts = '<option value="">고르세요</option>';
+      if (maker && !list.length) opts += '<option value="__none__">등록된 모델이 없습니다 — 기준정보 관리에서 먼저 등록해주세요</option>';
+      else opts += list.map(function (m) { return '<option value="' + esc(m) + '">' + esc(m) + '</option>'; }).join('');
+      return opts;
+    }
+    function modelMissingDialog(maker) {
+      var d = openModal('<div class="mh"><b>등록된 모델이 없습니다</b><button class="mx" type="button">✕</button></div>' +
+        '<div class="note" style="margin-bottom:14px">선택하신 제조사(<b>' + esc(maker || '') + '</b>)에 등록된 모델이 없거나, 원하시는 모델이 목록에 없습니다. 먼저 <b>기준정보 관리 → 모델명</b>에서 해당 모델을 등록해주세요.</div>' +
+        '<div class="mf"><button class="btn" id="mm_close" type="button">닫기</button><button class="btn pri" id="mm_go" type="button">기준정보 관리로 이동</button></div>', 420);
+      $('#mm_close', d.d).onclick = d.close;
+      $('#mm_go', d.d).onclick = function () { d.close(); location.hash = '#/catalog/model'; };
+    }
+    function refreshModelOptions() {
+      var maker = V('manufacturer'), sel = $('#n_model'), cur = sel.value;
+      sel.innerHTML = modelOptionsHtml(maker);
+      if (cur && $$('option', sel).some(function (o) { return o.value === cur; })) sel.value = cur;
+    }
+    refreshModelOptions();
+    $('#n_manufacturer').oninput = refreshModelOptions; $('#n_manufacturer').onchange = refreshModelOptions;
+    $('#n_model').onchange = function () { if (this.value === '__none__') { this.value = ''; modelMissingDialog(V('manufacturer')); } };
     $('#n_user_id').oninput = function () {   // 값만 채우므로 입력 중인 칸은 다시 그리지 않음 (한글 입력 안전)
       var e = S.empBy[V('user_id').toUpperCase()] || S.empBy[V('user_id')], h = $('#h_user_id');
       if (e) { $('#n_user_name').value = e.name || ''; $('#n_dept').value = e.dept || ''; $('#n_title').value = e.title || ''; h.innerHTML = '<span style="background:#e6f4ea;color:#1e8e3e;border-radius:4px;padding:2px 8px">인사 정보 일치: ' + esc((e.name || '') + ' · ' + (e.dept || '') + ' · ' + (e.title || '')) + ' (자동 입력)</span>'; }
@@ -3587,12 +3702,13 @@
         var s = await sb.auth.getSession();
         if (!s.data.session) { pageLogin(); return; }
         S.user = s.data.session.user;
-        var adm = await sb.from('admin_users').select('user_id,sabun,role,active,name,dept').eq('user_id', S.user.id).maybeSingle();
+        var adm = await sb.from('admin_users').select('user_id,sabun,role,active,name,dept,must_change_password').eq('user_id', S.user.id).maybeSingle();
         if (adm.error) { adm = await sb.from('admin_users').select('user_id').eq('user_id', S.user.id).maybeSingle(); if (adm.data) { adm.data.role = 'main'; adm.data.active = true; } }   // v1.9.4 SQL 실행 전에도 기존 관리자는 동작
         S.me = adm.data || null;
         if (!adm.data) { await sb.auth.signOut(); pageLogin('관리자 권한이 없는 계정입니다. 메인 관리자에게 등록을 요청하세요.'); return; }
         if (adm.data.active === false) { await sb.auth.signOut(); pageLogin('사용이 중지된 계정입니다. 전산지원파트로 문의하세요.'); return; }
         if (!adm.data.role) adm.data.role = 'admin';
+        if (adm.data.must_change_password) { pageForcePasswordChange(); return; }   // v1.9.46: 초기 비밀번호 강제 변경 전까지는 다른 화면 진입 차단
       }
       if (DEMO) S.me = { sabun: '99999012', role: params.get('role') || 'main', name: '배병욱', dept: '전산지원파트', title: '파트장' };
       $app.innerHTML = '<div style="padding:40px;text-align:center;color:#5c5c5c">불러오는 중…</div>';
@@ -4219,26 +4335,41 @@
   // (노션 자동 동기화는 아직 연결되지 않음 — Notion 통합 토큰 설정 후 별도 작업 필요. 지금은 2026-11-27 내보내기 기준 수동 관리 목록)
   // =====================================================================
   function vpnBandLabel(b) { if (!b) return '—'; return /^\d+$/.test(b) ? ('192.168.' + b) : String(b); }   // v1.9.45: 저장된 값은 대역 끝자리 숫자만 — 화면엔 "192.168.N" 전체로 표시
+  function vpnBandKey(b) {   // v1.9.46: 대역을 "A.B.C" 전체 문자열로 저장하므로, 옥텟 3개를 모두 반영해 정렬 — 끝자리만 보던 이전 방식은 172.x 대역과 192.168.x 대역이 같은 숫자로 뒤섞이는 문제가 있었음
+    if (!b) return null;
+    var p = String(b).split('.');
+    if (p.length === 1) p = ['192', '168', p[0]];   // 과거 끝자리 숫자만 저장된 값이 남아있을 경우의 대비
+    if (isNaN(parseInt(p[0], 10))) return null;
+    var a = parseInt(p[0], 10) || 0, c = parseInt(p[1], 10) || 0, d = parseInt(p[2], 10) || 0;
+    return a * 1000000 + c * 1000 + d;
+  }
   function vpnFilterList() {
     var q = (VPNF.q || '').toLowerCase();
     var list = (S.vpnDevices || []).slice();
     if (q) list = list.filter(function (r) { return [r.band, r.site_name, r.maker, r.model, r.public_ip, r.serial_no, r.note].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; }); });
-    return list.sort(function (a, b) { var x = parseInt(a.band, 10), y = parseInt(b.band, 10); if (isNaN(x) && isNaN(y)) return (a.site_name || '').localeCompare(b.site_name || '', 'ko'); if (isNaN(x)) return 1; if (isNaN(y)) return -1; return x - y; });
+    return list.sort(function (a, b) { var x = vpnBandKey(a.band), y = vpnBandKey(b.band); if (x == null && y == null) return (a.site_name || '').localeCompare(b.site_name || '', 'ko'); if (x == null) return 1; if (y == null) return -1; return x - y; });
   }
   var VPNF = { q: '' };
-  function pageIpVpn() {
-    var list = vpnFilterList();
+  function vpnListInner(list) {
     var rows = list.map(function (r, i) {
       return '<tr class="clk" data-id="' + r.id + '"><td>' + (i + 1) + '</td><td class="mono">' + vpnBandLabel(r.band) + '</td><td>' + (r.site_name ? esc(r.site_name) : '<span class="note">(미배정)</span>') + '</td><td>' + esc(r.maker || '') + '</td><td>' + esc(r.model || '') + '</td><td>' + esc(r.firmware || '') + '</td><td class="mono">' + esc(r.public_ip || '') + '</td><td class="mono">' + esc(r.serial_no || '') + '</td><td>' + esc(r.note || '') + '</td></tr>';
     }).join('') || '<tr><td colspan="9" class="note" style="padding:24px;text-align:center">등록된 VPN 장비가 없습니다.</td></tr>';
+    return '<div style="overflow:auto;margin-top:10px"><table class="tbl"><thead><tr><th>번호</th><th>IP 대역</th><th>본사·본부·사업단명</th><th>제조사명</th><th>장비명</th><th>펌웨어 Ver</th><th>공인 IP</th><th>S/N</th><th>비고</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+  function vpnBindRows() {
+    $$('tr.clk', $('#vpnlist')).forEach(function (tr) { tr.onclick = function () { var r = (S.vpnDevices || []).filter(function (x) { return String(x.id) === tr.dataset.id; })[0]; if (r) vpnDialog(r); }; });
+  }
+  function pageIpVpn(partial) {   // v1.9.46: 검색창에 입력할 때마다 화면 전체를 다시 그려 입력창 포커스가 끊기던 문제 수정 — 목록 부분(#vpnlist)만 갱신
+    var list = vpnFilterList();
+    if (partial && $('#vpnlist')) { $('#vpnlist').innerHTML = vpnListInner(list); vpnBindRows(); return; }
     shell('ip', '<h1>IP 관리</h1>' + ipTabs('vpn') +
       '<div class="note" style="margin:10px 0;background:#eafaf0;border-left:3px solid #1e8e3e;color:#1b5e30;padding:8px 12px">노션 "A+에셋 VPN 설치 현황(와치가드/어울림)" 내보내기(2026-11-27)로 ' + list.length.toLocaleString() + '건을 최초 적재했습니다. <b>자동 동기화는 아직 연결 전</b>입니다 — Notion 통합 토큰을 발급해 주시면 주기적 자동 동기화를 연결하겠습니다. 그 전까지는 이 목록에서 직접 추가·수정·삭제하세요(여기서 고친 항목은 수정 화면에서 "직접 수정됨"으로 표시되어, 나중에 자동 동기화를 연결해도 덮어쓰지 않습니다).</div>' +
       '<div class="row wrap"><input type="text" id="vpnq" placeholder="검색 (대역·사업단명·제조사·공인IP·S/N 등)" style="width:280px" value="' + esc(VPNF.q) + '"><div class="grow"></div><button class="btn" id="vpnsync" type="button">지금 동기화</button><button class="btn pri wonly" id="vpnnew" type="button">＋ VPN 장비 추가</button></div>' +
-      '<div style="overflow:auto;margin-top:10px"><table class="tbl"><thead><tr><th>번호</th><th>IP 대역</th><th>본사·본부·사업단명</th><th>제조사명</th><th>장비명</th><th>펌웨어 Ver</th><th>공인 IP</th><th>S/N</th><th>비고</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
-    $('#vpnq').oninput = function () { VPNF.q = this.value; pageIpVpn(); };
+      '<div id="vpnlist">' + vpnListInner(list) + '</div>');
+    $('#vpnq').oninput = function () { VPNF.q = this.value; pageIpVpn(true); };
     $('#vpnnew').onclick = function () { vpnDialog(null); };
     $('#vpnsync').onclick = function () { toast('아직 Notion 자동 동기화가 설정되지 않았습니다. Notion 통합 토큰을 연결하면 이 버튼으로 바로 가져올 수 있게 만들어 드리겠습니다.'); };
-    $$('tr.clk', $('#view')).forEach(function (tr) { tr.onclick = function () { var r = (S.vpnDevices || []).filter(function (x) { return String(x.id) === tr.dataset.id; })[0]; if (r) vpnDialog(r); }; });
+    vpnBindRows();
   }
   var VPNFLBL = { band: '대역', site_name: '본사·본부·사업단명', maker: '제조사명', model: '장비명', firmware: '펌웨어 Ver', public_ip: '공인 IP', note: '비고', serial_no: 'S/N', device_type: '장비종류', eol_date: 'EOL날짜' };
   async function dbVpnSave(row, patch) {
@@ -4268,17 +4399,19 @@
     var inp2 = function (id, val, w) { return '<input type="text" id="vp_' + id + '" value="' + esc(val || '') + '" style="width:' + (w || '100%') + '">'; };
     var d = openModal('<div class="mh"><b>' + (row ? 'VPN 장비 수정' : 'VPN 장비 추가') + '</b><button class="mx" type="button">✕</button></div>' +
       (row && row.source === 'notion' ? '<div class="note" style="background:#fff8e1;color:#7a5b00;padding:6px 10px;border-radius:6px;margin-bottom:8px">이 항목은 노션에서 가져온 값입니다. 저장하면 "직접 수정됨"으로 표시되고, 앞으로의 자동 동기화에서 이 항목은 건너뜁니다.</div>' : '') +
-      '<div class="row wrap"><div style="flex:1"><div class="ms">대역 (숫자만, 예: 101)</div>' + inp2('band', v.band) + '</div><div style="flex:2"><div class="ms">본사·본부·사업단명</div>' + inp2('site_name', v.site_name) + '</div></div>' +
-      '<div class="row wrap" style="margin-top:8px"><div style="flex:1"><div class="ms">제조사명</div>' + inp2('maker', v.maker) + '</div><div style="flex:1"><div class="ms">장비명(모델)</div>' + inp2('model', v.model) + '</div><div style="flex:1"><div class="ms">펌웨어 Ver</div>' + inp2('firmware', v.firmware) + '</div></div>' +
+      '<div class="row wrap"><div style="flex:1"><div class="ms">대역 (예: 192.168.5 또는 172.31.0)</div>' + inp2('band', v.band) + '</div><div style="flex:1"><div class="ms">본사·본부·사업단명</div>' + inp2('site_name', v.site_name) + '</div></div>' +
+      '<div class="row wrap" style="margin-top:8px"><div style="flex:1"><div class="ms">제조사명</div>' + inp2('maker', v.maker) + '</div><div style="flex:1"><div class="ms">장비명(모델)</div>' + inp2('model', v.model) + '</div></div>' +
       '<div class="row wrap" style="margin-top:8px"><div style="flex:1"><div class="ms">공인 IP</div>' + inp2('public_ip', v.public_ip) + '</div><div style="flex:1"><div class="ms">S/N</div>' + inp2('serial_no', v.serial_no) + '</div></div>' +
-      '<div class="row wrap" style="margin-top:8px"><div style="flex:1"><div class="ms">장비종류</div>' + inp2('device_type', v.device_type) + '</div><div style="flex:1"><div class="ms">EOL날짜</div>' + inp2('eol_date', v.eol_date) + '</div></div>' +
+      '<div class="row wrap" style="margin-top:8px"><div style="flex:1"><div class="ms">펌웨어 Ver</div>' + inp2('firmware', v.firmware) + '</div><div style="flex:1"><div class="ms">EOL날짜</div>' + inp2('eol_date', v.eol_date) + '</div></div>' +
       '<div class="ms" style="margin-top:8px">비고</div><textarea id="vp_note" rows="2" style="width:100%;box-sizing:border-box">' + esc(v.note || '') + '</textarea>' +
       '<div class="mf">' + (row ? '<button class="btn dng" id="vp_del" type="button" style="margin-right:auto">삭제</button>' : '') + '<button class="btn" id="vp_cancel" type="button">취소</button><button class="btn pri" id="vp_ok" type="button">저장</button></div>', 480);
     $('#vp_cancel', d.d).onclick = d.close;
     var delB = $('#vp_del', d.d); if (delB) delB.onclick = function () { if (!confirm('이 VPN 장비(' + (row.site_name || '') + ')를 삭제할까요?')) return; dbVpnDelete(row).then(function () { d.close(); toast('삭제했습니다.'); pageIpVpn(); }).catch(fail); };
     $('#vp_ok', d.d).onclick = async function () {
       var g = function (id) { return $('#vp_' + id, d.d).value.trim(); };
-      var patch = { band: g('band') || null, site_name: g('site_name'), maker: g('maker') || null, model: g('model') || null, firmware: g('firmware') || null, public_ip: g('public_ip') || null, serial_no: g('serial_no') || null, device_type: g('device_type') || null, eol_date: g('eol_date') || null, note: g('note') || null };
+      var bandVal = g('band');
+      if (bandVal && !/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(bandVal)) { toast('대역은 "192.168.5"처럼 점(.)으로 구분된 3자리 형식으로 입력하세요(예: 172.31.0).'); return; }
+      var patch = { band: bandVal || null, site_name: g('site_name'), maker: g('maker') || null, model: g('model') || null, firmware: g('firmware') || null, public_ip: g('public_ip') || null, serial_no: g('serial_no') || null, eol_date: g('eol_date') || null, note: g('note') || null };
       if (!patch.site_name) { toast('본사·본부·사업단명은 꼭 입력해야 합니다.'); return; }
       this.disabled = true;
       try { await dbVpnSave(row, patch); d.close(); toast('저장했습니다.'); pageIpVpn(); } catch (e) { this.disabled = false; fail(e); }
@@ -4549,7 +4682,7 @@
   function xSheetGuide(wb) {
     var ws = wb.addWorksheet('사용안내', { views: [{ showGridLines: false }] });
     ws.getColumn(1).width = 3; ws.getColumn(2).width = 26; ws.getColumn(3).width = 96;
-    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.45', 20);
+    xTitle(ws, 'B2', 'IP 관리 시스템 v1.9.46', 20);
     xSub(ws, 'B3', '전국 사업본부·사업단 IP 통합 관리 · ' + ymd(new Date()) + ' 기준 데이터 (엑셀 내보내기 스냅샷)');
     var guide = [
       ['핵심 규칙', '입력은 관리자 웹의 [IP 관리] 메뉴에서만 합니다. 이 엑셀 파일은 내보낸 시점의 스냅샷이며, 여기서 고쳐도 시스템에는 반영되지 않습니다.'],
@@ -4561,7 +4694,7 @@
       ['자리배치도(이 파일 안에서만)', '자리_익성3·4·5층 시트는 내보낸 시점의 "자리" 값을 기준으로 자동 생성됩니다. 웹 화면에는 자리배치도가 없습니다.'],
       ['색 의미', '초록=정상 · 빨강=중복 · 노랑=확인 필요 · 주황=회수 예정 · 파랑=예약 · 회색=회의실/장비 · 연회색=공석/미기재'],
       ['조회 전용 계정', '뷰어(조회 전용) 권한은 IP의 3·4번째 자리가 가려진 상태로 내보내기됩니다.'],
-      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경 · v1.9.37 대시보드 하단 "PC 수집 현황" 카드를 "소속별 등록 IP"·"VPN 대역 모니터링"(요약 탭과 동일한 순환 카드)로 교체, "VPN 대역 핑 모니터링" 카드명을 "VPN 대역 모니터링"으로 간소화, 전환 주기 입력이 줄바꿈되던 문제 수정 및 이전·일시정지/재생·다음 아이콘을 정사각 중앙정렬 SVG로 교체 · v1.9.38 VPN 대역 모니터링 카드의 페이지 점(dot) 표시 제거, 표를 고정 폭(소속이 길어도 카드 틀이 흔들리지 않도록)으로 변경, 이전·일시정지/재생·다음 아이콘을 좌우 대칭으로 다시 그려 중앙정렬 개선 · v1.9.39 "VPN 대역 모니터링"을 "VPN 모니터링"으로 명칭 축약, 카드 열 너비 재배분 및 "핑 대상 IP"→"대상 IP"로 한 줄 표시, 정상/장애(응답없음) 집계 알약 추가(장애 알약을 누르면 장애만 모아보기), 이전·일시정지/재생·다음 아이콘을 더 뚜렷하게 구별되도록 교체, 원격 지원 "원격 접속 열기"를 "원격 지원 실행"으로 변경하고 제목 옆에 상시 실행 버튼 추가, 원격 지원 목록에 체크박스·선택 삭제·전체 삭제 추가, 월별 자산 현황에 회사·부서 드롭다운 추가(선택 기준으로 수량·그래프·표 재계산), 기간별 자산 변동 필터 순서를 회사→부서→분류로 재배치하고 회사 드롭다운 신규 추가 · v1.9.40 "장애 처리" 기능 신설(db/update_v1.9.40.sql 실행 필요) — 접수 등록 화면, 접수대기/진행중/완료/반려 탭과 상태 변경 모달(담당자 지정·처리 내용), 체크박스 선택/전체 삭제, 대시보드에 KPI·알약 카드 추가, 보고서에 "장애 처리 현황"(기간·회사·부서·분류·상태 필터) 신설, 사이드바에 신규 메뉴 배치(현황 점검 아래·원격 지원 위) 및 실사·인사 정보 순서 교체, VPN 모니터링 카드를 제목·알약·이전/재생/다음·전환주기·적용 버튼까지 한 줄로 정리("갱신 n분 적용"), 대역 현황에 VPN 핑 대상 해제 버튼과 체크박스 선택 해제·전체 소속 일괄 해제 추가, 사이드바 디자인을 체크박스형 아이콘에서 메뉴별 라인아이콘 + 둥근 액티브 하이라이트로 개선 · v1.9.41 대시보드에서 "최근 활동" 카드 삭제, 카드 레이아웃을 1번째 줄 부서별 자산 수·소속별 등록 IP·보증 만료·교체 알림(표 형태 그대로) 3칸, 2번째 줄 VPN 모니터링·장애 처리 현황 2칸으로 재배치 · v1.9.42 대시보드 "회사별 자산" 카드 하단의 "회사를 누르면 바뀝니다 · 상세 보기" 문구를 제목 오른쪽으로 이동, 옆의 자산 유형·자산 상태 카드가 "회사별 자산" 카드 높이에 맞춰 늘어나며 생기던 빈 여백을 제거(세 카드 모두 내용물 높이만큼만 차지) · v1.9.43 대시보드 "회사별 자산"·"자산 유형"·"자산 상태" 3개 카드의 세로 높이를 완전히 동일하게 정렬(내용은 각 카드 안에서 세로 중앙 정렬), 카드 줄 순서를 VPN 모니터링·장애 처리 현황(위) → 부서별 자산 수·소속별 등록 IP·보증 만료 교체 알림(아래)으로 변경 · v1.9.44 IP 추가·수정 창의 "조직명"을 검색형 콤보박스로 변경(IP 대장 필터와 동일 방식), 자산 직접 등록의 "제조사"를 자산분류처럼 고르거나 직접 입력하는 방식으로 변경, "회사"를 필수 선택(빨간 *, "선택 안 함" 제거)으로 변경, 관리자 메뉴 아래 "기준정보 관리" 신설(자산분류·제조사 추가·이름변경·삭제, db/update_v1.9.44.sql 실행 필요), IP 관리에 "VPN 장비 현황" 탭 신설(대역 현황과 RPA PC 사이 — 제조사·장비명·펌웨어·공인IP·S/N·EOL 등 관리, 노션 내보내기 274건 최초 적재, 자동 동기화는 미연결) · v1.9.45 VPN 장비 현황 표 열 순서/구성 수정 — 맨 앞에 "번호"(행 순번) 열 추가, "IP 대역"을 끝자리 숫자가 아닌 "192.168.N" 전체 형태로 표시, "장비종류·EOL날짜·출처" 열 제거, "S/N"과 "비고" 순서 교체(S/N을 비고보다 앞으로)'],
+      ['버전 이력', 'v1.9.15 IP 관리 1차(요약/IP 대장/대역 현황, 점검 자동계산) · v1.9.16 2차(RPA PC 탭, 엑셀 내보내기 10개 시트 — 수식/드롭다운/조건서식/시트보호 없이 값만 제공) · v1.9.17 3차(요약 도넛 16개 확장, 대시보드 3칸, IP 대장 본부/부문 열, 대역 현황 접기/펼치기) · v1.9.18 일반 관리자 OTP 필수화, 요약 도넛 4열·대역 현황 3열, 로고 링크·본부/팀 표시 · v1.9.19 IP 대장 열을 팀/파트로 변경, 로그인 OTP 화면 정리 · v1.9.20 자산 관리·IP 대장·인사 정보·이력 관리·관리자 표 헤더 고정 · v1.9.21 IP 관리 용어를 인사 정보 기준(조직명·본부/부서)으로 통일 · v1.9.22 인사 정보 목록 열 순서 변경(본부/팀·조직명을 앞으로) · v1.9.23 IP 관리 소속 목록에서 속초사업단 숨김(데이터는 유지) · v1.9.24 IP 대장 검색 대상에 본부/부서·조직명 추가(버그 수정) · v1.9.25 IP 대장 필터에 조직명 검색형 콤보박스 추가 · v1.9.26 IP 대장 기본 정렬(소속→조직명) 적용, 조직명 콤보박스에 x 지우기 버튼·재포커스시 전체 목록 추가, 인사 정보·자산 관리에도 기본 정렬 적용 · v1.9.27 자산 관리에 소속 검색형 콤보박스 추가 · v1.9.28 자산 관리 열 순서 변경(회사·소속명·사용자명·직책을 앞으로), IP 관리 대역 현황에 "다음 추천 IP" 버튼 추가(클릭마다 다음 빈 IP로 순환) · v1.9.29 자산 관리 상단 "전체 삭제…" 버튼 제거(전체 선택 ▾ 안으로만), 대시보드 막대그래프 라벨을 막대 위로 올려 긴 조직명도 안 잘리게 개선 · v1.9.30 인사 정보(재적 인원·전체 인원) 목록을 "상위 300명 스크롤" 방식에서 자산 관리와 동일한 페이지네이션(20명씩, 이전/다음)으로 변경 · v1.9.31 인사 정보 검색줄·정렬줄 한 줄로 합치고 표 높이 전용 계산(한 화면에 모두 보이게), 상단 통합 검색을 자산·IP·인사 동시 검색 드롭다운으로 전면 개편 · v1.9.32 모바일 반응형 기준폭 조정 — 600px 이하만 좁은 화면 전용 레이아웃(가로탭·통합검색 숨김) 적용, 600~1100px(태블릿·폴드 펼침 등 중간 폭)는 사이드바·통합검색·그래프 그리드 등 PC와 동일한 레이아웃 사용 · v1.9.33 VPN 대역 핑 모니터링 추가 — IP 관리 요약 화면에 대역별 핑 상태 순환 카드(5개씩, 전환 주기 설정 가능), 대역 현황 화면에서 대역별 VPN 핑 대상 IP 지정, 장애 발생 시 텔레그램 단계별 알림(1차 즉시·2차 10분·3차 30분·이후 60분마다, 복구 시 1회) · v1.9.34 통합검색 결과(자산·IP·인사정보 개별 항목) 클릭 동작 변경 — 수정 화면으로 바로 이동하던 것을 해당 화면의 목록(검색어 자동 입력)으로 이동하도록 수정 · v1.9.35 IP 관리 대역 현황에 "전체 대역 자동 등록" 버튼 추가(미설정 숫자 대역에 192.168.&lt;대역&gt;.1을 일괄 등록, 기존 설정·특수 대역은 유지), 보안 설정에 "접속 범위"(내부 접속 전용 모드) 추가 — 등록한 공인 IP/대역에서만 로그인 허용, 자신의 접속 IP가 빠진 채 저장하면 한 번 더 확인 · v1.9.36 IP 관리 대역 현황에 "전체 소속 일괄 등록" 버튼 추가(19개 소속 전체를 순회하며 미설정 숫자 대역에 .1 IP 일괄 등록), VPN 대역 핑 모니터링 카드에 이전(◀)·일시정지/재생(■/▶)·다음(▶) 버튼 추가, 같은 카드의 대역 정렬을 소속 우선에서 대역 번호 오름차순으로 변경 · v1.9.37 대시보드 하단 "PC 수집 현황" 카드를 "소속별 등록 IP"·"VPN 대역 모니터링"(요약 탭과 동일한 순환 카드)로 교체, "VPN 대역 핑 모니터링" 카드명을 "VPN 대역 모니터링"으로 간소화, 전환 주기 입력이 줄바꿈되던 문제 수정 및 이전·일시정지/재생·다음 아이콘을 정사각 중앙정렬 SVG로 교체 · v1.9.38 VPN 대역 모니터링 카드의 페이지 점(dot) 표시 제거, 표를 고정 폭(소속이 길어도 카드 틀이 흔들리지 않도록)으로 변경, 이전·일시정지/재생·다음 아이콘을 좌우 대칭으로 다시 그려 중앙정렬 개선 · v1.9.39 "VPN 대역 모니터링"을 "VPN 모니터링"으로 명칭 축약, 카드 열 너비 재배분 및 "핑 대상 IP"→"대상 IP"로 한 줄 표시, 정상/장애(응답없음) 집계 알약 추가(장애 알약을 누르면 장애만 모아보기), 이전·일시정지/재생·다음 아이콘을 더 뚜렷하게 구별되도록 교체, 원격 지원 "원격 접속 열기"를 "원격 지원 실행"으로 변경하고 제목 옆에 상시 실행 버튼 추가, 원격 지원 목록에 체크박스·선택 삭제·전체 삭제 추가, 월별 자산 현황에 회사·부서 드롭다운 추가(선택 기준으로 수량·그래프·표 재계산), 기간별 자산 변동 필터 순서를 회사→부서→분류로 재배치하고 회사 드롭다운 신규 추가 · v1.9.40 "장애 처리" 기능 신설(db/update_v1.9.40.sql 실행 필요) — 접수 등록 화면, 접수대기/진행중/완료/반려 탭과 상태 변경 모달(담당자 지정·처리 내용), 체크박스 선택/전체 삭제, 대시보드에 KPI·알약 카드 추가, 보고서에 "장애 처리 현황"(기간·회사·부서·분류·상태 필터) 신설, 사이드바에 신규 메뉴 배치(현황 점검 아래·원격 지원 위) 및 실사·인사 정보 순서 교체, VPN 모니터링 카드를 제목·알약·이전/재생/다음·전환주기·적용 버튼까지 한 줄로 정리("갱신 n분 적용"), 대역 현황에 VPN 핑 대상 해제 버튼과 체크박스 선택 해제·전체 소속 일괄 해제 추가, 사이드바 디자인을 체크박스형 아이콘에서 메뉴별 라인아이콘 + 둥근 액티브 하이라이트로 개선 · v1.9.41 대시보드에서 "최근 활동" 카드 삭제, 카드 레이아웃을 1번째 줄 부서별 자산 수·소속별 등록 IP·보증 만료·교체 알림(표 형태 그대로) 3칸, 2번째 줄 VPN 모니터링·장애 처리 현황 2칸으로 재배치 · v1.9.42 대시보드 "회사별 자산" 카드 하단의 "회사를 누르면 바뀝니다 · 상세 보기" 문구를 제목 오른쪽으로 이동, 옆의 자산 유형·자산 상태 카드가 "회사별 자산" 카드 높이에 맞춰 늘어나며 생기던 빈 여백을 제거(세 카드 모두 내용물 높이만큼만 차지) · v1.9.43 대시보드 "회사별 자산"·"자산 유형"·"자산 상태" 3개 카드의 세로 높이를 완전히 동일하게 정렬(내용은 각 카드 안에서 세로 중앙 정렬), 카드 줄 순서를 VPN 모니터링·장애 처리 현황(위) → 부서별 자산 수·소속별 등록 IP·보증 만료 교체 알림(아래)으로 변경 · v1.9.44 IP 추가·수정 창의 "조직명"을 검색형 콤보박스로 변경(IP 대장 필터와 동일 방식), 자산 직접 등록의 "제조사"를 자산분류처럼 고르거나 직접 입력하는 방식으로 변경, "회사"를 필수 선택(빨간 *, "선택 안 함" 제거)으로 변경, 관리자 메뉴 아래 "기준정보 관리" 신설(자산분류·제조사 추가·이름변경·삭제, db/update_v1.9.44.sql 실행 필요), IP 관리에 "VPN 장비 현황" 탭 신설(대역 현황과 RPA PC 사이 — 제조사·장비명·펌웨어·공인IP·S/N·EOL 등 관리, 노션 내보내기 274건 최초 적재, 자동 동기화는 미연결) · v1.9.45 VPN 장비 현황 표 열 순서/구성 수정 — 맨 앞에 "번호"(행 순번) 열 추가, "IP 대역"을 끝자리 숫자가 아닌 "192.168.N" 전체 형태로 표시, "장비종류·EOL날짜·출처" 열 제거, "S/N"과 "비고" 순서 교체(S/N을 비고보다 앞으로) · v1.9.46 VPN 장비 현황 검색창 입력 시 포커스가 끊기던 버그 수정(목록 부분만 갱신), VPN 대역 데이터 오류 수정(172.x 대역 8건이 192.168.N으로 잘못 저장·표시되던 문제 — 원본대로 복구 + 대역을 전체 문자열로 저장), VPN 장비 수정 화면 필드 재배치(대역·본사/제조사명·장비명/공인IP·S/N/펌웨어Ver·EOL날짜 각 1:1, 장비종류 제거) 및 대역을 "192.168.5"처럼 전체 입력하도록 변경, 사이드바 메뉴 글씨 시인성 개선(비활성 메뉴 밝게, 선택 메뉴 그라데이션+좌측 강조바), "내 계정"에 비밀번호 변경 추가 및 초기화된 비밀번호로 로그인 시 변경 전까지 다른 화면 사용 차단, 기준정보 관리에 "모델명" 탭 신설(제조사별로 구분 관리, 탭 순서 제조사→자산분류→모델명)과 자산 직접 등록의 모델명을 제조사에 맞는 드롭다운 선택으로 변경(미등록 모델은 기준정보 관리로 안내), 보안 설정 "해외 접속 차단"을 서버 환경변수 대신 화면 토글 스위치로 변경(db/update_v1.9.46.sql 실행 필요)'],
       ['이 엑셀과 v1.7(이전 수기 파일)의 차이', '예전 파일의 수식·드롭다운·시트보호는 웹 시스템이 대신하므로 이 엑셀에는 값만 들어있습니다. [대역마스터]는 선택식 1~254 격자 대신 소속·대역별 집계표로 제공됩니다.']
     ];
     var r = 5;
