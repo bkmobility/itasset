@@ -407,3 +407,7 @@ body.viewer .wonly{display:none!important}
 .tgl input:checked + .tslider:before{transform:translateX(17px)}
 .tglrow{display:flex;align-items:center;gap:6px}
 .tglrow .st{font-size:11px;color:#5c5c5c;width:26px}
+
+/* v1.9.49 Frame 73: "(미배정)" 행 색상 강조 (A안 — 행 전체 연한 분홍 배경 + 빨간 글씨) */
+tr.unassigned-row td{background:#fdeef0}
+tr.unassigned-row td .unassigned-tag{color:#c0392b;font-weight:600}
