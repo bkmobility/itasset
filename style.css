@@ -411,3 +411,19 @@ body.viewer .wonly{display:none!important}
 /* v1.9.49 Frame 73: "(미배정)" 행 색상 강조 (A안 — 행 전체 연한 분홍 배경 + 빨간 글씨) */
 tr.unassigned-row td{background:#fdeef0}
 tr.unassigned-row td .unassigned-tag{color:#c0392b;font-weight:600}
+
+/* v1.9.50 Frame 75: "상태 변경"·"처리 이력" 모달 — 접수 상세 정보 2열 표시 */
+.fig{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #eef0f3}
+.fig .full{grid-column:1/-1}
+.fig .kv2{margin-bottom:9px}
+.fig .kv2 .k{font-size:10.5px;color:#8a8f98;margin-bottom:1px}
+.fig .kv2 .v{font-size:12.5px;color:#1a1a1a}
+
+/* v1.9.50 Frame 76: 장애 접수 목록 더블클릭 → 처리 이력 타임라인 */
+.timeline{padding:2px 0 0}
+.tl-item{position:relative;padding-left:18px;padding-bottom:16px;border-left:2px solid #e3e5e8;margin-left:4px}
+.tl-item:last-child{border-left-color:transparent;padding-bottom:0}
+.tl-item:before{content:'';position:absolute;left:-6px;top:2px;width:10px;height:10px;border-radius:50%;background:#0f6cbd}
+.tl-item.now:before{background:#1e8e3e}
+.tl-t{font-size:10.5px;color:#8a8f98;margin-bottom:2px}
+.tl-s{font-size:12.5px;color:#1a1a1a;line-height:1.6}
